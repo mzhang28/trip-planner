@@ -4,6 +4,7 @@ import { Button, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { formatTime, setTimeOfDay, zoneFor } from '../lib/time';
+import { PlacePicker } from './PlacePicker';
 
 const STATUS_OPTIONS = BOOKING_STATUSES.map((status) => ({
   value: status,
@@ -75,29 +76,11 @@ export function EventEditor({
           onBlur={(e) => onPatch({ city: e.currentTarget.value.trim() || undefined })}
         />
 
-        <TextField
-          label="Place"
-          defaultValue={event.location?.label ?? ''}
-          placeholder="Fushimi Inari Taisha"
-          onBlur={(e) => {
-            const value = e.currentTarget.value.trim();
-            onPatch({
-              location: value ? { ...event.location, label: value } : undefined,
-            });
-          }}
+        <PlacePicker
+          value={event.location}
+          onChange={(location) => onPatch({ location })}
         />
       </div>
-
-      <TextField
-        label="Address"
-        defaultValue={event.location?.address ?? ''}
-        placeholder="68 Fukakusa Yabunouchicho"
-        onBlur={(e) => {
-          const address = e.currentTarget.value.trim();
-          const label = event.location?.label ?? address;
-          onPatch({ location: address || label ? { ...event.location, label, address } : undefined });
-        }}
-      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField

@@ -20,7 +20,7 @@ import {
   type TripDoc,
   type TripEvent,
 } from '@trip/crdt';
-import { Button, TextField, ThemeToggle } from '@trip/ui';
+import { Button, SegmentedControl, TextField, ThemeToggle } from '@trip/ui';
 import { GripVertical, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -32,8 +32,19 @@ import { SearchBar } from '../trip/SearchBar';
 import { SyncBadge } from '../trip/SyncBadge';
 import type { CommandId } from '../trip/search';
 import { useEvents, useTripState, useTripStore } from '../trip/useTrip';
+import { setZonePreference, useZonePreference } from '../trip/useDisplayZone';
 
 const UNSCHEDULED = 'unscheduled';
+
+/*
+ * Times read in the zone of the place by default: a 09:00 entry in Kyoto is
+ * 09:00 whether you are there or at home, which is what a plan is for. The
+ * other setting is for working out whether you can call someone.
+ */
+const ZONE_OPTIONS = [
+  { value: 'event', label: 'Local time' },
+  { value: 'device', label: 'My time' },
+] as const;
 
 function groupByDay(events: TripEvent[], homeTimezone: string) {
   const days = new Map<string, TripEvent[]>();
@@ -77,6 +88,7 @@ export function TripView() {
   const readOnly = trip?.role === 'viewer';
   const days = useMemo(() => groupByDay(events, homeTimezone), [events, homeTimezone]);
   const fieldDefs = useMemo(() => liveFieldDefs(doc), [doc]);
+  const zonePreference = useZonePreference();
 
   /*
    * The keyboard sensor is not optional. Dragging is the only way to move an
@@ -168,6 +180,13 @@ export function TripView() {
               onRunCommand={runCommand}
             />
           </div>
+          <SegmentedControl
+            label="Show times in"
+            className="hidden md:inline-flex"
+            options={ZONE_OPTIONS}
+            value={zonePreference}
+            onChange={setZonePreference}
+          />
           <ThemeToggle />
         </div>
 

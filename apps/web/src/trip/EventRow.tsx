@@ -3,7 +3,8 @@ import { Card, StatusChip, StatusSpine, cn } from '@trip/ui';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Button } from 'react-aria-components';
-import { formatTime, zoneFor } from '../lib/time';
+import { formatTime } from '../lib/time';
+import { useDisplayZone } from './useDisplayZone';
 import { EventEditor } from './EventEditor';
 
 export interface EventRowProps {
@@ -40,7 +41,8 @@ export function EventRow({
   dragHandle,
 }: EventRowProps) {
   const [open, setOpen] = useState(false);
-  const zone = zoneFor(event.timezone, homeTimezone);
+  const displayZone = useDisplayZone();
+  const zone = displayZone(event.timezone, homeTimezone);
   const time = event.startsAt === undefined ? null : formatTime(event.startsAt, zone);
 
   const linkCount = Object.keys(event.links).length;
