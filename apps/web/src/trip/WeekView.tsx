@@ -162,7 +162,7 @@ function DayColumn({
       style={{
         height: DAY_HEIGHT,
         backgroundImage:
-          'repeating-linear-gradient(to bottom, transparent 0, transparent 55px, var(--line) 56px)',
+          'repeating-linear-gradient(to bottom, transparent 0, transparent 55px, var(--border-subtle) 56px)',
       }}
     >
       {children}
@@ -233,10 +233,10 @@ export function WeekView({
         setDragTo(null);
       }}
     >
-      <div className="min-w-3xl">
+      <div className="min-w-[50.5rem]">
         {/* City bands: the same device the month view uses, one row high. */}
         {cities.length > 0 && (
-          <div className="grid grid-cols-7 gap-px pb-1">
+          <div className="ml-10 grid grid-cols-7 gap-px pb-1">
             {days.map((day) => {
               const segment = cities.find((run) => day >= run.from && day <= run.to);
               const isStart = segment?.from === day;
@@ -258,7 +258,7 @@ export function WeekView({
           </div>
         )}
 
-        <div className="grid grid-cols-7 gap-px rounded-lg border border-line bg-line">
+        <div className="ml-10 grid grid-cols-7 gap-px rounded-t-lg border border-line bg-line">
           {days.map((day) => {
             const forecast = weather.get(day);
             const glyph = forecast ? weatherGlyph(forecast.code) : null;
@@ -295,6 +295,20 @@ export function WeekView({
               </div>
             );
           })}
+        </div>
+
+        <div className="grid grid-cols-[2.5rem_repeat(7,minmax(0,1fr))] gap-px rounded-b-lg border-x border-b border-line bg-line">
+          <div aria-hidden="true" className="relative bg-page text-right text-2xs text-ink-muted">
+            {Array.from({ length: 24 }, (_, hour) => (
+              <span
+                key={hour}
+                style={{ top: hour * HOUR_HEIGHT }}
+                className="absolute right-1 -translate-y-1/2 tabular"
+              >
+                {String(hour).padStart(2, '0')}:00
+              </span>
+            ))}
+          </div>
 
           {days.map((day) => {
             const positioned = positionEvents(byDay.get(day) ?? [], displayZone, homeTimezone);

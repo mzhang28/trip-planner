@@ -25,15 +25,15 @@ export function TripList() {
   }
 
   return (
-    <div className="min-h-dvh bg-page text-ink">
-      <header className="border-b border-line">
+    <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
+      <header className="shrink-0 border-b border-line">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <h1 className="text-lg">Trips</h1>
           <ThemeToggle />
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-end gap-2">
           <TextField
             label="New trip"

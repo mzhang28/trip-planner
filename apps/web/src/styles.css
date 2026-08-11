@@ -8,3 +8,13 @@
 @import '@trip/ui/styles.css';
 
 @source './**/*.{ts,tsx}';
+
+/* Routes provide their own scroll region. Keeping the document fixed prevents
+ * a long itinerary, settings form, or 24-hour week grid from moving the app
+ * chrome out from under the person using it. */
+html,
+body,
+#root {
+  block-size: 100%;
+  overflow: hidden;
+}

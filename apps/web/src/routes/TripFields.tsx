@@ -105,8 +105,8 @@ export function TripFields() {
   }
 
   return (
-    <div className="min-h-dvh bg-page text-ink">
-      <header className="border-b border-line">
+    <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
+      <header className="shrink-0 border-b border-line">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <Link
             to={`/t/${tripId}`}
@@ -119,7 +119,7 @@ export function TripFields() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto min-h-0 w-full max-w-5xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
         <h2 className="mb-1 text-sm text-ink">Custom fields</h2>
         <p className="mb-6 max-w-prose text-sm text-ink-secondary">
           Anything you add here appears on every event in this trip, and is searchable by its name

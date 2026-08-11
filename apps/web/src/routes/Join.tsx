@@ -24,7 +24,7 @@ export function Join() {
   }, [token, navigate]);
 
   return (
-    <div className="grid min-h-dvh place-items-center bg-page px-6 text-center text-ink">
+    <div className="grid h-dvh place-items-center overflow-hidden bg-page px-6 text-center text-ink">
       {failed ? (
         <div>
           <h1 className="mb-2 text-xl">This link no longer works</h1>
