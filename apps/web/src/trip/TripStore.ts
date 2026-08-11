@@ -1,6 +1,16 @@
 import * as A from '@automerge/automerge';
 import type { Doc, TripDoc } from '@trip/crdt';
-import { forgetDoc, loadDoc, loadSync, saveDoc, saveSync, type StoredSync } from './storage';
+import {
+  forgetDoc,
+  forgetRecovery,
+  loadDoc,
+  loadRecovery,
+  loadSync,
+  saveDoc,
+  saveRecovery,
+  saveSync,
+  type StoredSync,
+} from './storage';
 
 /**
  * What has happened to this person's changes.
@@ -18,8 +28,11 @@ export interface TripState {
   doc: Doc;
   phase: SyncPhase;
   lastSyncedAt?: number;
-  /** Set when the local copy had to be thrown away, for the banner to explain. */
-  recovered?: boolean;
+  /**
+   * How many local changes were set aside when the copy was discarded, so the
+   * banner can offer them back. Absent when there is nothing waiting.
+   */
+  recoverableChanges?: number;
 }
 
 const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
@@ -57,6 +70,11 @@ export class TripStore {
   static async open(tripId: string): Promise<TripStore> {
     const [stored, sync] = await Promise.all([loadDoc(tripId), loadSync(tripId)]);
     const store = new TripStore(tripId, stored ?? A.init<TripDoc>(), sync);
+
+    // A copy set aside in an earlier session is still worth offering back.
+    const recovery = await loadRecovery(tripId);
+    if (recovery) store.#recoverable = recovery.changeCount;
+
     store.#listen();
     void store.sync();
     return store;
@@ -136,6 +154,7 @@ export class TripStore {
       doc: this.#doc,
       phase: this.#phase,
       lastSyncedAt: this.#sync.lastSyncedAt,
+      recoverableChanges: this.#recoverable,
       ...patch,
     };
     for (const listener of this.#listeners) listener();
@@ -202,6 +221,7 @@ export class TripStore {
             syncState: this.#sync.serverState,
             message: b64(message ?? new Uint8Array()),
             lastSyncedAt: this.#sync.lastSyncedAt,
+            hasLocalChanges: A.getAllChanges(this.#doc).length > 0,
           }),
         });
 
@@ -251,20 +271,68 @@ export class TripStore {
   }
 
   /**
-   * Discards the local copy and takes a fresh one.
+   * Discards the local copy and takes a fresh one, keeping what it was carrying.
    *
    * The server refuses to merge a document older than its last tombstone sweep,
    * because it may still hold events whose delete markers have been removed.
+   * Merging it would put deleted events back, so there is no version of this
+   * that keeps the document.
+   *
+   * What it was carrying is another matter. Changes the server never saw are
+   * somebody's work, so they are set aside before the document goes and offered
+   * back once the fresh copy has arrived.
    */
   async #startAgain(): Promise<void> {
+    const unsent = A.getChanges(A.init<TripDoc>(), this.#doc).length;
+
+    if (unsent > 0) {
+      await saveRecovery(this.tripId, {
+        doc: A.save(this.#doc),
+        changeCount: unsent,
+        savedAt: Date.now(),
+      });
+    }
+
     await forgetDoc(this.tripId);
 
     this.#doc = A.init<TripDoc>();
     this.#localState = A.initSyncState();
     this.#sync = {};
     this.#phase = 'resync-required';
-    this.#publish({ recovered: true });
+    this.#recoverable = unsent > 0 ? unsent : undefined;
+    this.#publish();
 
     await this.#runSync();
+  }
+
+  #recoverable: number | undefined;
+
+  /**
+   * Merges the set-aside copy back in.
+   *
+   * Re-applied rather than restored: the fresh document is the one the server
+   * will accept, and the old changes go on top of it as ordinary edits. Anything
+   * the sweep removed stays removed, because the fresh copy has no key for it
+   * and merging a change to a key that is gone adds nothing back.
+   */
+  async recoverSetAside(): Promise<void> {
+    const recovery = await loadRecovery(this.tripId);
+    if (!recovery) return;
+
+    this.#doc = A.merge(this.#doc, A.load<TripDoc>(recovery.doc));
+    this.#recoverable = undefined;
+
+    await saveDoc(this.tripId, this.#doc);
+    await forgetRecovery(this.tripId);
+
+    this.#publish();
+    void this.sync();
+  }
+
+  /** Throws the set-aside copy away, when the person says they do not want it. */
+  async discardSetAside(): Promise<void> {
+    await forgetRecovery(this.tripId);
+    this.#recoverable = undefined;
+    this.#publish();
   }
 }

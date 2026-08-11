@@ -48,3 +48,33 @@ export async function forgetDoc(tripId: string): Promise<void> {
   await del(docKey(tripId), store);
   await del(syncKey(tripId), store);
 }
+
+const recoveryKey = (tripId: string) => `recovery:${tripId}`;
+
+export interface Recovery {
+  /** The document as it was, saved before it was thrown away. */
+  doc: Uint8Array;
+  /** How many changes it held that the server had never seen. */
+  changeCount: number;
+  savedAt: number;
+}
+
+/**
+ * Keeps a copy of what was discarded, so it can be offered back.
+ *
+ * Throwing the document away is the only safe answer to a sweep the device
+ * missed, but the changes it was carrying were somebody's work. Setting them
+ * aside costs a few kilobytes and is the difference between a warning and a
+ * loss.
+ */
+export async function saveRecovery(tripId: string, recovery: Recovery): Promise<void> {
+  await set(recoveryKey(tripId), recovery, store);
+}
+
+export async function loadRecovery(tripId: string): Promise<Recovery | null> {
+  return (await get<Recovery>(recoveryKey(tripId), store)) ?? null;
+}
+
+export async function forgetRecovery(tripId: string): Promise<void> {
+  await del(recoveryKey(tripId), store);
+}

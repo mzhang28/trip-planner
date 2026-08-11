@@ -210,6 +210,20 @@ describe('who may sync incrementally', () => {
     // tombstones, so it has to take a fresh copy.
     expect(canSyncIncrementally(undefined, sweptAt)).toBe(false);
   });
+
+  it('allows a peer carrying nothing, whatever its history says', () => {
+    /*
+     * This is the state a peer is in the moment after being told to start
+     * again: no document, no last sync. Refusing it there leaves it asking and
+     * being refused for ever, and an empty document cannot revive anything.
+     */
+    expect(canSyncIncrementally(undefined, sweptAt, false)).toBe(true);
+    expect(canSyncIncrementally(sweptAt - 10_000, sweptAt, false)).toBe(true);
+  });
+
+  it('still refuses a peer that is carrying something from before the sweep', () => {
+    expect(canSyncIncrementally(sweptAt - 1, sweptAt, true)).toBe(false);
+  });
 });
 
 describe('merging events', () => {

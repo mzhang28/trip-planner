@@ -35,6 +35,7 @@ import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
 import { addDays, eventDay, startOfWeek, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
 import { useUploadFlush } from '../trip/Attachments';
+import { RecoveryBanner } from '../trip/RecoveryBanner';
 import { MergePreview, SelectionBar } from '../trip/SelectionBar';
 import { TransitLeg } from '../trip/TransitLeg';
 import { MonthView } from '../trip/MonthView';
@@ -292,6 +293,8 @@ export function TripView() {
       </header>
 
       <main className="mx-auto w-full max-w-[100rem] px-4 py-6 sm:px-6 lg:px-8">
+        {state && store && <RecoveryBanner state={state} store={store} />}
+
         {!readOnly && (
           <div ref={addBoxRef} className="mb-6 flex items-end gap-2">
             <TextField

@@ -19,6 +19,14 @@ const bodySchema = z.object({
   message: z.string(),
   /** When this client last completed a sync, used against the sweep horizon. */
   lastSyncedAt: z.number().optional(),
+  /**
+   * Whether this client is carrying anything of its own.
+   *
+   * A client with an empty document cannot resurrect a swept event, so it is
+   * safe to sync with whatever its history says -- and that is the state it is
+   * in right after being told to start again.
+   */
+  hasLocalChanges: z.boolean().default(true),
 });
 
 const decode = (value: string) => new Uint8Array(Buffer.from(value, 'base64'));
@@ -52,7 +60,13 @@ export function syncRoutes() {
      * events whose tombstones have been removed. Merging it would put those
      * events back, so it is told to start again from a fresh copy instead.
      */
-    if (!canSyncIncrementally(parsed.data.lastSyncedAt, trip.sweptAt ?? undefined)) {
+    if (
+      !canSyncIncrementally(
+        parsed.data.lastSyncedAt,
+        trip.sweptAt ?? undefined,
+        parsed.data.hasLocalChanges,
+      )
+    ) {
       return c.json({ type: 'resync_required', sweptAt: trip.sweptAt }, 409);
     }
 

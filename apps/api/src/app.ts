@@ -1,3 +1,5 @@
+import { TOMBSTONE_TTL_MS } from '@trip/crdt';
+import { trips } from '@trip/schema';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { config } from './config';
@@ -11,6 +13,7 @@ import { metadataRoutes, oauthRoutes } from './routes/oauth';
 import { placeRoutes, weatherRoutes } from './routes/places';
 import { shareRoutes, tripRoutes } from './routes/trips';
 import { syncRoutes } from './routes/sync';
+import { sweepAllTrips } from './sweep';
 
 export function createApp(services: Services) {
   const app = new Hono<AppEnv>();
@@ -56,6 +59,24 @@ export function createApp(services: Services) {
     renameUser(c.var.services.db, c.var.identity.userId, displayName.slice(0, 80));
     return c.json({ ...c.var.identity, displayName });
   });
+
+  /*
+   * Puts the server in the state it reaches after a sweep: tombstones removed,
+   * and a watermark that makes it refuse any document older than now.
+   *
+   * The watermark is set whether or not there was anything to remove, which the
+   * nightly job does not do — it has no reason to make peers resync for a sweep
+   * that changed nothing. Only mounted outside production, because it exists so
+   * the tests can reach a state that otherwise takes thirty days to arrive.
+   */
+  if (!config.isProduction) {
+    app.post('/api/test/force-resync', (c) => {
+      const swept = sweepAllTrips(services.db, services.docs, Date.now() + TOMBSTONE_TTL_MS + 1);
+      services.db.update(trips).set({ tombstonesSweptAt: Date.now() }).run();
+
+      return c.json({ swept });
+    });
+  }
 
   app.route('/oauth', oauthRoutes());
   app.route('/api/blobs', blobRoutes());

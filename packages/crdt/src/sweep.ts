@@ -67,17 +67,24 @@ export function sweepTombstones(doc: Doc, now: Instant = Date.now()): SweepResul
 }
 
 /**
- * Whether a peer whose last sync was at `lastSyncedAt` can still merge safely.
+ * Whether a peer can merge safely, or has to throw away its copy first.
  *
- * False means the peer has to throw away its copy and take a fresh one, because
- * anything it holds from before the sweep may include events whose tombstones
- * are gone.
+ * The danger is only ever a peer that holds something. Anything it carries from
+ * before a sweep may include events whose delete markers have been removed, so
+ * merging it would put them back.
+ *
+ * A peer carrying nothing is safe whatever its history says. That is not a
+ * corner case: it is exactly the state a peer is in immediately after being told
+ * to start again, and refusing it there would leave it asking and being refused
+ * for ever.
  */
 export function canSyncIncrementally(
   lastSyncedAt: Instant | undefined,
   tombstonesSweptAt: Instant | undefined,
+  peerHasChanges = true,
 ): boolean {
   if (tombstonesSweptAt === undefined) return true;
+  if (!peerHasChanges) return true;
   if (lastSyncedAt === undefined) return false;
   return lastSyncedAt >= tombstonesSweptAt;
 }
