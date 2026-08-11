@@ -2,13 +2,16 @@ import type { TripEvent } from '@trip/crdt';
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
+  clampDay,
   citySegments,
+  daysInRange,
   eventsByDay,
   lodgingSpans,
   monthGrid,
   openingDay,
   spanWithin,
   startOfWeek,
+  tripDateRange,
   weekOf,
   weekdayOf,
 } from './calendar';
@@ -74,6 +77,44 @@ describe('day arithmetic', () => {
     // A trip starting on the 30th needs its row complete, so the days either
     // side of the month are real cells rather than blanks.
     expect(grid[grid.length - 1]!).toBe('2026-09-06');
+  });
+
+  it('builds and clamps a finite inclusive range', () => {
+    expect(daysInRange('2026-08-10', '2026-08-12')).toEqual([
+      '2026-08-10',
+      '2026-08-11',
+      '2026-08-12',
+    ]);
+    expect(clampDay('2026-08-01', '2026-08-10', '2026-08-20')).toBe('2026-08-10');
+    expect(clampDay('2026-08-21', '2026-08-10', '2026-08-20')).toBe('2026-08-20');
+  });
+});
+
+describe('trip date range', () => {
+  it('uses explicit trip dates ahead of event dates', () => {
+    expect(
+      tripDateRange(
+        { startsAt: at('2026-08-08'), endsAt: at('2026-08-18') },
+        [event({ startsAt: at('2026-08-12') })],
+        TOKYO,
+        '2026-08-01',
+      ),
+    ).toEqual({ start: '2026-08-08', end: '2026-08-18' });
+  });
+
+  it('keeps old trips finite using their events or one week from today', () => {
+    expect(
+      tripDateRange(
+        undefined,
+        [event({ startsAt: at('2026-08-12') }), event({ startsAt: at('2026-08-16') })],
+        TOKYO,
+        '2026-08-01',
+      ),
+    ).toEqual({ start: '2026-08-12', end: '2026-08-16' });
+    expect(tripDateRange(undefined, [], TOKYO, '2026-08-01')).toEqual({
+      start: '2026-08-01',
+      end: '2026-08-07',
+    });
   });
 });
 

@@ -7,6 +7,11 @@ storybook-static/
 # Runtime data: the SQLite database and filesystem blob store
 data/
 
+# Static source data shipped with the API, not runtime state.
+!apps/api/data/
+!apps/api/data/README.md
+!apps/api/data/openflights-airports.dat
+
 .env
 .env.local
 .env.*.local

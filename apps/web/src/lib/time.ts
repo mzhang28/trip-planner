@@ -34,22 +34,89 @@ let cachedZones: string[] | null = null;
 export function knownTimeZones(): string[] {
   if (cachedZones) return cachedZones;
 
-  const supported = (
-    Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
-  ).supportedValuesOf;
+  const supported = (Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] })
+    .supportedValuesOf;
 
   cachedZones = supported ? supported('timeZone') : [];
   return cachedZones;
 }
 
+const FRIENDLY_ZONE_NAMES: Record<string, Array<[offsetMinutes: number, name: string]>> = {
+  'America/New_York': [
+    [-300, 'EST'],
+    [-240, 'EDT'],
+  ],
+  'America/Chicago': [
+    [-360, 'CST'],
+    [-300, 'CDT'],
+  ],
+  'America/Denver': [
+    [-420, 'MST'],
+    [-360, 'MDT'],
+  ],
+  'America/Los_Angeles': [
+    [-480, 'PST'],
+    [-420, 'PDT'],
+  ],
+  'America/Anchorage': [
+    [-540, 'AKST'],
+    [-480, 'AKDT'],
+  ],
+  'Pacific/Honolulu': [[-600, 'HST']],
+  'Asia/Tokyo': [[540, 'JST']],
+  'Asia/Seoul': [[540, 'KST']],
+  'Asia/Shanghai': [[480, 'CST']],
+  'Asia/Hong_Kong': [[480, 'HKT']],
+  'Asia/Singapore': [[480, 'SGT']],
+  'Asia/Kolkata': [[330, 'IST']],
+  'Europe/London': [
+    [0, 'GMT'],
+    [60, 'BST'],
+  ],
+  'Europe/Paris': [
+    [60, 'CET'],
+    [120, 'CEST'],
+  ],
+  'Europe/Berlin': [
+    [60, 'CET'],
+    [120, 'CEST'],
+  ],
+  'Australia/Sydney': [
+    [600, 'AEST'],
+    [660, 'AEDT'],
+  ],
+  'Australia/Adelaide': [
+    [570, 'ACST'],
+    [630, 'ACDT'],
+  ],
+  'Australia/Perth': [[480, 'AWST']],
+  'Pacific/Auckland': [
+    [720, 'NZST'],
+    [780, 'NZDT'],
+  ],
+};
+
 /** The short name people expect to see beside a clock, such as JST or GMT+9. */
 export function timeZoneAbbreviation(at: Instant, timeZone: string): string {
+  const friendly = FRIENDLY_ZONE_NAMES[timeZone]?.find(
+    ([offsetMinutes]) => offsetMinutes === Math.round(offsetAt(at, timeZone) / 60_000),
+  )?.[1];
+  if (friendly) return friendly;
+
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone,
     timeZoneName: 'short',
   }).formatToParts(at);
 
   return parts.find((part) => part.type === 'timeZoneName')?.value ?? timeZone;
+}
+
+/** All familiar short names accepted when searching for a zone. */
+export function timeZoneSearchAbbreviations(at: Instant, timeZone: string): string[] {
+  return [
+    timeZoneAbbreviation(at, timeZone),
+    ...(FRIENDLY_ZONE_NAMES[timeZone]?.map(([, name]) => name) ?? []),
+  ];
 }
 
 export function formatTime(at: Instant, timeZone: string): string {

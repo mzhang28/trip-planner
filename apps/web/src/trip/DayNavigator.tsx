@@ -1,7 +1,7 @@
 import { Button, IconButton, cn } from '@trip/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DayKey } from '../lib/calendar';
-import { addDays } from '../lib/calendar';
+import { addDays, clampDay } from '../lib/calendar';
 import {
   setCalendarDisplaySettings,
   useCalendarDisplaySettings,
@@ -13,10 +13,13 @@ export interface DayNavigatorProps {
   view: CalendarView;
   anchor: DayKey;
   today: DayKey;
+  /** Inclusive bounds used by the finite week strip. */
+  tripStart?: DayKey;
+  tripEnd?: DayKey;
   onChange: (day: DayKey) => void;
 }
 
-function describe(view: CalendarView, anchor: DayKey): string {
+function describe(view: CalendarView, anchor: DayKey, tripEnd?: DayKey): string {
   const at = Date.parse(`${anchor}T12:00:00Z`);
 
   if (view === 'month') {
@@ -34,7 +37,8 @@ function describe(view: CalendarView, anchor: DayKey): string {
       year: 'numeric',
       timeZone: 'UTC',
     });
-    const end = addDays(anchor, 6);
+    const naturalEnd = addDays(anchor, 6);
+    const end = tripEnd && naturalEnd > tripEnd ? tripEnd : naturalEnd;
     return `${format.format(at)} – ${format.format(Date.parse(`${end}T12:00:00Z`))}`;
   }
 
@@ -57,9 +61,19 @@ function describe(view: CalendarView, anchor: DayKey): string {
  * sits beside the steps because "the Tuesday after next" is faster to pick than
  * to reach a fortnight at a time.
  */
-export function DayNavigator({ view, anchor, today, onChange }: DayNavigatorProps) {
+export function DayNavigator({
+  view,
+  anchor,
+  today,
+  tripStart,
+  tripEnd,
+  onChange,
+}: DayNavigatorProps) {
   const step = view === 'month' ? 28 : view === 'week' ? 7 : 1;
   const display = useCalendarDisplaySettings();
+  const bounded = view === 'week' && tripStart && tripEnd;
+  const move = (day: DayKey) =>
+    onChange(bounded ? clampDay(day, tripStart, tripEnd) : day);
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -68,19 +82,21 @@ export function DayNavigator({ view, anchor, today, onChange }: DayNavigatorProp
           label="Earlier"
           size="sm"
           variant="secondary"
-          onPress={() => onChange(addDays(anchor, -step))}
+          isDisabled={Boolean(bounded && anchor <= tripStart)}
+          onPress={() => move(addDays(anchor, -step))}
           className="rounded-r-none border-r-0 shadow-none before:inset-0"
         >
           <ChevronLeft aria-hidden="true" />
         </IconButton>
-        <Button size="sm" onPress={() => onChange(today)} className="rounded-none shadow-none">
+        <Button size="sm" onPress={() => move(today)} className="rounded-none shadow-none">
           Today
         </Button>
         <IconButton
           label="Later"
           size="sm"
           variant="secondary"
-          onPress={() => onChange(addDays(anchor, step))}
+          isDisabled={Boolean(bounded && anchor >= tripEnd)}
+          onPress={() => move(addDays(anchor, step))}
           className="rounded-l-none border-l-0 shadow-none before:inset-0"
         >
           <ChevronRight aria-hidden="true" />
@@ -93,7 +109,9 @@ export function DayNavigator({ view, anchor, today, onChange }: DayNavigatorProp
           type="date"
           data-testid="go-to-date"
           value={anchor}
-          onChange={(e) => e.target.value && onChange(e.target.value)}
+          min={bounded ? tripStart : undefined}
+          max={bounded ? tripEnd : undefined}
+          onChange={(e) => e.target.value && move(e.target.value)}
           className={cn(
             'h-7 rounded-md border border-line-input bg-card px-2 text-xs text-ink',
             'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
@@ -165,7 +183,7 @@ export function DayNavigator({ view, anchor, today, onChange }: DayNavigatorProp
       )}
 
       <span data-testid="range-label" className="text-xs text-ink-muted">
-        {describe(view, anchor)}
+        {describe(view, anchor, view === 'week' ? tripEnd : undefined)}
       </span>
     </div>
   );

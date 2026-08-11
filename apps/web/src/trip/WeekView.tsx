@@ -2,9 +2,16 @@ import type { TripEvent } from '@trip/crdt';
 import { StatusSpine, cn } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DayKey } from '../lib/calendar';
-import { addDays, citySegments, eventsByDay, lodgingSpans, spanWithin } from '../lib/calendar';
+import {
+  clampDay,
+  citySegments,
+  daysInRange,
+  eventsByDay,
+  lodgingSpans,
+  spanWithin,
+} from '../lib/calendar';
 import { formatTime } from '../lib/time';
 import { useCalendarDisplaySettings } from './useCalendarDisplaySettings';
 import { useDisplayZone } from './useDisplayZone';
@@ -14,8 +21,6 @@ import { weatherGlyph, type DailyWeather } from './useWeather';
 const HOUR_HEIGHT = 56;
 const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
 const DEFAULT_EVENT_MINUTES = 30;
-const BUFFER_DAYS_BEFORE = 1;
-const RENDERED_DAY_COUNT = 15;
 
 interface PositionedEvent {
   event: TripEvent;
@@ -144,13 +149,14 @@ function positionEvents(
 
 export interface WeekViewProps {
   anchor: DayKey;
+  tripStart: DayKey;
+  tripEnd: DayKey;
   events: TripEvent[];
   homeTimezone: string;
   weather: Map<DayKey, DailyWeather>;
   today: DayKey;
   readOnly: boolean;
   onOpenEvent: (eventId: string) => void;
-  onChangeAnchor: (day: DayKey) => void;
   /**
    * Makes an event on that day, over that time when a drag said one.
    *
@@ -344,41 +350,33 @@ function DayColumn({
  */
 export function WeekView({
   anchor,
+  tripStart,
+  tripEnd,
   events,
   homeTimezone,
   weather,
   today,
   readOnly,
   onOpenEvent,
-  onChangeAnchor,
   onCreateAt,
 }: WeekViewProps) {
-  const days = useMemo(
-    () =>
-      Array.from({ length: RENDERED_DAY_COUNT }, (_, index) =>
-        addDays(anchor, index - BUFFER_DAYS_BEFORE),
-      ),
-    [anchor],
-  );
+  const days = useMemo(() => daysInRange(tripStart, tripEnd), [tripStart, tripEnd]);
   const displaySettings = useCalendarDisplaySettings();
   const windowStart = displaySettings.weekStartHour * 60;
   const windowEnd = displaySettings.weekEndHour * 60;
   const timetableHeight = (windowEnd - windowStart) * MINUTE_HEIGHT;
   const horizontalScroller = useRef<HTMLDivElement>(null);
-  const anchorCell = useRef<HTMLDivElement>(null);
-  const centeredScrollLeft = useRef(0);
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gridTemplateColumns = `2.5rem repeat(${days.length}, minmax(5.5rem, calc((100cqw - 2.5rem - 7px) / 7)))`;
 
   /*
-   * Keep one week visible, but render a week of runway on either side. Once a
-   * horizontal gesture settles, that newly visible first day becomes the
-   * anchor and the runway is rebuilt around it. The pixels stay in the same
-   * place while the user gets an effectively unbounded strip of dates.
+   * The whole trip is one finite strip. Moving the anchor only brings its
+   * already-rendered cell to the left edge; it never replaces dates behind the
+   * scrollbar, so the thumb truthfully represents start-to-end progress.
    */
   useLayoutEffect(() => {
     const scroller = horizontalScroller.current;
-    const cell = anchorCell.current;
+    const target = clampDay(anchor, tripStart, tripEnd);
+    const cell = scroller?.querySelector<HTMLElement>(`[data-week-day="${target}"]`);
     if (!scroller || !cell) return;
 
     const gutterWidth = 40;
@@ -388,29 +386,8 @@ export function WeekView({
       scroller.getBoundingClientRect().left -
       gutterWidth -
       1;
-    centeredScrollLeft.current = nextScrollLeft;
     scroller.scrollLeft = nextScrollLeft;
-  }, [anchor]);
-
-  useEffect(
-    () => () => {
-      if (scrollTimer.current) clearTimeout(scrollTimer.current);
-    },
-    [],
-  );
-
-  function settleHorizontalScroll() {
-    const scroller = horizontalScroller.current;
-    const cell = anchorCell.current;
-    if (!scroller || !cell) return;
-
-    if (scrollTimer.current) clearTimeout(scrollTimer.current);
-    scrollTimer.current = setTimeout(() => {
-      const dayStep = cell.getBoundingClientRect().width + 1;
-      const dayOffset = Math.round((scroller.scrollLeft - centeredScrollLeft.current) / dayStep);
-      if (dayOffset !== 0) onChangeAnchor(addDays(anchor, dayOffset));
-    }, 140);
-  }
+  }, [anchor, tripEnd, tripStart]);
 
   /*
    * Which days are being dragged across.
@@ -476,7 +453,6 @@ export function WeekView({
       <div
         ref={horizontalScroller}
         data-testid="week-horizontal-scroll"
-        onScroll={settleHorizontalScroll}
         className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain"
         style={{ containerType: 'inline-size' }}
       >
@@ -519,7 +495,6 @@ export function WeekView({
                 return (
                   <div
                     key={day}
-                    ref={day === anchor ? anchorCell : undefined}
                     data-week-day={day}
                     className="min-w-0 bg-card px-1 py-1.5 text-center"
                   >

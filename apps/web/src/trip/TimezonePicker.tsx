@@ -15,11 +15,16 @@ import {
 import { cn } from '@trip/ui';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { knownTimeZones, timeZoneAbbreviation } from '../lib/time';
+import {
+  knownTimeZones,
+  timeZoneAbbreviation,
+  timeZoneSearchAbbreviations,
+} from '../lib/time';
 
 interface ZoneOption {
   id: string;
   abbreviation: string;
+  aliases: string[];
   offset: string;
 }
 
@@ -74,7 +79,9 @@ export function TimezonePicker({
     whileElementsMounted: autoUpdate,
   });
 
-  const click = useClick(context, { enabled: !disabled });
+  // Mousedown opens before the airport input's blur can finish. This matters
+  // when an exact airport result has just filled the zone beside this button.
+  const click = useClick(context, { enabled: !disabled, event: 'mousedown' });
   const dismiss = useDismiss(context);
   const role = useRole(context, { role: 'dialog' });
   const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss, role]);
@@ -86,6 +93,7 @@ export function TimezonePicker({
     return withCurrent.map((id) => ({
       id,
       abbreviation: timeZoneAbbreviation(at, id),
+      aliases: timeZoneSearchAbbreviations(at, id),
       offset: timeZoneOffset(at, id),
     }));
   }, [at, value]);
@@ -100,7 +108,8 @@ export function TimezonePicker({
     const words = needle.split(/\s+/);
     return options
       .filter((option) => {
-        const haystack = `${option.id} ${option.id.replaceAll('_', ' ')} ${option.abbreviation} ${option.offset}`.toLowerCase();
+        const haystack =
+          `${option.id} ${option.id.replaceAll('_', ' ')} ${option.aliases.join(' ')} ${option.offset}`.toLowerCase();
         return words.every((word) => haystack.includes(word));
       })
       .sort((a, b) => {

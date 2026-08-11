@@ -1,4 +1,4 @@
-import type { Instant, TripEvent } from '@trip/crdt';
+import type { Instant, TripEvent, TripMeta } from '@trip/crdt';
 import { dayKey } from './time';
 
 /** A calendar day as `YYYY-MM-DD`. */
@@ -7,6 +7,55 @@ export type DayKey = string;
 export function addDays(day: DayKey, count: number): DayKey {
   const at = Date.parse(`${day}T12:00:00Z`) + count * 24 * 60 * 60 * 1000;
   return new Date(at).toISOString().slice(0, 10);
+}
+
+export function clampDay(day: DayKey, start: DayKey, end: DayKey): DayKey {
+  return day < start ? start : day > end ? end : day;
+}
+
+export interface TripDateRange {
+  start: DayKey;
+  /** Inclusive: a trip ending Friday includes Friday. */
+  end: DayKey;
+}
+
+/**
+ * The finite run of days that belongs to a trip.
+ *
+ * New trips store these bounds explicitly. Older documents fall back to their
+ * scheduled events, or one week from today when they have no dated events, so
+ * upgrading never produces an empty calendar or an unbounded scroller.
+ */
+export function tripDateRange(
+  meta: Pick<TripMeta, 'startsAt' | 'endsAt'> | undefined,
+  events: TripEvent[],
+  homeTimezone: string,
+  today: DayKey,
+): TripDateRange {
+  const eventDays = events
+    .map((event) => eventDay(event, homeTimezone))
+    .filter((day): day is DayKey => day !== null)
+    .sort();
+  const explicitStart =
+    meta?.startsAt === undefined ? undefined : dayKey(meta.startsAt, homeTimezone);
+  const explicitEnd = meta?.endsAt === undefined ? undefined : dayKey(meta.endsAt, homeTimezone);
+
+  let start = explicitStart ?? eventDays[0];
+  let end = explicitEnd ?? eventDays[eventDays.length - 1];
+
+  if (!start && end) start = addDays(end, -6);
+  if (!start) start = today;
+  if (!end) end = addDays(start, 6);
+
+  // Concurrent edits can briefly cross the bounds. The calendar remains
+  // usable while the settings screen makes the next edit restore the order.
+  return start <= end ? { start, end } : { start: end, end: start };
+}
+
+export function daysInRange(start: DayKey, end: DayKey): DayKey[] {
+  const days: DayKey[] = [];
+  for (let day = start; day <= end; day = addDays(day, 1)) days.push(day);
+  return days;
 }
 
 /** 0 for Monday. Weeks start on Monday, which is how a trip is talked about. */

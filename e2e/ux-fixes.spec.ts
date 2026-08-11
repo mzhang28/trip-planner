@@ -94,7 +94,7 @@ test.describe('putting an event on a chosen day', () => {
 
     await page.getByTestId('event-date').fill('2026-09-03');
 
-    const time = page.getByRole('textbox', { name: /Time \(/ });
+    const time = page.getByRole('textbox', { name: 'Time' });
     await time.fill('nine-ish');
     await time.blur();
 
@@ -259,27 +259,23 @@ test.describe('what a field does with input it cannot use', () => {
     await expect(page.getByRole('textbox', { name: 'How long' })).toHaveValue('90');
   });
 
-  test('a time zone has to be one the browser knows', async ({ page }) => {
+  test('a time zone is searched by IANA name inside the time field', async ({ page }) => {
     await page.goto('/');
     await newTrip(page);
 
     await page.getByRole('textbox', { name: 'New event' }).fill('Tea ceremony');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await eventRow(page, 'Tea ceremony').click();
-    await reveal(page, 'timezone');
+    await reveal(page, 'when');
 
-    const zone = page.getByRole('combobox', { name: 'Time zone' });
-    await zone.fill('Japan/Kyoto');
-    await zone.blur();
-    await expect(page.getByText('Not a time zone')).toBeVisible();
+    await page.getByRole('button', { name: 'Time zone: Asia/Tokyo' }).click();
+    const search = page.getByRole('searchbox', { name: 'Search time zone' });
+    await search.fill('Japan/Kyoto');
+    await expect(page.getByText('No matching time zone.')).toBeVisible();
 
-    await zone.fill('Asia/Osaka');
-    await zone.blur();
-    await expect(page.getByText('Not a time zone')).toBeVisible();
-
-    await zone.fill('Asia/Tokyo');
-    await zone.blur();
-    await expect(page.getByText('Not a time zone')).toHaveCount(0);
+    await search.fill('London');
+    await page.getByRole('option', { name: /Europe\/London/ }).click();
+    await expect(page.getByRole('button', { name: 'Time zone: Europe/London' })).toBeVisible();
   });
 });
 
@@ -339,7 +335,7 @@ test.describe('a day decided before an hour', () => {
     // The day is decided and the hour is not, and both the card and the field
     // say so. A 12:00 here reads as a booking somebody made.
     const editor = page.getByTestId('event-editor');
-    await expect(editor.getByRole('textbox', { name: /Time \(/ })).toHaveValue('');
+    await expect(editor.getByRole('textbox', { name: 'Time' })).toHaveValue('');
     await expect(editor.getByText('The day is enough')).toBeVisible();
     await expect(eventRow(page, 'Ryokan')).toContainText('--:--');
 
@@ -363,7 +359,7 @@ test.describe('a day decided before an hour', () => {
     await reveal(page, 'when');
 
     await page.getByTestId('event-date').fill('2026-09-03');
-    const time = page.getByRole('textbox', { name: /Time \(/ });
+    const time = page.getByRole('textbox', { name: 'Time' });
     await time.fill('15:00');
     await time.blur();
     await expect(eventRow(page, 'Ryokan')).toContainText('15:00');
@@ -700,20 +696,6 @@ test.describe('a flight', () => {
     await expect(editor.getByText('before the flight leaves')).toBeVisible();
   });
 
-  test('a flight time zone has to be one the browser knows', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page);
-    await newFlight(page);
-
-    const editor = page.getByTestId('event-editor');
-    const zone = editor.getByRole('combobox', { name: 'Departure time zone' });
-    await zone.fill('Japan/Narita');
-    await zone.blur();
-
-    // An unknown zone was stored and then threw from Intl every time the
-    // flight was drawn, which reads as the app breaking.
-    await expect(editor.getByText('Not a time zone')).toBeVisible();
-  });
 });
 
 test.describe('the map and the forecast', () => {

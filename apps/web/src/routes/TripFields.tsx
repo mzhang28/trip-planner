@@ -4,6 +4,7 @@ import {
   deleteFieldDef,
   liveFieldDefs,
   removeFieldOption,
+  updateTripMeta,
   updateFieldDef,
   type FieldDef,
   type FieldType,
@@ -15,7 +16,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { randomId } from '../lib/crypto';
 import { api, type TripSummary } from '../lib/api';
+import { setDay, toDateInput } from '../lib/time';
 import { AuditPanel } from '../trip/AuditPanel';
+import { SyncBadge } from '../trip/SyncBadge';
 import { useTripState, useTripStore } from '../trip/useTrip';
 
 const TYPES: Array<{ value: FieldType; label: string; hint: string }> = [
@@ -71,6 +74,46 @@ export function TripFields() {
 
   const doc = state?.doc as TripDoc | undefined;
   const defs = useMemo(() => liveFieldDefs(doc), [doc]);
+  const homeTimezone = doc?.meta.homeTimezone ?? trip?.homeTimezone ?? 'UTC';
+  const tripStart =
+    doc?.meta.startsAt === undefined ? '' : toDateInput(doc.meta.startsAt, homeTimezone);
+  const tripEnd = doc?.meta.endsAt === undefined ? '' : toDateInput(doc.meta.endsAt, homeTimezone);
+
+  function setTripStart(day: string) {
+    if (!store) return;
+    if (!day) {
+      store.change((current) => updateTripMeta(current, { startsAt: undefined }));
+      return;
+    }
+
+    const startsAt = setDay(undefined, homeTimezone, day);
+    if (startsAt === null) return;
+    store.change((current) =>
+      updateTripMeta(current, {
+        startsAt,
+        // Keep the range valid when its beginning moves past its end.
+        ...(tripEnd && tripEnd < day ? { endsAt: startsAt } : {}),
+      }),
+    );
+  }
+
+  function setTripEnd(day: string) {
+    if (!store) return;
+    if (!day) {
+      store.change((current) => updateTripMeta(current, { endsAt: undefined }));
+      return;
+    }
+
+    const endsAt = setDay(undefined, homeTimezone, day);
+    if (endsAt === null) return;
+    store.change((current) =>
+      updateTripMeta(current, {
+        endsAt,
+        // Likewise, choosing an earlier end brings the start with it.
+        ...(tripStart && tripStart > day ? { startsAt: endsAt } : {}),
+      }),
+    );
+  }
 
   /** How many events would lose something, so a delete can say what it costs. */
   const usage = useMemo(() => {
@@ -115,11 +158,47 @@ export function TripFields() {
             Back to trip
           </Link>
           <h1 className="flex-1 text-lg">Trip settings</h1>
+          <SyncBadge state={state} />
           <ThemeToggle />
         </div>
       </header>
 
       <main className="mx-auto min-h-0 w-full max-w-5xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+        <h2 className="mb-1 text-sm text-ink">Trip dates</h2>
+        <p className="mb-4 max-w-prose text-sm text-ink-secondary">
+          The week timeline starts and stops on these days. Both dates are included.
+        </p>
+
+        <Card className="mb-10 p-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-xs font-medium text-ink-secondary">
+              Trip starts
+              <input
+                type="date"
+                data-testid="trip-start-date"
+                value={tripStart}
+                disabled={readOnly}
+                onChange={(event) => setTripStart(event.currentTarget.value)}
+                className="h-9 rounded-md border border-line-input bg-card px-2.5 text-sm text-ink focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1 disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-60"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium text-ink-secondary">
+              Trip ends
+              <input
+                type="date"
+                data-testid="trip-end-date"
+                value={tripEnd}
+                disabled={readOnly}
+                onChange={(event) => setTripEnd(event.currentTarget.value)}
+                className="h-9 rounded-md border border-line-input bg-card px-2.5 text-sm text-ink focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1 disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-60"
+              />
+            </label>
+          </div>
+          <p className="mt-3 text-2xs text-ink-muted">
+            Dates use the trip timezone: {homeTimezone}.
+          </p>
+        </Card>
+
         <h2 className="mb-1 text-sm text-ink">Custom fields</h2>
         <p className="mb-6 max-w-prose text-sm text-ink-secondary">
           Anything you add here appears on every event in this trip, and is searchable by its name
@@ -128,7 +207,7 @@ export function TripFields() {
 
         {readOnly && (
           <p className="mb-6 rounded-md border border-line bg-sunken px-3 py-2 text-sm text-ink-secondary">
-            You are reading this trip. Only someone who can edit it may change its fields.
+            You are reading this trip. Only someone who can edit it may change its settings.
           </p>
         )}
 

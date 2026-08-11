@@ -10,10 +10,11 @@ import {
   mergeEvents,
   setCustomField,
   updateEvent,
+  updateTripMeta,
   type Doc,
 } from './doc';
 import { canSyncIncrementally, sweepTombstones, TOMBSTONE_TTL_MS } from './sweep';
-import type { TripDoc } from './types';
+import type { EventId, TripDoc } from './types';
 
 const ada = { userId: 'user-ada' };
 const bo = { userId: 'user-bo' };
@@ -37,6 +38,19 @@ function trip(): Doc {
   doc = addEvent(doc, { id: 'e1', name: 'Fushimi Inari' }, ada);
   return doc;
 }
+
+describe('trip dates', () => {
+  it('sets and clears the trip-wide bounds', () => {
+    let doc = createTrip('Japan, April', 'Asia/Tokyo');
+    doc = updateTripMeta(doc, { startsAt: 1_776_000_000_000, endsAt: 1_777_000_000_000 });
+
+    expect((doc as TripDoc).meta.startsAt).toBe(1_776_000_000_000);
+    expect((doc as TripDoc).meta.endsAt).toBe(1_777_000_000_000);
+
+    doc = updateTripMeta(doc, { endsAt: undefined });
+    expect((doc as TripDoc).meta.endsAt).toBeUndefined();
+  });
+});
 
 describe('offline edits merging', () => {
   it('keeps both edits when two people change different fields', () => {
@@ -354,6 +368,6 @@ describe('a patch carrying an object', () => {
       { userId: 'u1' },
     );
 
-    expect(doc.events.e1.location).toEqual({ label: 'Kyoto Station', lat: 34.98, lng: 135.75 });
+    expect(doc.events.e1!.location).toEqual({ label: 'Kyoto Station', lat: 34.98, lng: 135.75 });
   });
 });

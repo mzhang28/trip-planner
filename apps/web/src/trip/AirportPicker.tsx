@@ -40,6 +40,11 @@ export function AirportPicker({ label, code, timezone, onChange }: AirportPicker
   const id = useId();
   const latest = useRef(0);
   const choosing = useRef(false);
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     setQuery(code ?? '');
@@ -74,8 +79,9 @@ export function AirportPicker({ label, code, timezone, onChange }: AirportPicker
           if (!exact) return;
 
           setKnown(exact);
+          setOpen(false);
           if (exact.code !== code || exact.timezone !== timezone) {
-            onChange({ code: exact.code, timezone: exact.timezone });
+            onChangeRef.current({ code: exact.code, timezone: exact.timezone });
           }
         })
         .catch(() => {
@@ -84,7 +90,7 @@ export function AirportPicker({ label, code, timezone, onChange }: AirportPicker
     }, 180);
 
     return () => clearTimeout(timer);
-  }, [query, code, timezone, onChange]);
+  }, [query, code, timezone]);
 
   const airports = lookup.state === 'found' ? lookup.airports : [];
   const showing = open && query.trim().length >= 2;

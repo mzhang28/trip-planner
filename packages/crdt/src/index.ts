@@ -25,6 +25,7 @@ export {
   removeAttachment,
   removeFieldOption,
   setCustomField,
+  updateTripMeta,
   updateEvent,
   updateFieldDef,
   valueMatchesType,

@@ -140,8 +140,8 @@ test.describe('offline editing', () => {
     await eventRow(page, 'Fushimi Inari').click();
     await revealField(page, 'when');
     await page.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
-    await page.getByRole('textbox', { name: /Time \(/ }).fill('05:30');
-    await page.getByRole('textbox', { name: /Time \(/ }).blur();
+    await page.getByRole('textbox', { name: 'Time' }).fill('05:30');
+    await page.getByRole('textbox', { name: 'Time' }).blur();
 
     await eventRow(otherPage, 'Fushimi Inari').click();
     await revealField(otherPage, 'booking');
@@ -297,8 +297,8 @@ test.describe('moving events', () => {
     await eventRow(page, 'Fushimi Inari').click();
     await revealField(page, 'when');
     await page.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
-    await page.getByRole('textbox', { name: /Time \(/ }).fill('09:00');
-    await page.getByRole('textbox', { name: /Time \(/ }).blur();
+    await page.getByRole('textbox', { name: 'Time' }).fill('09:00');
+    await page.getByRole('textbox', { name: 'Time' }).blur();
     await page.locator('[data-testid="event"][aria-expanded="true"]').click();
     await expectSaved(page);
 

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { dayKey, formatDayHeading, formatTime, moveToDay, setTimeOfDay } from './time';
+import {
+  dayKey,
+  formatDayHeading,
+  formatTime,
+  moveToDay,
+  setTimeOfDay,
+  timeZoneAbbreviation,
+  timeZoneSearchAbbreviations,
+} from './time';
 
 const TOKYO = 'Asia/Tokyo';
 const NEW_YORK = 'America/New_York';
@@ -92,5 +100,20 @@ describe('moveToDay', () => {
     for (const input of ['', 'tomorrow', '2026-8-14', '14/08/2026']) {
       expect(moveToDay(at, TOKYO, input), input).toBeNull();
     }
+  });
+});
+
+describe('time zone abbreviations', () => {
+  const summer = Date.parse('2026-08-12T12:00:00Z');
+
+  it('uses familiar names when Intl only returns a numeric offset', () => {
+    expect(timeZoneAbbreviation(summer, TOKYO)).toBe('JST');
+    expect(timeZoneAbbreviation(summer, 'Europe/London')).toBe('BST');
+  });
+
+  it('search includes both sides of a daylight-saving change', () => {
+    expect(timeZoneSearchAbbreviations(summer, NEW_YORK)).toEqual(
+      expect.arrayContaining(['EST', 'EDT']),
+    );
   });
 });

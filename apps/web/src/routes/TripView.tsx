@@ -32,7 +32,7 @@ import { Link, useParams } from 'react-router';
 import { ApiError, api, type TripSummary } from '../lib/api';
 import { randomId } from '../lib/crypto';
 import { dayKey, formatDayHeading, moveToDay, setDay, setTimeOfDay } from '../lib/time';
-import { addDays, eventDay, openingDay, type DayKey } from '../lib/calendar';
+import { clampDay, eventDay, tripDateRange, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
 import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
 import { useUploadFlush } from '../trip/Attachments';
@@ -245,6 +245,10 @@ export function TripView() {
   const [anchor, setAnchor] = useState<DayKey>(() => new Date().toISOString().slice(0, 10));
   const [anchored, setAnchored] = useState(false);
   const today = dayKey(Date.now(), homeTimezone);
+  const tripRange = useMemo(
+    () => tripDateRange(doc?.meta, events, homeTimezone, today),
+    [doc?.meta, events, homeTimezone, today],
+  );
 
   /**
    * Moves the view, and records that it was moved on purpose.
@@ -264,11 +268,19 @@ export function TripView() {
    * The opening guess, once, and only while the person has not chosen a day.
    */
   useEffect(() => {
-    if (anchored || events.length === 0) return;
+    if (anchored) return;
 
-    setAnchor(openingDay(events, homeTimezone, today));
+    setAnchor(clampDay(today, tripRange.start, tripRange.end));
     setAnchored(true);
-  }, [anchored, events, homeTimezone, today]);
+  }, [anchored, today, tripRange]);
+
+  // A range can change on another device while this view is open. The week
+  // must never point at a day its finite strip no longer contains.
+  useEffect(() => {
+    if (view !== 'week') return;
+    const bounded = clampDay(anchor, tripRange.start, tripRange.end);
+    if (bounded !== anchor) moveAnchor(bounded);
+  }, [anchor, moveAnchor, tripRange, view]);
 
   const days = useMemo(() => {
     const grouped = groupByDay(events, homeTimezone);
@@ -542,7 +554,7 @@ export function TripView() {
               to={`/t/${tripId}/fields`}
               className="text-xs text-ink-muted underline-offset-2 hover:underline"
             >
-              Fields
+              Trip settings
             </Link>
             <SyncBadge state={state} />
           </div>
@@ -638,20 +650,28 @@ export function TripView() {
           </p>
         )}
 
-        <DayNavigator view={view} anchor={anchor} today={today} onChange={moveAnchor} />
+        <DayNavigator
+          view={view}
+          anchor={anchor}
+          today={today}
+          tripStart={tripRange.start}
+          tripEnd={tripRange.end}
+          onChange={moveAnchor}
+        />
 
         <div className={view === 'week' ? 'min-h-0 flex-1' : undefined}>
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           {view === 'week' && (
             <WeekView
               anchor={anchor}
+              tripStart={tripRange.start}
+              tripEnd={tripRange.end}
               events={events}
               homeTimezone={homeTimezone}
               weather={weather}
               today={today}
               readOnly={readOnly}
               onOpenEvent={focusEvent}
-              onChangeAnchor={moveAnchor}
               onCreateAt={(day, name, startMinutes, endMinutes) =>
                 createOn(day, { startMinutes, endMinutes, name, openAfterCreate: false })
               }

@@ -61,9 +61,9 @@ async function addEvent(page: Page, name: string, city: string, time: string, da
    */
   const afterDate = page.getByTestId('event-editor');
   await expect(afterDate.getByTestId('event-date')).toHaveValue(day);
-  await expect(afterDate.getByRole('textbox', { name: /Time \(/ })).toBeEnabled();
-  await afterDate.getByRole('textbox', { name: /Time \(/ }).fill(time);
-  await afterDate.getByRole('textbox', { name: /Time \(/ }).blur();
+  await expect(afterDate.getByRole('textbox', { name: 'Time' })).toBeEnabled();
+  await afterDate.getByRole('textbox', { name: 'Time' }).fill(time);
+  await afterDate.getByRole('textbox', { name: 'Time' }).blur();
 
   // Both halves of the instant, checked where they were typed. A day that did
   // not take leaves the event on today, and every later assertion then fails
@@ -104,6 +104,14 @@ async function switchTo(page: Page, view: 'Day' | 'Week' | 'Month') {
     .getByRole('radiogroup', { name: 'Calendar view' })
     .getByText(view, { exact: true })
     .click();
+}
+
+async function setTripDates(page: Page, start: string, end: string) {
+  await page.getByRole('link', { name: 'Trip settings' }).click();
+  await page.getByTestId('trip-start-date').fill(start);
+  await page.getByTestId('trip-end-date').fill(end);
+  await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
+  await page.getByRole('link', { name: 'Back to trip' }).click();
 }
 
 test.describe('week and month views', () => {
@@ -173,6 +181,7 @@ test.describe('week and month views', () => {
   test('moving between weeks changes what is shown, and Today comes back', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-08-05', '2026-08-25');
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
     await page.getByTestId('go-to-date').fill(ON);
@@ -181,16 +190,32 @@ test.describe('week and month views', () => {
     const event = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
     await expect(event).toBeInViewport();
 
-    /*
-     * Out of sight rather than off the page. The week keeps a runway of days
-     * rendered on either side so a sideways swipe has somewhere to go, so what
-     * moving on changes is which days are on screen.
-     */
+    // Every date exists once, bounded by the trip rather than regenerated as
+    // the scrollbar moves.
+    const renderedDays = page.locator('[data-week-day]');
+    await expect(renderedDays).toHaveCount(21);
+    await expect(page.locator('[data-week-day="2026-08-05"]')).toHaveCount(1);
+    await expect(page.locator('[data-week-day="2026-08-25"]')).toHaveCount(1);
+    await expect(page.locator('[data-week-day="2026-08-04"]')).toHaveCount(0);
+    await expect(page.locator('[data-week-day="2026-08-26"]')).toHaveCount(0);
+
     await page.getByRole('button', { name: 'Later' }).click();
     await expect(event).not.toBeInViewport();
 
     await page.getByTestId('go-to-date').fill(ON);
     await expect(event).toBeInViewport();
+
+    const scroller = page.getByTestId('week-horizontal-scroll');
+    expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+      true,
+    );
+    await scroller.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
+    await expect(page.locator('[data-week-day="2026-08-25"]')).toBeInViewport();
+    const rightEdge = await scroller.evaluate((element) => element.scrollLeft);
+    await page.waitForTimeout(250);
+    expect(await scroller.evaluate((element) => element.scrollLeft)).toBe(rightEdge);
+    await scroller.evaluate((element) => element.scrollTo({ left: 0 }));
+    await expect(page.locator('[data-week-day="2026-08-05"]')).toBeInViewport();
   });
 
   test('picking an event in the week opens it in the day view', async ({ page }) => {
@@ -232,12 +257,16 @@ test.describe('flights and the map', () => {
     await revealField(page, 'kind');
     await editor.getByRole('radiogroup', { name: 'What this is' }).getByText('Flight').click();
 
+    // The route card is the only editor for the flight's schedule and places.
+    await expect(editor.getByTestId('event-date')).toHaveCount(0);
+    await expect(editor.getByRole('combobox', { name: 'Place' })).toHaveCount(0);
+
     await editor.getByRole('textbox', { name: 'Airline' }).fill('ANA');
     await editor.getByRole('textbox', { name: 'Flight number' }).fill('nh017');
 
     // Each end names itself, so neither the test nor a screen reader has to
     // work out which of two fields called "Airport" is which.
-    await editor.getByRole('textbox', { name: 'Leaving from' }).fill('nrt');
+    await editor.getByRole('combobox', { name: 'Leaving from' }).fill('nrt');
     await expect(
       editor.getByRole('button', { name: 'Departure time zone: Asia/Tokyo' }),
     ).toBeVisible();
@@ -255,7 +284,7 @@ test.describe('flights and the map', () => {
     await editor.getByRole('textbox', { name: /Departs/ }).fill('17:05');
     await editor.getByRole('textbox', { name: /Departs/ }).blur();
 
-    await editor.getByRole('textbox', { name: 'Arriving at' }).fill('lhr');
+    await editor.getByRole('combobox', { name: 'Arriving at' }).fill('lhr');
     await expect(
       editor.getByRole('button', { name: 'Arrival time zone: Europe/London' }),
     ).toBeVisible();
@@ -425,10 +454,10 @@ test.describe('filling an event in gradually', () => {
 
     // Laying every field out at once is the wall this exists to avoid.
     await expect(expand).toBeVisible();
-    await expect(editor.getByTestId('add-field-timezone')).toHaveCount(0);
+    await expect(editor.getByTestId('add-field-confirmation')).toHaveCount(0);
 
     await expand.click();
-    await expect(editor.getByTestId('add-field-timezone')).toBeVisible();
+    await expect(editor.getByTestId('add-field-confirmation')).toBeVisible();
   });
 
   test('a field that has something in it is there without being asked for', async ({ page }) => {
@@ -527,7 +556,7 @@ test.describe('making an event from the calendar', () => {
     const editor = page.getByTestId('event-editor');
     await expect(editor).toBeVisible();
 
-    await expect(editor.getByRole('textbox', { name: /Time \(/ })).toHaveValue('10:00');
+    await expect(editor.getByRole('textbox', { name: 'Time' })).toHaveValue('10:00');
     await expect(editor.getByTestId('field-duration')).toBeVisible();
     await expect(editor.getByRole('textbox', { name: 'How long' }).first()).toHaveValue('120');
   });

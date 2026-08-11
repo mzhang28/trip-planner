@@ -14,6 +14,7 @@ import type {
   OptionId,
   TripDoc,
   TripEvent,
+  TripMeta,
   UserId,
 } from './types';
 
@@ -35,6 +36,30 @@ export function createTrip(name: string, homeTimezone: string): Doc {
     meta: { name, homeTimezone },
     fieldDefs: {},
     events: {},
+  });
+}
+
+/**
+ * Changes trip-wide facts as one mergeable document edit.
+ *
+ * Optional values are deleted instead of assigned `undefined`, which Automerge
+ * does not accept. Writing each key separately also lets two people change the
+ * start and end dates at the same time without replacing the whole metadata
+ * object.
+ */
+export function updateTripMeta(doc: Doc, patch: Partial<TripMeta>): Doc {
+  return A.change(doc, (d) => {
+    if ('name' in patch && patch.name !== undefined) d.meta.name = patch.name;
+    if ('homeTimezone' in patch && patch.homeTimezone !== undefined) {
+      d.meta.homeTimezone = patch.homeTimezone;
+    }
+
+    for (const key of ['startsAt', 'endsAt'] as const) {
+      if (!(key in patch)) continue;
+      const value = patch[key];
+      if (value === undefined) delete d.meta[key];
+      else d.meta[key] = value;
+    }
   });
 }
 

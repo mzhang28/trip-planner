@@ -310,15 +310,17 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
         </div>
       </div>
 
-      <div className="grid gap-2 border-t border-line bg-card px-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_repeat(3,minmax(4rem,0.65fr))]">
+      <div className="grid grid-cols-6 gap-2 border-t border-line bg-card px-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_repeat(3,minmax(4rem,0.65fr))]">
         <TextField
           label="Airline"
+          className="col-span-3 sm:col-auto"
           defaultValue={flight.airline ?? ''}
           placeholder="ANA"
           onBlur={(e) => patchFlight({ airline: e.currentTarget.value.trim() || undefined })}
         />
         <TextField
           label="Flight number"
+          className="col-span-3 sm:col-auto"
           defaultValue={flight.number ?? ''}
           placeholder="NH017"
           onBlur={(e) =>
@@ -327,18 +329,21 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
         />
         <TextField
           label="Seat"
+          className="col-span-2 sm:col-auto"
           defaultValue={flight.seat ?? ''}
           placeholder="32A"
           onBlur={(e) => patchFlight({ seat: e.currentTarget.value.trim() || undefined })}
         />
         <TextField
           label="Terminal"
+          className="col-span-2 sm:col-auto"
           defaultValue={flight.terminal ?? ''}
           placeholder="1"
           onBlur={(e) => patchFlight({ terminal: e.currentTarget.value.trim() || undefined })}
         />
         <TextField
           label="Gate"
+          className="col-span-2 sm:col-auto"
           defaultValue={flight.gate ?? ''}
           placeholder="12"
           onBlur={(e) => patchFlight({ gate: e.currentTarget.value.trim() || undefined })}

@@ -486,6 +486,16 @@ export function EventEditor({
       },
     ];
 
+    if (event.kind === 'flight') {
+      // The route card owns both local dates, both local times, the resulting
+      // duration, and the two airports. Showing the generic versions as well
+      // creates two controls for one value (and one misleading single place).
+      const flightOwned = new Set(['when', 'duration', 'place']);
+      for (let index = list.length - 1; index >= 0; index -= 1) {
+        if (flightOwned.has(list[index]!.key)) list.splice(index, 1);
+      }
+    }
+
     // A stay and a flight carry their own things, and only ever those.
     if (event.kind === 'lodging') {
       list.push({
