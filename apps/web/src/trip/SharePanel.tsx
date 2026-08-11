@@ -1,6 +1,6 @@
 import { Button, Card, SegmentedControl, cn } from '@trip/ui';
 import { Check, Copy, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 
 type Role = 'viewer' | 'editor';
@@ -59,18 +59,25 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
   const [you, setYou] = useState<string | null>(null);
   const [unreachable, setUnreachable] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  const latest = useRef(0);
 
   const load = useCallback(async () => {
+    // A slower earlier answer must not overwrite a faster later one: the panel
+    // reloads on a timer and after every change, so two are often in flight.
+    const ticket = ++latest.current;
+
     setUnreachable(false);
     try {
       const res = await fetch(`/api/trips/${tripId}/access`);
-      if (!res.ok) return;
+      if (!res.ok || ticket !== latest.current) return;
 
       const body = (await res.json()) as {
         links: AccessLink[];
         members: Member[];
         you: string;
       };
+
+      if (ticket !== latest.current) return;
 
       setLinks(body.links);
       setMembers(body.members);
@@ -84,8 +91,17 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
     }
   }, [tripId]);
 
+  /*
+   * Reloaded while the panel is open, because the thing it shows changes
+   * without this device doing anything: somebody opens the link and joins.
+   * A list that only loaded once said "nobody yet" for as long as it was left
+   * open, which is exactly when it is being watched.
+   */
   useEffect(() => {
     void load();
+
+    const timer = setInterval(() => void load(), 2500);
+    return () => clearInterval(timer);
   }, [load]);
 
   async function makeLink() {

@@ -205,7 +205,10 @@ test.describe('sharing', () => {
     const other = await browser.newContext();
     const guest = await other.newPage();
     await guest.goto(url!);
-    await expect(guest.getByTestId('event')).toHaveCount(0);
+
+    // On the trip, and reading it: an assertion that only counts what is
+    // absent would also pass on the page that says you cannot open this.
+    await expect(guest.getByRole('heading', { name: 'Japan, April' })).toBeVisible();
     await expect(guest.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
 
     await panel.getByRole('button', { name: 'Revoke' }).click();
