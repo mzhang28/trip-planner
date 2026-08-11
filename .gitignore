@@ -1,0 +1,22 @@
+node_modules/
+dist/
+build/
+storybook-static/
+*.tsbuildinfo
+
+# Runtime data: the SQLite database and filesystem blob store
+data/
+
+.env
+.env.local
+.env.*.local
+
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+coverage/
+.vite/
+.DS_Store
+*.log

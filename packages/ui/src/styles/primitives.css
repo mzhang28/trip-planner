@@ -1,0 +1,81 @@
+/*
+ * Primitive tokens: raw ramps with no meaning attached.
+ *
+ * Nothing in the app references these directly. They exist so the semantic
+ * layer in semantic.css has a fixed vocabulary to map roles onto, and so the
+ * two themes can differ in which step of a ramp they pick rather than in which
+ * colours exist at all.
+ *
+ * The neutrals carry a slight blue cast. The direction is a timetable printed
+ * on cool grey stock, and a warm grey undoes that in one step.
+ */
+
+:root {
+  /* Neutrals */
+  --grey-0: #ffffff;
+  --grey-25: #f8f9fb;
+  --grey-50: #f1f3f6;
+  --grey-100: #e7eaee;
+  --grey-150: #dce0e6;
+  --grey-200: #cbd2da;
+  --grey-300: #aeb7c2;
+  --grey-400: #8b96a5;
+  --grey-500: #6c7787;
+  --grey-600: #545e6c;
+  --grey-700: #3d4653;
+  --grey-800: #2a313b;
+  --grey-850: #1a2029;
+  --grey-900: #12161c;
+  --grey-950: #0a0d11;
+
+  /* Green: a booking that is confirmed and needs nothing further */
+  --green-50: #ecf7f3;
+  --green-100: #d7ede5;
+  --green-200: #a8d8c8;
+  --green-300: #2fa98a;
+  --green-400: #1b8e75;
+  --green-500: #136f5b;
+  --green-600: #0e5747;
+  --green-900: #0a2e26;
+  --green-950: #06201a;
+
+  /* Amber: a booking in progress, held, or waiting on someone */
+  --amber-50: #fcf5e8;
+  --amber-100: #f7e7c9;
+  --amber-200: #edd0a0;
+  --amber-400: #d99a2b;
+  --amber-500: #c98418;
+  --amber-600: #b06e12;
+  --amber-700: #8a5409;
+  --amber-900: #33230a;
+  --amber-950: #241806;
+
+  /* Vermilion: reserved for now. The current-time line and today's marker. */
+  --vermilion-100: #fbddd7;
+  --vermilion-400: #ff6a4d;
+  --vermilion-500: #d93f2b;
+  --vermilion-600: #b83122;
+  --vermilion-900: #3d130d;
+
+  /* Indigo: interactive and selected. Signage blue rather than a link blue. */
+  --indigo-100: #dee2fa;
+  --indigo-200: #bcc4f4;
+  --indigo-350: #8290ee;
+  --indigo-400: #6272e0;
+  --indigo-500: #3b4cca;
+  --indigo-600: #2f3e9e;
+  --indigo-900: #131a47;
+  --indigo-950: #0d1231;
+
+  /*
+   * Radii do not change between themes, so they are declared once in the
+   * Tailwind theme block in index.css rather than being mapped through here.
+   *
+   * Elevation. Shallow and tight; the drag shadow is the only loud one.
+   */
+  --elevation-xs: 0 1px 1px rgb(10 13 17 / 0.04);
+  --elevation-sm: 0 1px 2px rgb(10 13 17 / 0.06), 0 1px 3px rgb(10 13 17 / 0.05);
+  --elevation-md: 0 2px 4px rgb(10 13 17 / 0.06), 0 4px 10px rgb(10 13 17 / 0.07);
+  --elevation-lg: 0 8px 16px rgb(10 13 17 / 0.1), 0 2px 6px rgb(10 13 17 / 0.06);
+  --elevation-drag: 0 12px 28px rgb(10 13 17 / 0.22), 0 2px 6px rgb(10 13 17 / 0.12);
+}

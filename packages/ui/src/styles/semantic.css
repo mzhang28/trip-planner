@@ -1,0 +1,137 @@
+/*
+ * Semantic tokens: roles, mapped onto the primitive ramps.
+ *
+ * Components reference only these. That is what makes the theme switch a change
+ * in this file and nowhere else.
+ *
+ * Status colours come in two strengths because they are held to two different
+ * contrast thresholds. `--status-*` marks a graphic — a card spine, a map pin, a
+ * chip fill — and needs 3:1. `--status-*-text` labels something in words and
+ * needs 4.5:1, so in the light theme it is a darker step of the same ramp. The
+ * contrast story in Storybook asserts both.
+ *
+ * The theme is chosen by a `data-theme` attribute on <html>, set by an inline
+ * script before first paint. There is no `prefers-color-scheme` rule here on
+ * purpose: the script reads that media query itself, so the preference and the
+ * explicit override resolve in one place instead of fighting through the cascade.
+ */
+
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-page: var(--grey-100);
+  --surface-card: var(--grey-0);
+  --surface-raised: var(--grey-0);
+  --surface-sunken: var(--grey-150);
+  --surface-inverse: var(--grey-850);
+  --surface-overlay: rgb(10 13 17 / 0.42);
+
+  --text-primary: var(--grey-900);
+  --text-secondary: var(--grey-700);
+  --text-muted: var(--grey-600);
+  --text-placeholder: var(--grey-500);
+  --text-inverse: var(--grey-25);
+
+  --border-subtle: var(--grey-150);
+  --border-default: var(--grey-200);
+  --border-strong: var(--grey-300);
+  /*
+   * The edge of a control a person has to find and click, held to 3:1. It has
+   * to clear that against the grey page as well as against a white card, and
+   * the page is the harder of the two, which is what pushes it this dark.
+   */
+  --border-input: var(--grey-500);
+
+  --status-booked: var(--green-500);
+  --status-booked-text: var(--green-600);
+  --status-booked-soft: var(--green-100);
+
+  --status-pending: var(--amber-600);
+  --status-pending-text: var(--amber-700);
+  --status-pending-soft: var(--amber-100);
+
+  /*
+   * A step darker than the grey-400 the dark theme uses. On white, grey-400
+   * lands at exactly 3.0 against the graphic threshold, and exactly at the line
+   * is not passing it.
+   */
+  --status-idea: var(--grey-500);
+  --status-idea-text: var(--grey-600);
+  --status-idea-soft: var(--grey-100);
+
+  --accent: var(--indigo-500);
+  --accent-text: var(--indigo-500);
+  --accent-hover: var(--indigo-600);
+  --accent-soft: var(--indigo-100);
+  --accent-ink: var(--grey-0);
+
+  /* Vermilion appears here and nowhere else. */
+  --accent-now: var(--vermilion-500);
+  --accent-now-soft: var(--vermilion-100);
+
+  --focus-ring: var(--indigo-500);
+
+  --depth-xs: var(--elevation-xs);
+  --depth-sm: var(--elevation-sm);
+  --depth-md: var(--elevation-md);
+  --depth-lg: var(--elevation-lg);
+  --depth-drag: var(--elevation-drag);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --surface-page: var(--grey-900);
+  --surface-card: var(--grey-850);
+  --surface-raised: var(--grey-800);
+  --surface-sunken: var(--grey-950);
+  --surface-inverse: var(--grey-50);
+  --surface-overlay: rgb(5 7 9 / 0.62);
+
+  --text-primary: var(--grey-50);
+  --text-secondary: var(--grey-300);
+  --text-muted: var(--grey-400);
+  --text-placeholder: var(--grey-500);
+  --text-inverse: var(--grey-900);
+
+  --border-subtle: var(--grey-800);
+  --border-default: var(--grey-700);
+  --border-strong: var(--grey-600);
+  --border-input: var(--grey-500);
+
+  --status-booked: var(--green-300);
+  --status-booked-text: var(--green-300);
+  --status-booked-soft: var(--green-950);
+
+  --status-pending: var(--amber-400);
+  --status-pending-text: var(--amber-400);
+  --status-pending-soft: var(--amber-950);
+
+  --status-idea: var(--grey-400);
+  /* A step lighter than the mark, so the label still clears 4.5:1 on idea-soft. */
+  --status-idea-text: var(--grey-300);
+  --status-idea-soft: var(--grey-800);
+
+  --accent: var(--indigo-400);
+  --accent-text: var(--indigo-350);
+  --accent-hover: var(--indigo-350);
+  --accent-soft: var(--indigo-950);
+  --accent-ink: var(--grey-950);
+
+  --accent-now: var(--vermilion-400);
+  --accent-now-soft: var(--vermilion-900);
+
+  --focus-ring: var(--indigo-350);
+
+  /*
+   * Shadows read as dirt on a dark surface. Depth there comes from the surface
+   * ramp instead, so these drop to almost nothing and only the drag lift stays
+   * legible.
+   */
+  --depth-xs: none;
+  --depth-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --depth-md: 0 2px 6px rgb(0 0 0 / 0.45);
+  --depth-lg: 0 8px 20px rgb(0 0 0 / 0.5);
+  --depth-drag: 0 14px 32px rgb(0 0 0 / 0.6);
+}

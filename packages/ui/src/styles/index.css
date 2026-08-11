@@ -1,0 +1,163 @@
+@import 'tailwindcss';
+
+@import '@fontsource-variable/archivo';
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
+@import './primitives.css';
+@import './semantic.css';
+
+@source '../**/*.{ts,tsx}';
+
+/*
+ * `inline` is what makes the theme switchable at runtime. Without it Tailwind
+ * resolves each var to its value at build time and both themes collapse into
+ * whichever one was defined last; with it the generated utility keeps the
+ * var() reference, so changing data-theme on <html> restyles the page.
+ */
+@theme inline {
+  --color-page: var(--surface-page);
+  --color-card: var(--surface-card);
+  --color-raised: var(--surface-raised);
+  --color-sunken: var(--surface-sunken);
+  --color-inverse: var(--surface-inverse);
+  --color-overlay: var(--surface-overlay);
+
+  --color-ink: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-ink-placeholder: var(--text-placeholder);
+  --color-ink-inverse: var(--text-inverse);
+
+  --color-line: var(--border-subtle);
+  --color-line-default: var(--border-default);
+  --color-line-strong: var(--border-strong);
+
+  --color-booked: var(--status-booked);
+  --color-booked-text: var(--status-booked-text);
+  --color-booked-soft: var(--status-booked-soft);
+
+  --color-pending: var(--status-pending);
+  --color-pending-text: var(--status-pending-text);
+  --color-pending-soft: var(--status-pending-soft);
+
+  --color-idea: var(--status-idea);
+  --color-idea-text: var(--status-idea-text);
+  --color-idea-soft: var(--status-idea-soft);
+
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+
+  --color-now: var(--accent-now);
+  --color-now-soft: var(--accent-now-soft);
+
+  --color-focus: var(--focus-ring);
+
+  --font-display: 'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.625rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 2.125rem;
+  --text-3xl--line-height: 2.375rem;
+  --text-4xl: 2.75rem;
+  --text-4xl--line-height: 3rem;
+
+  /* Small by default: this is printed matter, not rounded app chrome. */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.1875rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.25rem;
+
+  --shadow-xs: var(--depth-xs);
+  --shadow-sm: var(--depth-sm);
+  --shadow-md: var(--depth-md);
+  --shadow-lg: var(--depth-lg);
+  --shadow-drag: var(--depth-drag);
+
+  --spacing: 0.25rem;
+}
+
+@layer base {
+  html {
+    background-color: var(--surface-page);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+  }
+
+  /*
+   * Display type is set on the width axis, not just the weight axis. That is
+   * what gives headings the compressed signage look the direction asks for, and
+   * it is why the variable font is worth the download over a static cut.
+   */
+  .font-display,
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-variation-settings: 'wdth' 112;
+    letter-spacing: -0.011em;
+  }
+
+  /* Times, dates, airport codes, and confirmation codes line up in columns. */
+  .tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Pointer users should not see a ring on click; keyboard users must. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: var(--accent-soft);
+    color: var(--text-primary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
