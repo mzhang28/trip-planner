@@ -773,38 +773,41 @@ export function WeekView({
                 No hotels this week. Add an event and set its kind to lodging to see it here.
               </p>
             ) : (
-              <div className="flex flex-col gap-1">
+              <div
+                data-testid="lodging-rail"
+                className="grid gap-px"
+                style={{ gridTemplateColumns }}
+              >
+                <div className="sticky left-0 z-20 bg-page" style={{ gridRow: 1 }} />
                 {beds.map((span) => {
                   const placed = spanWithin(span, days)!;
 
                   return (
-                    <div
+                    <button
                       key={span.event.id}
-                      className="grid gap-px"
-                      style={{ gridTemplateColumns }}
+                      type="button"
+                      data-testid="week-lodging"
+                      onClick={() => onOpenEvent(span.event.id)}
+                      style={{
+                        gridColumn: `${placed.start + 2} / span ${placed.length}`,
+                        gridRow: 1,
+                      }}
+                      className={cn(
+                        'flex min-w-0 items-center gap-1.5 truncate rounded-full border border-line-default bg-sunken px-2 py-1',
+                        'text-left text-2xs text-ink hover:bg-card focus-visible:outline-focus focus-visible:outline-2',
+                      )}
                     >
-                      <div className="sticky left-0 z-20 bg-page" />
-                      <button
-                        type="button"
-                        onClick={() => onOpenEvent(span.event.id)}
-                        style={{ gridColumn: `${placed.start + 2} / span ${placed.length}` }}
-                        className={cn(
-                          'flex items-center gap-1.5 truncate rounded-full border border-line-default bg-sunken px-2 py-1',
-                          'text-left text-2xs text-ink hover:bg-card focus-visible:outline-focus focus-visible:outline-2',
-                        )}
-                      >
-                        <StatusSpine
-                          status={span.event.booking.status}
-                          orientation="horizontal"
-                          className="w-4 shrink-0"
-                        />
-                        <EventKindIcon
-                          kind={span.event.kind}
-                          className="size-3 shrink-0 text-ink-muted"
-                        />
-                        <span className="truncate">{span.event.name}</span>
-                      </button>
-                    </div>
+                      <StatusSpine
+                        status={span.event.booking.status}
+                        orientation="horizontal"
+                        className="w-4 shrink-0"
+                      />
+                      <EventKindIcon
+                        kind={span.event.kind}
+                        className="size-3 shrink-0 text-ink-muted"
+                      />
+                      <span className="truncate">{span.event.name}</span>
+                    </button>
                   );
                 })}
               </div>

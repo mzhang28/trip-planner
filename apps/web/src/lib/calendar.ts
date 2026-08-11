@@ -198,11 +198,14 @@ export function lodgingSpans(events: TripEvent[], homeTimezone: string): Lodging
     const checkIn = event.lodging?.checkIn ?? event.startsAt;
     if (checkIn === undefined) continue;
 
+    const checkOut =
+      event.lodging?.checkOut ??
+      (event.startsAt === undefined || event.durationMinutes === undefined
+        ? undefined
+        : event.startsAt + event.durationMinutes * 60_000);
+
     const from = dayKey(checkIn, zone);
-    const to =
-      event.lodging?.checkOut === undefined
-        ? from
-        : addDays(dayKey(event.lodging.checkOut, zone), -1);
+    const to = checkOut === undefined ? from : addDays(dayKey(checkOut, zone), -1);
 
     spans.push({ event, from, to: to < from ? from : to });
   }

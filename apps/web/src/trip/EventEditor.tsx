@@ -482,13 +482,18 @@ export function EventEditor({
       },
     ];
 
-    if (event.kind === 'flight') {
-      // The route card owns both local dates, both local times, the resulting
-      // duration, and the two airports. Showing the generic versions as well
-      // creates two controls for one value (and one misleading single place).
-      const flightOwned = new Set(['when', 'duration', 'place']);
+    if (event.kind === 'flight' || event.kind === 'lodging') {
+      // These editors own their schedule. Showing the generic versions as
+      // well creates two controls for the same startsAt/duration values and
+      // lets them drift apart. A flight also owns both of its places; a stay
+      // keeps the ordinary Place field for its hotel.
+      const owned = new Set([
+        'when',
+        'duration',
+        ...(event.kind === 'flight' ? ['place'] : []),
+      ]);
       for (let index = list.length - 1; index >= 0; index -= 1) {
-        if (flightOwned.has(list[index]!.key)) list.splice(index, 1);
+        if (owned.has(list[index]!.key)) list.splice(index, 1);
       }
     }
 
@@ -506,8 +511,12 @@ export function EventEditor({
            * the week began a day early.
            */
           const stay = event.lodging;
-          const checkIn = stay?.checkIn;
-          const checkOut = stay?.checkOut;
+          const checkIn = stay?.checkIn ?? event.startsAt;
+          const canonicalCheckOut =
+            event.startsAt === undefined || event.durationMinutes === undefined
+              ? undefined
+              : event.startsAt + event.durationMinutes * 60_000;
+          const checkOut = stay?.checkOut ?? canonicalCheckOut;
           const wrongWayRound =
             checkIn !== undefined && checkOut !== undefined && checkOut <= checkIn;
 
@@ -522,8 +531,20 @@ export function EventEditor({
                     value={checkIn === undefined ? '' : toDateInput(checkIn, zone)}
                     onChange={(e) => {
                       const day = e.target.value;
-                      const at = day ? setTimeOfDay(setDay(undefined, zone, day)!, zone, '15:00') : undefined;
-                      onPatch({ lodging: { ...stay, checkIn: at ?? undefined } });
+                      const onDay = day ? setDay(undefined, zone, day) : null;
+                      const at = onDay === null ? undefined : setTimeOfDay(onDay, zone, '15:00');
+                      const durationMinutes =
+                        at !== undefined && at !== null && checkOut !== undefined && checkOut > at
+                          ? Math.round((checkOut - at) / 60_000)
+                          : undefined;
+
+                      onPatch({
+                        lodging: { ...stay, checkIn: at ?? undefined, checkOut },
+                        startsAt: at ?? undefined,
+                        durationMinutes,
+                        timeUndecided: undefined,
+                        ...(at === undefined || at === null ? {} : { timezone: zone }),
+                      });
                     }}
                     className={cn(
                       'h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-ink',
@@ -542,8 +563,20 @@ export function EventEditor({
                     min={checkIn === undefined ? undefined : toDateInput(checkIn, zone)}
                     onChange={(e) => {
                       const day = e.target.value;
-                      const at = day ? setTimeOfDay(setDay(undefined, zone, day)!, zone, '10:00') : undefined;
-                      onPatch({ lodging: { ...stay, checkOut: at ?? undefined } });
+                      const onDay = day ? setDay(undefined, zone, day) : null;
+                      const at = onDay === null ? undefined : setTimeOfDay(onDay, zone, '10:00');
+                      const durationMinutes =
+                        checkIn !== undefined && at !== undefined && at !== null && at > checkIn
+                          ? Math.round((at - checkIn) / 60_000)
+                          : undefined;
+
+                      onPatch({
+                        lodging: { ...stay, checkIn, checkOut: at ?? undefined },
+                        ...(checkIn === undefined
+                          ? {}
+                          : { startsAt: checkIn, timezone: zone, timeUndecided: undefined }),
+                        durationMinutes,
+                      });
                     }}
                     className={cn(
                       'h-9 w-full rounded-md border bg-card px-2.5 text-ink',

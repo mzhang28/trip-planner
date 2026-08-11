@@ -179,6 +179,19 @@ describe('lodging spans', () => {
     expect(lodgingSpans([hotel], TOKYO)[0]).toMatchObject({ from: '2026-08-10', to: '2026-08-10' });
   });
 
+  it('uses the canonical event schedule when lodging dates are not duplicated', () => {
+    const hotel = event({
+      kind: 'lodging',
+      startsAt: at('2026-08-10', 15),
+      durationMinutes: 67 * 60,
+    });
+
+    expect(lodgingSpans([hotel], TOKYO)[0]).toMatchObject({
+      from: '2026-08-10',
+      to: '2026-08-12',
+    });
+  });
+
   it('ignores anything that is not somewhere to sleep', () => {
     expect(lodgingSpans([event({ startsAt: at('2026-08-10') })], TOKYO)).toEqual([]);
   });

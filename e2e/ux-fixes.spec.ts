@@ -624,9 +624,16 @@ test.describe('a stay', () => {
     await reveal(page, 'kind');
     await page.getByTestId('event-editor').getByText('Stay', { exact: true }).click();
 
+    // Stay dates are the canonical event schedule, so duplicate generic date
+    // and duration controls cannot disagree with them.
+    await expect(page.getByTestId('event-date')).toHaveCount(0);
+    await expect(page.getByTestId('field-duration')).toHaveCount(0);
+
     // A text box built the instant at 15:00 UTC, which is the small hours of
     // the next day in Tokyo: the stay was drawn on the wrong nights.
     await page.getByTestId('check-in').fill('2026-08-14');
+    await expect(page.getByTestId('day-heading-2026-08-14')).toBeVisible();
+    await expect(eventRow(page, 'Ryokan')).toContainText('15:00');
     await page.getByTestId('check-out').fill('2026-08-12');
     await expect(page.getByText('leaving before you arrive')).toBeVisible();
 
@@ -638,6 +645,28 @@ test.describe('a stay', () => {
     await eventRow(page, 'Ryokan').click();
     await expect(page.getByTestId('check-in')).toHaveValue('2026-08-14');
     await expect(page.getByTestId('check-out')).toHaveValue('2026-08-17');
+
+    // Consecutive hotels share one rail instead of each consuming another
+    // stacked row beneath the timetable.
+    await page.getByTestId('close-editor').click();
+    await page.getByRole('textbox', { name: 'New event' }).fill('City Hotel');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'City Hotel').click();
+    await page.getByTestId('event-editor').getByText('Stay', { exact: true }).click();
+    await page.getByTestId('check-in').fill('2026-08-17');
+    await page.getByTestId('check-out').fill('2026-08-19');
+    await page.getByTestId('close-editor').click();
+
+    await page
+      .getByRole('radiogroup', { name: 'Calendar view' })
+      .getByText('Week', { exact: true })
+      .click();
+    const hotels = page.getByTestId('week-lodging');
+    await expect(hotels).toHaveCount(2);
+    const tops = await hotels.evaluateAll((items) =>
+      items.map((item) => Math.round(item.getBoundingClientRect().top)),
+    );
+    expect(new Set(tops).size).toBe(1);
   });
 });
 
