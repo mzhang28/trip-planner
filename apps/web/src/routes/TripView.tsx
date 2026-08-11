@@ -36,6 +36,7 @@ import { addDays, eventDay, startOfWeek, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
 import { useUploadFlush } from '../trip/Attachments';
 import { MergePreview, SelectionBar } from '../trip/SelectionBar';
+import { TransitLeg } from '../trip/TransitLeg';
 import { MonthView } from '../trip/MonthView';
 import { WeekView } from '../trip/WeekView';
 import { useWeather } from '../trip/useWeather';
@@ -391,8 +392,10 @@ export function TripView() {
 
               <DayDropZone dayKey={key} disabled={readOnly || key === UNSCHEDULED}>
                 <div className="flex flex-col gap-2">
-                  {dayEvents.map((event) => (
-                    <DraggableEvent key={event.id} id={event.id} disabled={readOnly}>
+                  {dayEvents.map((event, index) => (
+                    <div key={event.id}>
+                      <TransitLeg event={event} previous={dayEvents[index - 1]} />
+                      <DraggableEvent id={event.id} disabled={readOnly}>
                       {(handle) => (
                         <div
                           id={`event-${event.id}`}
@@ -477,9 +480,10 @@ export function TripView() {
                               )
                             }
                           />
-                        </div>
-                      )}
-                    </DraggableEvent>
+                          </div>
+                        )}
+                      </DraggableEvent>
+                    </div>
                   ))}
                 </div>
               </DayDropZone>

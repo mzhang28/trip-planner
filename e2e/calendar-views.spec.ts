@@ -245,3 +245,43 @@ test.describe('selecting several events', () => {
     ).toBeDisabled();
   });
 });
+
+test.describe('getting between events', () => {
+  test('a journey that does not fit the gap says how short it is', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    // Two events twenty minutes apart, with a forty-five minute journey between.
+    await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '12:20');
+
+    await eventRow(page, 'Fushimi Inari').click();
+    const editor = page.getByTestId('event-editor');
+
+    await editor.getByRole('textbox', { name: 'How long' }).nth(1).fill('45');
+    await editor.getByRole('textbox', { name: 'How long' }).nth(1).blur();
+    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+
+    const leg = page.getByTestId('transit-leg');
+    await expect(leg).toContainText('45 min');
+    await expect(leg).toContainText('25 min short of the gap');
+  });
+
+  test('a journey that fits is stated without a warning', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '14:00');
+
+    await eventRow(page, 'Fushimi Inari').click();
+    const editor = page.getByTestId('event-editor');
+    await editor.getByRole('textbox', { name: 'How long' }).nth(1).fill('20');
+    await editor.getByRole('textbox', { name: 'How long' }).nth(1).blur();
+    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+
+    const leg = page.getByTestId('transit-leg');
+    await expect(leg).toContainText('20 min');
+    await expect(leg).not.toContainText('short of the gap');
+  });
+});

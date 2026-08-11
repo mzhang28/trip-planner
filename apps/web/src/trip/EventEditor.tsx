@@ -25,6 +25,13 @@ const STATUS_OPTIONS = BOOKING_STATUSES.map((status) => ({
  * somewhere to sleep gets nights rather than a start time, and both are drawn
  * differently on the calendar.
  */
+const TRANSIT_MODES = [
+  { value: 'walk', label: 'Walk' },
+  { value: 'transit', label: 'Train' },
+  { value: 'drive', label: 'Drive' },
+  { value: 'fly', label: 'Fly' },
+] as const;
+
 const KIND_OPTIONS = [
   { value: 'activity', label: 'Thing to do' },
   { value: 'lodging', label: 'Stay' },
@@ -199,6 +206,56 @@ export function EventEditor({
           }}
         />
       </div>
+
+      <section className="flex flex-col gap-2">
+        <span className="text-xs font-medium text-ink-secondary">Getting here</span>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <TextField
+            label="How long"
+            inputMode="numeric"
+            defaultValue={event.transitIn ? String(event.transitIn.minutes) : ''}
+            placeholder="20"
+            description="In minutes, from the event before."
+            onBlur={(e) => {
+              const raw = e.currentTarget.value.trim();
+              const minutes = Number(raw);
+
+              onPatch({
+                transitIn:
+                  raw === '' || Number.isNaN(minutes) || minutes <= 0
+                    ? undefined
+                    : { ...event.transitIn, minutes, mode: event.transitIn?.mode ?? 'walk' },
+              });
+            }}
+          />
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-ink-secondary">By</span>
+            <SegmentedControl
+              label="How you get here"
+              options={TRANSIT_MODES}
+              value={event.transitIn?.mode ?? 'walk'}
+              onChange={(mode) =>
+                onPatch({
+                  transitIn: { minutes: event.transitIn?.minutes ?? 0, mode },
+                })
+              }
+            />
+          </div>
+
+          <TextField
+            label="Note"
+            defaultValue={event.transitIn?.note ?? ''}
+            placeholder="Change at Kyoto"
+            onBlur={(e) =>
+              event.transitIn &&
+              onPatch({
+                transitIn: { ...event.transitIn, note: e.currentTarget.value.trim() || undefined },
+              })
+            }
+          />
+        </div>
+      </section>
 
       <TextField
         label="Time zone"
