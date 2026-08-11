@@ -49,10 +49,10 @@ export const api = {
 
   getTrip: (tripId: string) => request<TripSummary>(`/api/trips/${tripId}`),
 
-  createShareLink: (tripId: string, role: 'viewer' | 'editor') =>
+  createShareLink: (tripId: string, role: 'viewer' | 'editor', expiresInDays?: number) =>
     request<{ token: string; role: string }>(`/api/trips/${tripId}/share`, {
       method: 'POST',
-      body: JSON.stringify({ role }),
+      body: JSON.stringify(expiresInDays ? { role, expiresInDays } : { role }),
     }),
 
   redeemShareLink: (token: string) =>

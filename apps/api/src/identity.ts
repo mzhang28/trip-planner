@@ -59,7 +59,25 @@ export interface Identity {
  * Signing in later attaches a second credential to this same id, so the trips
  * they open before signing in are still theirs afterwards.
  */
-export function createAnonymousUser(db: Db, displayName = 'Someone'): Identity {
+/*
+ * Words for a name nobody has to type.
+ *
+ * Everyone anonymous was called "Someone", so an owner looking at four people
+ * on a trip saw four rows saying the same thing and could not tell whose
+ * access to remove. A pair of ordinary words is enough to tell people apart
+ * and says nothing about who they are.
+ */
+const COLOURS = ['Amber', 'Blue', 'Coral', 'Green', 'Indigo', 'Olive', 'Plum', 'Rust'];
+const THINGS = ['Ferry', 'Kite', 'Lantern', 'Map', 'Postcard', 'Suitcase', 'Tram', 'Umbrella'];
+
+function anonymousName(): string {
+  const colour = COLOURS[Math.floor(Math.random() * COLOURS.length)] ?? 'Blue';
+  const thing = THINGS[Math.floor(Math.random() * THINGS.length)] ?? 'kite';
+
+  return `${colour} ${thing.toLowerCase()}`;
+}
+
+export function createAnonymousUser(db: Db, displayName = anonymousName()): Identity {
   const now = Date.now();
   const userId = `u_${token(16)}`;
 

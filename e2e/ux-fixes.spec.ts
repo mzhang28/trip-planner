@@ -561,9 +561,15 @@ test.describe('reaching things with a finger', () => {
       .getByText('Week', { exact: true })
       .click();
 
+    /*
+     * A day chosen on purpose, so this does not depend on where the week
+     * happens to open -- the trip's day and the day where the test runs are
+     * not the same date on either side of midnight.
+     */
+    const today = await page.getByTestId('go-to-date').inputValue();
+
     // Dragging down a column is how the week is scrolled with a finger, so the
     // gesture cannot also create. This is what it gets instead.
-    const today = new Date().toISOString().slice(0, 10);
     await page.getByTestId(`week-add-${today}`).click();
 
     const draft = page.getByTestId('week-event-draft');
@@ -793,5 +799,48 @@ test.describe('the map and the forecast', () => {
       const second = await pins.nth(1).boundingBox();
       expect(Math.abs(first!.x - second!.x)).toBeGreaterThan(40);
     }).toPass({ timeout: 10_000 });
+  });
+});
+
+test.describe('who is on a trip', () => {
+  test('members are told apart, and can be moved between reading and editing', async ({
+    page,
+    browser,
+  }) => {
+    await page.goto('/');
+    const tripId = await newTrip(page);
+
+    await page.getByRole('button', { name: 'Share trip' }).click();
+    const panel = page.getByTestId('share-panel');
+
+    // A link that runs out, which the server has always taken and the panel
+    // never offered.
+    await panel.getByTestId('link-lifetime').selectOption('7');
+    await panel.getByRole('button', { name: 'Make a link' }).click();
+    const url = await panel.getByTestId('share-url').textContent();
+    await expect(panel.getByText(/runs out/)).toBeVisible();
+
+    const other = await browser.newContext();
+    const guest = await other.newPage();
+    await guest.goto(url!);
+    await expect(guest.getByRole('heading', { name: 'Japan, April' })).toBeVisible();
+
+    // Everyone anonymous used to be called "Someone", so an owner could not
+    // tell whose access they were about to remove.
+    const role = panel.locator('[data-testid^="member-role-"]');
+    await expect(role).toHaveCount(1);
+    await expect(panel.getByText('Someone')).toHaveCount(0);
+
+    // A reader becomes an editor without being removed and invited again.
+    await role.selectOption('viewer');
+    await guest.reload();
+    await expect(guest.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
+
+    await role.selectOption('editor');
+    await guest.reload();
+    await expect(guest.getByRole('textbox', { name: 'New event' })).toBeVisible();
+
+    await other.close();
+    void tripId;
   });
 });

@@ -1,5 +1,5 @@
 import { Button, Card, SegmentedControl, cn } from '@trip/ui';
-import { Check, Copy, X } from 'lucide-react';
+import { Check, Copy, Share2, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 
@@ -9,6 +9,18 @@ const ROLES = [
   { value: 'viewer', label: 'Can read' },
   { value: 'editor', label: 'Can edit' },
 ] as const;
+
+/*
+ * How long a link works for. The server has always taken an expiry and the
+ * panel never offered one, so every link ever made lasted until somebody
+ * remembered to revoke it.
+ */
+const LIVES_FOR = [
+  { value: 0, label: 'Until revoked' },
+  { value: 1, label: 'A day' },
+  { value: 7, label: 'A week' },
+  { value: 30, label: 'A month' },
+];
 
 interface AccessLink {
   id: string;
@@ -52,6 +64,7 @@ function on(at: number): string {
  */
 export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () => void }) {
   const [role, setRole] = useState<Role>('editor');
+  const [days, setDays] = useState(0);
   const [made, setMade] = useState<{ url: string; role: Role } | null>(null);
   const [copied, setCopied] = useState(false);
   const [links, setLinks] = useState<AccessLink[]>([]);
@@ -106,7 +119,7 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
 
   async function makeLink() {
     try {
-      const { token } = await api.createShareLink(tripId, role);
+      const { token } = await api.createShareLink(tripId, role, days || undefined);
 
       setMade({ url: `${location.origin}/join/${token}`, role });
       setCopied(false);
@@ -171,6 +184,22 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
             />
           </div>
 
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-ink-secondary">Works for</span>
+            <select
+              data-testid="link-lifetime"
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+              className="h-8 rounded-md border border-line-input bg-card px-2 text-xs text-ink"
+            >
+              {LIVES_FOR.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <Button variant="primary" onPress={() => void makeLink()}>
             Make a link
           </Button>
@@ -219,6 +248,22 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
                 {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                 {copied ? 'Copied' : 'Copy'}
               </Button>
+
+              {/* Handing a link to somebody standing next to you is the common
+                  case on a phone, and the browser already knows how. */}
+              {typeof navigator.share === 'function' && (
+                <Button
+                  size="sm"
+                  onPress={() =>
+                    void navigator
+                      .share({ title: 'Trip', url: made.url })
+                      .catch(() => setFailed(null))
+                  }
+                >
+                  <Share2 className="size-3.5" />
+                  Share
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -283,6 +328,28 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
                   {member.userId === you && ' (you)'}
                   <span className="block text-2xs text-ink-muted">{ROLE_WORD[member.role]}</span>
                 </span>
+
+                {member.userId !== you && member.role !== 'owner' && (
+                  <label className="flex items-center gap-1 text-2xs text-ink-secondary">
+                    <span className="sr-only">What {member.name} can do</span>
+                    <select
+                      data-testid={`member-role-${member.userId}`}
+                      value={member.role}
+                      onChange={async (e) => {
+                        await fetch(`/api/trips/${tripId}/access/members/${member.userId}`, {
+                          method: 'PATCH',
+                          headers: { 'content-type': 'application/json' },
+                          body: JSON.stringify({ role: e.target.value }),
+                        });
+                        await load();
+                      }}
+                      className="h-7 rounded-md border border-line-input bg-card px-1 text-xs text-ink"
+                    >
+                      <option value="viewer">Can read</option>
+                      <option value="editor">Can edit</option>
+                    </select>
+                  </label>
+                )}
 
                 {member.userId !== you && (
                   <Button

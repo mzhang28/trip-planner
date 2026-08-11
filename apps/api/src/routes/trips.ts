@@ -194,6 +194,33 @@ export function tripRoutes() {
     return c.json({ ok: true });
   });
 
+  /**
+   * Changes what a member may do.
+   *
+   * Removing and re-inviting was the only way to turn a reader into an editor,
+   * which loses them the trip in their list in between.
+   */
+  app.patch('/:tripId/access/members/:userId', requireMembership, async (c) => {
+    const { db } = c.var.services;
+    const membership = c.var.membership!;
+    const target = c.req.param('userId');
+
+    if (membership.role !== 'owner') return c.json({ error: 'owner_only' }, 403);
+    if (target === membership.userId) return c.json({ error: 'cannot_change_yourself' }, 400);
+
+    const parsed = z
+      .object({ role: z.enum(['viewer', 'editor']) })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: 'bad_request' }, 400);
+
+    db.update(tripMembers)
+      .set({ role: parsed.data.role })
+      .where(and(eq(tripMembers.tripId, membership.tripId), eq(tripMembers.userId, target)))
+      .run();
+
+    return c.json({ ok: true });
+  });
+
   app.delete('/:tripId/access/members/:userId', requireMembership, (c) => {
     const { db } = c.var.services;
     const membership = c.var.membership!;
