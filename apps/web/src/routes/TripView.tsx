@@ -25,8 +25,8 @@ import {
   type TripDoc,
   type TripEvent,
 } from '@trip/crdt';
-import { Button, SegmentedControl, TextField, ThemeToggle } from '@trip/ui';
-import { GripVertical, Plus } from 'lucide-react';
+import { Button, IconButton, SegmentedControl, TextField, ThemeToggle } from '@trip/ui';
+import { GripVertical, Plus, Settings, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, type TripSummary } from '../lib/api';
@@ -83,6 +83,82 @@ function groupByDay(events: TripEvent[], homeTimezone: string) {
   }
 
   return [...days.entries()];
+}
+
+function HeaderActions({
+  canShare,
+  zonePreference,
+  onChangeZone,
+  onShare,
+}: {
+  canShare: boolean;
+  zonePreference: 'event' | 'device';
+  onChangeZone: (value: 'event' | 'device') => void;
+  onShare: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const container = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function dismiss(event: PointerEvent) {
+      if (!container.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={container} className="relative flex items-center gap-1">
+      {canShare && (
+        <IconButton label="Share trip" variant="secondary" onPress={onShare}>
+          <Share2 aria-hidden="true" />
+        </IconButton>
+      )}
+
+      <IconButton
+        label="Settings"
+        variant="secondary"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onPress={() => setOpen((current) => !current)}
+      >
+        <Settings aria-hidden="true" />
+      </IconButton>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Settings"
+          className="absolute top-full right-0 z-30 mt-2 flex w-72 flex-col gap-4 rounded-lg border border-line bg-raised p-4 shadow-lg"
+        >
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-ink-secondary">Show times in</span>
+            <SegmentedControl
+              label="Show times in"
+              options={ZONE_OPTIONS}
+              value={zonePreference}
+              onChange={onChangeZone}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-ink-secondary">Theme</span>
+            <ThemeToggle />
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function TripView() {
@@ -370,14 +446,12 @@ export function TripView() {
             value={view}
             onChange={setView}
           />
-          <SegmentedControl
-            label="Show times in"
-            className="hidden md:inline-flex"
-            options={ZONE_OPTIONS}
-            value={zonePreference}
-            onChange={setZonePreference}
+          <HeaderActions
+            canShare={trip?.role === 'owner'}
+            zonePreference={zonePreference}
+            onChangeZone={setZonePreference}
+            onShare={share}
           />
-          <ThemeToggle />
         </div>
 
         {/* Below the small breakpoint the search box gets the whole row. */}
