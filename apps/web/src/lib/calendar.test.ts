@@ -6,6 +6,7 @@ import {
   eventsByDay,
   lodgingSpans,
   monthGrid,
+  openingDay,
   spanWithin,
   startOfWeek,
   weekOf,
@@ -169,5 +170,35 @@ describe('placing a span in a run of days', () => {
   it('gives nothing for a span that misses this week entirely', () => {
     expect(spanWithin({ from: '2026-09-01', to: '2026-09-03' }, days)).toBeNull();
     expect(spanWithin({ from: '2026-07-01', to: '2026-07-03' }, days)).toBeNull();
+  });
+});
+
+describe('which day a trip opens on', () => {
+  const TODAY = '2026-08-14';
+
+  it('opens on today when something is happening today', () => {
+    const byDay = [
+      event({ startsAt: at('2026-08-10') }),
+      event({ startsAt: at('2026-08-14') }),
+    ];
+    expect(openingDay(byDay, TOKYO, TODAY)).toBe(TODAY);
+  });
+
+  it('opens on the next day of a trip that has not started', () => {
+    const byDay = [event({ startsAt: at('2026-09-02') }), event({ startsAt: at('2026-09-05') })];
+
+    // A trip in September opened in August should show September, not an empty
+    // August that says nothing about it.
+    expect(openingDay(byDay, TOKYO, TODAY)).toBe('2026-09-02');
+  });
+
+  it('opens on the last day of a trip that is over', () => {
+    const byDay = [event({ startsAt: at('2026-07-02') }), event({ startsAt: at('2026-07-05') })];
+    expect(openingDay(byDay, TOKYO, TODAY)).toBe('2026-07-05');
+  });
+
+  it('falls back to today when nothing has a date', () => {
+    expect(openingDay([event({})], TOKYO, TODAY)).toBe(TODAY);
+    expect(openingDay([], TOKYO, TODAY)).toBe(TODAY);
   });
 });

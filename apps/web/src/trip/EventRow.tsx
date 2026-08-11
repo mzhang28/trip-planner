@@ -11,6 +11,7 @@ import type { ReactNode } from 'react';
 import { Button } from 'react-aria-components';
 import { formatTime } from '../lib/time';
 import { useDisplayZone } from './useDisplayZone';
+import { EventDetails } from './EventDetails';
 import { EventEditor } from './EventEditor';
 import { FlightSummary } from './FlightFields';
 
@@ -114,12 +115,10 @@ export function EventRow({
         <Button
           data-testid="event"
           onPress={onToggle}
-          isDisabled={readOnly}
           aria-expanded={isOpen}
           className={cn(
             'flex flex-1 items-center gap-3 px-3 py-2.5 text-left',
             'data-hovered:bg-sunken data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-2',
-            readOnly && 'cursor-default',
           )}
         >
           <span className="tabular w-11 shrink-0 text-xs text-ink-muted">{time ?? '--:--'}</span>
@@ -147,6 +146,17 @@ export function EventRow({
         <div className="px-3 pb-2">
           <FlightSummary event={event} homeTimezone={homeTimezone} />
         </div>
+      )}
+
+      {isOpen && readOnly && (
+        <EventDetails
+          event={event}
+          homeTimezone={homeTimezone}
+          zone={zone}
+          fieldDefs={fieldDefs}
+          doc={doc}
+          onOpenEvent={onOpenEvent}
+        />
       )}
 
       {isOpen && !readOnly && (

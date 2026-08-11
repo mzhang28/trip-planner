@@ -11,7 +11,8 @@ import { BOOKING_STATUSES } from '@trip/crdt';
 import { Button, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { formatTime, setTimeOfDay, zoneFor } from '../lib/time';
+import { formatTime, setDay, setTimeOfDay, toDateInput, zoneFor } from '../lib/time';
+import { TimeField } from './TimeField';
 import { Attachments } from './Attachments';
 import { DescriptionEditor } from './DescriptionEditor';
 import { FieldPalette, type PaletteChip } from './FieldPalette';
@@ -122,22 +123,63 @@ export function EventEditor({
         ),
       },
       {
-        key: 'time',
-        label: 'Time',
+        key: 'when',
+        label: 'Date',
         filled: event.startsAt !== undefined,
         render: () => (
-          <TextField
-            label={`Start time (${zone})`}
-            defaultValue={time}
-            placeholder="09:00"
-            onBlur={(e) => {
-              const raw = e.currentTarget.value.trim();
-              if (raw === '') return onPatch({ startsAt: undefined });
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-ink-secondary">Date</span>
+              {/*
+                A real date control, not a text box that guessed. Entering a
+                time used to put the event on today whatever day was meant,
+                which on a trip planner is the one thing that must not be
+                guessed.
+              */}
+              <input
+                type="date"
+                data-testid="event-date"
+                value={event.startsAt === undefined ? '' : toDateInput(event.startsAt, zone)}
+                onChange={(e) => {
+                  const day = e.target.value;
+                  if (!day) return onPatch({ startsAt: undefined });
 
-              const next = setTimeOfDay(event.startsAt ?? Date.now(), zone, raw);
-              if (next !== null) onPatch({ startsAt: next, timezone: zone });
-            }}
-          />
+                  const next = setDay(event.startsAt, zone, day);
+                  if (next !== null) onPatch({ startsAt: next, timezone: zone });
+                }}
+                className={cn(
+                  'h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-ink',
+                  'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                )}
+              />
+            </label>
+
+            <TimeField
+              label={`Time (${zone})`}
+              value={time}
+              disabled={event.startsAt === undefined}
+              hint={
+                event.startsAt === undefined
+                  ? 'Pick a date first.'
+                  : 'Leave blank while you are still working out when.'
+              }
+              onCommit={(raw) => {
+                if (raw === '') {
+                  // Keeps the day, drops the time of day, which is the state an
+                  // event is in before anyone has decided the hour.
+                  const day = toDateInput(event.startsAt!, zone);
+                  const next = setDay(undefined, zone, day);
+                  return next === null ? 'That is not a time' : (onPatch({ startsAt: next }), null);
+                }
+
+                const next = setTimeOfDay(event.startsAt ?? Date.now(), zone, raw);
+                if (next === null) return 'Use a 24-hour time, like 09:00';
+
+                onPatch({ startsAt: next, timezone: zone });
+                return null;
+              }}
+            />
+          </div>
         ),
       },
       {

@@ -179,3 +179,22 @@ export function spanWithin(
 
   return { start, length: end - start + 1 };
 }
+
+/**
+ * The day a trip should open on.
+ *
+ * Today, when the trip is happening around now. Otherwise its next day, and
+ * failing that its last — a trip in April opened in January should show April,
+ * not an empty January that says nothing about it.
+ */
+export function openingDay(events: TripEvent[], homeTimezone: string, today: DayKey): DayKey {
+  const days = events
+    .map((event) => eventDay(event, homeTimezone))
+    .filter((day): day is DayKey => day !== null)
+    .sort();
+
+  if (days.length === 0) return today;
+  if (days.some((day) => day === today)) return today;
+
+  return days.find((day) => day > today) ?? days[days.length - 1]!;
+}

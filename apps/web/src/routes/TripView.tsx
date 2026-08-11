@@ -32,8 +32,9 @@ import { Link, useParams } from 'react-router';
 import { api, type TripSummary } from '../lib/api';
 import { randomId } from '../lib/crypto';
 import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
-import { addDays, eventDay, startOfWeek, type DayKey } from '../lib/calendar';
+import { addDays, eventDay, openingDay, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
+import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
 import { useUploadFlush } from '../trip/Attachments';
 import { RecoveryBanner } from '../trip/RecoveryBanner';
 import { MergePreview, SelectionBar } from '../trip/SelectionBar';
@@ -56,8 +57,6 @@ const UNSCHEDULED = 'unscheduled';
  * 09:00 whether you are there or at home, which is what a plan is for. The
  * other setting is for working out whether you can call someone.
  */
-type CalendarView = 'day' | 'week' | 'month';
-
 const VIEW_OPTIONS = [
   { value: 'day', label: 'Day' },
   { value: 'week', label: 'Week' },
@@ -112,7 +111,7 @@ export function TripView() {
   const doc = state?.doc as TripDoc | undefined;
   const homeTimezone = trip?.homeTimezone ?? doc?.meta?.homeTimezone ?? 'UTC';
   const readOnly = trip?.role === 'viewer';
-  const days = useMemo(() => groupByDay(events, homeTimezone), [events, homeTimezone]);
+
   const fieldDefs = useMemo(() => liveFieldDefs(doc), [doc]);
   const zonePreference = useZonePreference();
 
@@ -122,7 +121,51 @@ export function TripView() {
 
   const [view, setView] = useState<CalendarView>('day');
   const [anchor, setAnchor] = useState<DayKey>(() => new Date().toISOString().slice(0, 10));
+  const [anchored, setAnchored] = useState(false);
   const today = dayKey(Date.now(), homeTimezone);
+
+  /**
+   * Moves the view, and records that it was moved on purpose.
+   *
+   * Everything that changes the day goes through here so the opening guess
+   * below cannot fire afterwards. Without that, navigating to a future day and
+   * adding to it would make the trip non-empty, which would then send the view
+   * somewhere else -- the person would be moved off the day they had just
+   * chosen, by the act of using it.
+   */
+  const moveAnchor = useCallback((day: DayKey) => {
+    setAnchor(day);
+    setAnchored(true);
+  }, []);
+
+  /*
+   * The opening guess, once, and only while the person has not chosen a day.
+   */
+  useEffect(() => {
+    if (anchored || events.length === 0) return;
+
+    setAnchor(openingDay(events, homeTimezone, today));
+    setAnchored(true);
+  }, [anchored, events, homeTimezone, today]);
+
+  const days = useMemo(() => {
+    const grouped = groupByDay(events, homeTimezone);
+
+    /*
+     * The anchored day is always present, even with nothing on it. Without it
+     * there is no way to add to a day that is empty, which is every day of a
+     * trip before it is planned.
+     */
+    if (view === 'day' && !grouped.some(([key]) => key === anchor)) {
+      grouped.push([anchor, []]);
+    }
+
+    return grouped.sort(([a], [b]) => {
+      if (a === UNSCHEDULED) return 1;
+      if (b === UNSCHEDULED) return -1;
+      return a.localeCompare(b);
+    });
+  }, [events, homeTimezone, view, anchor]);
 
   /*
    * The map shows the day the list is anchored on, not the whole trip. Pins
@@ -214,14 +257,14 @@ export function TripView() {
     });
 
     setView('day');
-    setAnchor(day);
+    moveAnchor(day);
     setOpenEventId(id);
     setHighlighted(id);
   }
 
   function goToDay(at: number) {
     const key = dayKey(at, homeTimezone);
-    setAnchor(key);
+    moveAnchor(key);
 
     // The day may not be on screen yet in week or month view, so move the
     // window first and scroll once React has drawn it.
@@ -367,34 +410,7 @@ export function TripView() {
           </p>
         )}
 
-        {view !== 'day' && (
-          <div className="mb-4 flex items-center gap-2">
-            <Button
-              size="sm"
-              onPress={() => setAnchor((at) => addDays(at, view === 'week' ? -7 : -28))}
-            >
-              Earlier
-            </Button>
-            <Button size="sm" onPress={() => setAnchor(today)}>
-              Today
-            </Button>
-            <Button
-              size="sm"
-              onPress={() => setAnchor((at) => addDays(at, view === 'week' ? 7 : 28))}
-            >
-              Later
-            </Button>
-            <span className="tabular text-xs text-ink-muted">
-              {view === 'week'
-                ? `Week of ${startOfWeek(anchor)}`
-                : new Intl.DateTimeFormat('en-GB', {
-                    month: 'long',
-                    year: 'numeric',
-                    timeZone: 'UTC',
-                  }).format(Date.parse(`${anchor}T12:00:00Z`))}
-            </span>
-          </div>
-        )}
+        <DayNavigator view={view} anchor={anchor} today={today} onChange={moveAnchor} />
 
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           {view === 'week' && (
@@ -419,7 +435,7 @@ export function TripView() {
               today={today}
               readOnly={readOnly}
               onOpenDay={(day) => {
-                setAnchor(day);
+                moveAnchor(day);
                 setView('day');
               }}
               onCreateOn={(day) => createOn(day)}
@@ -433,14 +449,27 @@ export function TripView() {
             <section key={key} className="mb-8">
               <h2 className="mb-2 text-sm text-ink-muted">
                 {key === UNSCHEDULED
-                  ? 'No time yet'
-                  : formatDayHeading(
-                      dayEvents[0]!.startsAt!,
-                      dayEvents[0]!.timezone ?? homeTimezone,
-                    )}
+                  ? 'No date yet'
+                  : /*
+                     * From the day itself, not from its first event. A day the
+                     * person navigated to has no events to ask, which is
+                     * exactly when it needs a heading.
+                     */
+                    formatDayHeading(Date.parse(`${key}T12:00:00Z`), 'UTC')}
               </h2>
 
               <DayDropZone dayKey={key} disabled={readOnly || key === UNSCHEDULED}>
+                {dayEvents.length === 0 && !readOnly && (
+                  <button
+                    type="button"
+                    data-testid={`add-on-${key}`}
+                    onClick={() => createOn(key)}
+                    className="w-full rounded-lg border border-dashed border-line-default px-3 py-6 text-sm text-ink-muted hover:border-accent hover:bg-accent-soft hover:text-accent-text focus-visible:outline-focus focus-visible:outline-2"
+                  >
+                    Nothing on this day yet. Add something.
+                  </button>
+                )}
+
                 <div className="flex flex-col gap-2">
                   {dayEvents.map((event, index) => (
                     <div key={event.id}>

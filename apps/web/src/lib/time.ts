@@ -115,3 +115,23 @@ function offsetAt(at: Instant, timeZone: string): number {
 
   return asIfUtc - at;
 }
+
+/** The calendar day of an instant in a zone, as a `YYYY-MM-DD` input value. */
+export function toDateInput(at: Instant, timeZone: string): string {
+  return dayKey(at, timeZone);
+}
+
+/**
+ * Puts an instant on a given calendar day, keeping its time of day.
+ *
+ * An event with no time yet lands at midday rather than midnight: it reads as
+ * "this day, time still to work out" instead of claiming to start at 00:00.
+ */
+export function setDay(
+  at: Instant | undefined,
+  timeZone: string,
+  day: string,
+): Instant | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  return moveToDay(at ?? Date.parse(`${day}T12:00:00Z`), timeZone, day);
+}

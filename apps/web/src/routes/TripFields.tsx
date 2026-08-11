@@ -11,9 +11,10 @@ import {
 } from '@trip/crdt';
 import { Button, Card, TextField, ThemeToggle } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { randomId } from '../lib/crypto';
+import { api, type TripSummary } from '../lib/api';
 import { AuditPanel } from '../trip/AuditPanel';
 import { useTripState, useTripStore } from '../trip/useTrip';
 
@@ -44,8 +45,46 @@ export function TripFields() {
   const store = useTripStore(tripId);
   const state = useTripState(store);
 
+  /*
+   * This screen asked nothing about the role and offered every write control to
+   * anyone who reached the URL. The server refuses the writes, so nothing was
+   * ever changed -- but a viewer could add a field, watch it appear, and find
+   * it gone on the next load, which is worse than being told no.
+   */
+  const [trip, setTrip] = useState<TripSummary | null>(null);
+
+  /*
+   * Read-only until the role is known, not until it is known to be viewer.
+   * The other way round shows every write control for as long as the request
+   * takes, so a viewer sees buttons appear and then vanish.
+   */
+  const canEdit = trip !== null && trip.role !== 'viewer';
+  const readOnly = !canEdit;
+
+  useEffect(() => {
+    if (!tripId) return;
+    void api
+      .getTrip(tripId)
+      .then(setTrip)
+      .catch(() => setTrip(null));
+  }, [tripId]);
+
   const doc = state?.doc as TripDoc | undefined;
   const defs = useMemo(() => liveFieldDefs(doc), [doc]);
+
+  /** How many events would lose something, so a delete can say what it costs. */
+  const usage = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const event of Object.values(doc?.events ?? {})) {
+      if (event.deletedAt !== undefined) continue;
+      for (const fieldId of Object.keys(event.customFields)) {
+        counts.set(fieldId, (counts.get(fieldId) ?? 0) + 1);
+      }
+    }
+
+    return counts;
+  }, [doc]);
 
   const [label, setLabel] = useState('');
   const [type, setType] = useState<FieldType>('text');
@@ -81,12 +120,19 @@ export function TripFields() {
       </header>
 
       <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-        <h2 className="mb-1 text-sm text-ink">Fields</h2>
+        <h2 className="mb-1 text-sm text-ink">Custom fields</h2>
         <p className="mb-6 max-w-prose text-sm text-ink-secondary">
           Anything you add here appears on every event in this trip, and is searchable by its name
           as well as its value.
         </p>
 
+        {readOnly && (
+          <p className="mb-6 rounded-md border border-line bg-sunken px-3 py-2 text-sm text-ink-secondary">
+            You are reading this trip. Only someone who can edit it may change its fields.
+          </p>
+        )}
+
+        {!readOnly && (
         <Card className="mb-8 p-4">
           <div className="flex flex-wrap items-end gap-3">
             <TextField
@@ -125,6 +171,7 @@ export function TripFields() {
             {TYPES.find((option) => option.value === type)?.hint}
           </p>
         </Card>
+        )}
 
         {defs.length === 0 ? (
           <p className="py-6 text-center text-ink-secondary">
@@ -136,6 +183,8 @@ export function TripFields() {
               <FieldRow
                 key={def.id}
                 def={def}
+                readOnly={readOnly}
+                usedBy={usage.get(def.id) ?? 0}
                 onRename={(next) => store?.change((c) => updateFieldDef(c, def.id, { label: next }))}
                 onSetUnit={(unit) => store?.change((c) => updateFieldDef(c, def.id, { unit }))}
                 onSetCurrency={(currency) =>
@@ -171,6 +220,8 @@ export function TripFields() {
 
 function FieldRow({
   def,
+  readOnly,
+  usedBy,
   onRename,
   onSetUnit,
   onSetCurrency,
@@ -179,6 +230,8 @@ function FieldRow({
   onDelete,
 }: {
   def: FieldDef;
+  readOnly: boolean;
+  usedBy: number;
   onRename: (label: string) => void;
   onSetUnit: (unit: string | undefined) => void;
   onSetCurrency: (currency: string | undefined) => void;
@@ -195,6 +248,7 @@ function FieldRow({
         <TextField
           label="Name"
           className="min-w-40 flex-1"
+          isDisabled={readOnly}
           defaultValue={def.label}
           onBlur={(e) => {
             const next = e.currentTarget.value.trim();
@@ -206,16 +260,32 @@ function FieldRow({
           {TYPES.find((t) => t.value === def.type)?.label}
         </span>
 
-        <Button variant="ghost" size="sm" onPress={onDelete} className="text-danger">
-          <Trash2 className="size-3.5" />
-          Delete
-        </Button>
+        {!readOnly && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onPress={() => {
+              /*
+               * Named, and counted. Removing a field takes its value off every
+               * event that had one, and the number is the only way to know
+               * whether that is nothing or a week of work.
+               */
+              const cost = usedBy === 0 ? '' : ` It is filled in on ${usedBy} event${usedBy === 1 ? '' : 's'}, and those values go with it.`;
+              if (confirm(`Delete the field “${def.label}”?${cost}`)) onDelete();
+            }}
+            className="text-danger"
+          >
+            <Trash2 className="size-3.5" />
+            Delete
+          </Button>
+        )}
       </div>
 
       {def.type === 'number' && (
         <TextField
           label="Unit"
           className="max-w-40"
+          isDisabled={readOnly}
           placeholder="km"
           defaultValue={def.unit ?? ''}
           onBlur={(e) => onSetUnit(e.currentTarget.value.trim() || undefined)}
@@ -226,6 +296,7 @@ function FieldRow({
         <TextField
           label="Currency"
           className="max-w-40"
+          isDisabled={readOnly}
           placeholder="JPY"
           description="A three-letter code."
           defaultValue={def.currency ?? ''}
@@ -233,7 +304,7 @@ function FieldRow({
         />
       )}
 
-      {isChoice && (
+      {isChoice && !readOnly && (
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium text-ink-secondary">Choices</span>
 

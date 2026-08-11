@@ -8,6 +8,97 @@ import { formatTime } from '../lib/time';
 import { useDisplayZone } from './useDisplayZone';
 import { weatherGlyph, type DailyWeather } from './useWeather';
 
+/* A calendar hour needs enough room for a readable short event. */
+const HOUR_HEIGHT = 56;
+const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
+const DAY_HEIGHT = HOUR_HEIGHT * 24;
+const DEFAULT_EVENT_MINUTES = 30;
+
+interface PositionedEvent {
+  event: TripEvent;
+  top: number;
+  height: number;
+  column: number;
+  columns: number;
+}
+
+function minutesSinceMidnight(at: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone,
+  }).formatToParts(at);
+  const value = (part: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((candidate) => candidate.type === part)?.value ?? '0');
+
+  return (value('hour') % 24) * 60 + value('minute');
+}
+
+/**
+ * Places events in their true time slot and gives overlapping appointments a
+ * lane of their own. Without lanes, two 09:00 appointments obscure each
+ * other; without absolute positions, a 17:00 appointment reads as though it
+ * follows breakfast.
+ */
+function positionEvents(
+  events: TripEvent[],
+  displayZone: (eventZone: string | undefined, homeZone: string) => string,
+  homeTimezone: string,
+): PositionedEvent[] {
+  const timed = events
+    .filter((event): event is TripEvent & { startsAt: number } => event.startsAt !== undefined)
+    .map((event) => {
+      const start = minutesSinceMidnight(event.startsAt, displayZone(event.timezone, homeTimezone));
+      const duration = Math.max(1, event.durationMinutes ?? DEFAULT_EVENT_MINUTES);
+
+      return {
+        event,
+        start,
+        end: Math.min(24 * 60, start + duration),
+        column: 0,
+        columns: 1,
+      };
+    })
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+
+  const positioned: typeof timed = [];
+  let group: typeof timed = [];
+  let groupEnd = -1;
+
+  function finishGroup() {
+    if (group.length === 0) return;
+    const columns = Math.max(...group.map((item) => item.column)) + 1;
+    for (const item of group) item.columns = columns;
+    positioned.push(...group);
+    group = [];
+    groupEnd = -1;
+  }
+
+  for (const item of timed) {
+    if (item.start >= groupEnd) finishGroup();
+
+    const occupied = new Set(
+      group.filter((candidate) => candidate.end > item.start).map((candidate) => candidate.column),
+    );
+    while (occupied.has(item.column)) item.column += 1;
+
+    group.push(item);
+    groupEnd = Math.max(groupEnd, item.end);
+  }
+  finishGroup();
+
+  return positioned.map((item) => ({
+    event: item.event,
+    top: item.start * MINUTE_HEIGHT,
+    // Leave a small visible gap between back-to-back appointments. The minimum
+    // keeps an undetailed event tappable.
+    height: Math.max(30, (item.end - item.start) * MINUTE_HEIGHT - 2),
+    column: item.column,
+    columns: item.columns,
+  }));
+}
+
 export interface WeekViewProps {
   anchor: DayKey;
   events: TripEvent[];
@@ -63,11 +154,16 @@ function DayColumn({
       onPointerEnter={onEnter}
       onPointerUp={onFinish}
       className={cn(
-        'flex min-h-40 min-w-32 flex-col gap-1 bg-card p-1 lg:min-h-[calc(100dvh-22rem)]',
+        'relative block min-w-32 bg-card',
         isOver && 'bg-accent-soft',
         selected && 'bg-accent-soft',
         !disabled && 'cursor-cell',
       )}
+      style={{
+        height: DAY_HEIGHT,
+        backgroundImage:
+          'repeating-linear-gradient(to bottom, transparent 0, transparent 55px, var(--line) 56px)',
+      }}
     >
       {children}
     </div>
@@ -200,26 +296,35 @@ export function WeekView({
             );
           })}
 
-          {days.map((day) => (
-            <DayColumn
-              key={day}
-              day={day}
-              disabled={readOnly}
-              selected={Boolean(selecting && day >= selecting.from && day <= selecting.to)}
-              onStart={() => {
-                setDragFrom(day);
-                setDragTo(day);
-              }}
-              onEnter={() => dragFrom && setDragTo(day)}
-              onFinish={finishDrag}
-            >
-                {(byDay.get(day) ?? []).map((event) => (
+          {days.map((day) => {
+            const positioned = positionEvents(byDay.get(day) ?? [], displayZone, homeTimezone);
+
+            return (
+              <DayColumn
+                key={day}
+                day={day}
+                disabled={readOnly}
+                selected={Boolean(selecting && day >= selecting.from && day <= selecting.to)}
+                onStart={() => {
+                  setDragFrom(day);
+                  setDragTo(day);
+                }}
+                onEnter={() => dragFrom && setDragTo(day)}
+                onFinish={finishDrag}
+              >
+                {positioned.map(({ event, top, height, column, columns }) => (
                   <button
                     key={event.id}
                     type="button"
                     data-testid="week-event"
                     onClick={() => onOpenEvent(event.id)}
-                    className="flex w-full gap-1.5 rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
+                    style={{
+                      top,
+                      height,
+                      left: `calc(${(column / columns) * 100}% + 2px)`,
+                      width: `calc(${100 / columns}% - 4px)`,
+                    }}
+                    className="absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
                   >
                     <StatusSpine status={event.booking.status} />
                     <span className="min-w-0 flex-1">
@@ -239,8 +344,9 @@ export function WeekView({
                     </span>
                   </button>
                 ))}
-            </DayColumn>
-          ))}
+              </DayColumn>
+            );
+          })}
         </div>
 
         <section className="mt-2" aria-label="Where you are sleeping">

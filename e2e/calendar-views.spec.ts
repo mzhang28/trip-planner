@@ -36,11 +36,15 @@ async function addEvent(page: Page, name: string, city: string, time: string) {
   await expect(editor).toHaveCount(1);
 
   await revealField(page, 'city');
-  await revealField(page, 'time');
+  await revealField(page, 'when');
 
   await editor.getByRole('textbox', { name: 'City' }).fill(city);
-  await editor.getByRole('textbox', { name: /Start time/ }).fill(time);
-  await editor.getByRole('textbox', { name: /Start time/ }).blur();
+
+  // A date first, then a time. The time field is disabled until there is a day
+  // for it to be a time on.
+  await editor.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
+  await editor.getByRole('textbox', { name: /Time \(/ }).fill(time);
+  await editor.getByRole('textbox', { name: /Time \(/ }).blur();
 
   // Close whichever card is open. The event has moved to another day by now,
   // so it is not necessarily the one that was clicked to open it.
@@ -328,7 +332,7 @@ test.describe('filling an event in gradually', () => {
     // Just a name. An event that is only a name is finished, not unfinished.
     await expect(editor.getByRole('textbox', { name: 'Name' })).toBeVisible();
     await expect(editor.getByTestId('field-city')).toHaveCount(0);
-    await expect(editor.getByTestId('field-time')).toHaveCount(0);
+    await expect(editor.getByTestId('field-when')).toHaveCount(0);
 
     await editor.getByTestId('add-field-city').click();
     await expect(editor.getByTestId('field-city')).toBeVisible();
@@ -367,7 +371,7 @@ test.describe('filling an event in gradually', () => {
     const editor = page.getByTestId('event-editor');
 
     await expect(editor.getByTestId('field-city')).toBeVisible();
-    await expect(editor.getByTestId('field-time')).toBeVisible();
+    await expect(editor.getByTestId('field-when')).toBeVisible();
     await expect(editor.getByTestId('add-field-city')).toHaveCount(0);
   });
 });

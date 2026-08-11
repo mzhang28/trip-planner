@@ -138,9 +138,10 @@ test.describe('offline editing', () => {
 
     // One sets the time, the other sets the booking status.
     await eventRow(page, 'Fushimi Inari').click();
-    await revealField(page, 'time');
-    await page.getByRole('textbox', { name: /Start time/ }).fill('05:30');
-    await page.getByRole('textbox', { name: /Start time/ }).blur();
+    await revealField(page, 'when');
+    await page.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
+    await page.getByRole('textbox', { name: /Time \(/ }).fill('05:30');
+    await page.getByRole('textbox', { name: /Time \(/ }).blur();
 
     await eventRow(otherPage, 'Fushimi Inari').click();
     await revealField(otherPage, 'booking');
@@ -212,7 +213,12 @@ test.describe('sharing', () => {
     await expect(eventRow(otherPage, 'Fushimi Inari')).toBeVisible();
     // No way in to change anything: no add box and the row does not open.
     await expect(otherPage.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
-    await expect(eventRow(otherPage, 'Fushimi Inari')).toBeDisabled();
+
+    // The card opens, into details rather than the editor. Read-only hides the
+    // controls, not the content.
+    await eventRow(otherPage, 'Fushimi Inari').click();
+    await expect(otherPage.getByTestId('event-details')).toBeVisible();
+    await expect(otherPage.getByTestId('event-editor')).toHaveCount(0);
 
     await other.close();
   });
@@ -289,9 +295,10 @@ test.describe('moving events', () => {
 
     await addEvent(page, 'Fushimi Inari');
     await eventRow(page, 'Fushimi Inari').click();
-    await revealField(page, 'time');
-    await page.getByRole('textbox', { name: /Start time/ }).fill('09:00');
-    await page.getByRole('textbox', { name: /Start time/ }).blur();
+    await revealField(page, 'when');
+    await page.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
+    await page.getByRole('textbox', { name: /Time \(/ }).fill('09:00');
+    await page.getByRole('textbox', { name: /Time \(/ }).blur();
     await page.locator('[data-testid="event"][aria-expanded="true"]').click();
     await expectSaved(page);
 
