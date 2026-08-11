@@ -12,7 +12,7 @@ runMigrations(db, resolve(import.meta.dirname, '../drizzle'));
 
 const docs = new DocStore(db);
 const blobs = await createBlobStore();
-const stopSweep = scheduleSweep(db, docs);
+const stopSweep = scheduleSweep(db, docs, blobs);
 
 const app = createApp({ db, docs, blobs });
 

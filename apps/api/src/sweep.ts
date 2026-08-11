@@ -81,20 +81,29 @@ export async function collectBlobs(
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Runs the sweep once at startup and then daily. */
-export function scheduleSweep(db: Db, docs: DocStore): () => void {
-  const run = () => {
+/** Runs the sweep and the blob collection once at startup, then daily. */
+export function scheduleSweep(db: Db, docs: DocStore, blobs: BlobStore): () => void {
+  const run = async () => {
     try {
       sweepAllTrips(db, docs);
+
+      /*
+       * Collection runs after the sweep, in that order on purpose. A tombstoned
+       * event still points at its files so an undo can bring them back, so the
+       * files only become unreachable once the tombstone itself has gone.
+       */
+      if (blobs.list) {
+        await collectBlobs(db, docs, blobs, await blobs.list());
+      }
     } catch (error) {
       // A failed sweep must not take the server down with it. Tombstones
       // outliving thirty days costs space; an unreachable server costs the app.
-      console.error('tombstone sweep failed', error);
+      console.error('nightly cleanup failed', error);
     }
   };
 
-  run();
-  const timer = setInterval(run, DAY_MS);
+  void run();
+  const timer = setInterval(() => void run(), DAY_MS);
   timer.unref?.();
 
   return () => clearInterval(timer);

@@ -47,6 +47,33 @@ export function blobRoutes() {
     });
   });
 
+  /**
+   * Where to send these bytes.
+   *
+   * On object storage this hands back a URL the browser uploads to directly, so
+   * a twenty-megabyte scan never travels through this server and never holds a
+   * request open for the minute it takes to arrive. On the filesystem store
+   * there is nowhere else to send it, so the answer is to come back here.
+   */
+  app.post('/:hash/upload-url', async (c) => {
+    const hash = c.req.param('hash');
+    if (!HASH.test(hash)) return c.json({ error: 'bad_hash' }, 400);
+
+    const membership = c.var.membership;
+    if (membership && !canEdit(membership.role)) return c.json({ error: 'read_only' }, 403);
+
+    const { blobs } = c.var.services;
+    if (await blobs.has(hash)) return c.json({ alreadyStored: true });
+
+    const mime = c.req.query('mime') ?? 'application/octet-stream';
+
+    if (blobs.presignPut) {
+      return c.json({ method: 'PUT', url: await blobs.presignPut(hash, mime), direct: true });
+    }
+
+    return c.json({ method: 'PUT', url: `/api/blobs/${hash}`, direct: false });
+  });
+
   app.put('/:hash', async (c) => {
     const hash = c.req.param('hash');
     if (!HASH.test(hash)) return c.json({ error: 'bad_hash' }, 400);

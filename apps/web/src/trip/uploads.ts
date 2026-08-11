@@ -60,21 +60,49 @@ export interface FlushResult {
  * again: the name is the content, so the server having it means it is the same
  * file. Anything that fails stays queued for the next attempt.
  */
-export async function flushUploads(): Promise<FlushResult> {
+let flushing: Promise<FlushResult> | null = null;
+
+export function flushUploads(): Promise<FlushResult> {
+  // One at a time. Attaching a file flushes, and so does coming back online, so
+  // two passes can otherwise send the same bytes twice.
+  flushing ??= runFlush().finally(() => {
+    flushing = null;
+  });
+
+  return flushing;
+}
+
+async function runFlush(): Promise<FlushResult> {
   const queued = await pendingUploads();
   let sent = 0;
 
   for (const upload of queued) {
     try {
-      const head = await fetch(`/api/blobs/${upload.hash}`, { method: 'HEAD' });
-      if (head.ok) {
+      /*
+       * The server says where these bytes should go. On object storage that is
+       * a presigned URL and the upload never touches the API; otherwise it is
+       * the API itself. Asking also settles whether the bytes are already
+       * there, which they often are -- the name is the content.
+       */
+      const ask = await fetch(
+        `/api/blobs/${upload.hash}/upload-url?mime=${encodeURIComponent(upload.mime)}`,
+        { method: 'POST' },
+      );
+
+      if (!ask.ok) continue;
+
+      const plan = (await ask.json()) as
+        | { alreadyStored: true }
+        | { method: 'PUT'; url: string; direct: boolean };
+
+      if ('alreadyStored' in plan) {
         await forgetUpload(upload.hash);
         sent += 1;
         continue;
       }
 
-      const response = await fetch(`/api/blobs/${upload.hash}`, {
-        method: 'PUT',
+      const response = await fetch(plan.url, {
+        method: plan.method,
         headers: { 'content-type': upload.mime },
         body: upload.bytes,
       });

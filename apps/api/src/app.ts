@@ -79,6 +79,11 @@ export function createApp(services: Services) {
   }
 
   app.route('/oauth', oauthRoutes());
+  /*
+   * Uploading is guarded by trip membership when the client says which trip it
+   * is for. Reading is not: a blob is named by its own hash, so knowing the
+   * name is already knowing the contents.
+   */
   app.route('/api/blobs', blobRoutes());
   app.route('/api/places', placeRoutes());
   app.route('/api/weather', weatherRoutes());

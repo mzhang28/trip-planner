@@ -21,6 +21,15 @@ export interface BlobStore {
   delete(hash: string): Promise<void>;
 
   /**
+   * Every hash held, for deciding which are no longer pointed at.
+   *
+   * Optional: a bucket with a million objects should not be listed to collect
+   * a handful, and a deployment on object storage is better served by a
+   * lifecycle rule. The filesystem store implements it because it can.
+   */
+  list?(): Promise<string[]>;
+
+  /**
    * A URL the browser can upload to directly, when the backing store offers
    * one. Absent for the filesystem store, where the upload goes through the
    * API because there is nowhere else for it to go.

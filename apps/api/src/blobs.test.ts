@@ -50,6 +50,34 @@ describe('the blob store', () => {
     expect(Buffer.from((await store.get(hash))!)).toEqual(bytes);
   });
 
+  it('survives the same file being written twice at once', async () => {
+    const bytes = randomBytes(2048);
+    const hash = sha256(bytes);
+
+    /*
+     * Two uploads of one file arriving together. The temporary name has to be
+     * unique per write: named after the process alone, both picked the same
+     * one and whichever renamed second found its own file already moved away.
+     */
+    await Promise.all([
+      store.put(hash, bytes, 'application/pdf'),
+      store.put(hash, bytes, 'application/pdf'),
+      store.put(hash, bytes, 'application/pdf'),
+    ]);
+
+    expect(Buffer.from((await store.get(hash))!)).toEqual(bytes);
+  });
+
+  it('lists what it holds, so collection knows what to consider', async () => {
+    const one = randomBytes(32);
+    const two = randomBytes(32);
+
+    await store.put(sha256(one), one, 'text/plain');
+    await store.put(sha256(two), two, 'text/plain');
+
+    expect((await store.list()).sort()).toEqual([sha256(one), sha256(two)].sort());
+  });
+
   it('reports nothing for a hash it has never seen', async () => {
     expect(await store.get(sha256(randomBytes(8)))).toBeNull();
     expect(await store.has('0'.repeat(64))).toBe(false);
