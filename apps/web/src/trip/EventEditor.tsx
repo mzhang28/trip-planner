@@ -4,6 +4,7 @@ import type {
   EventAttachment,
   FieldDef,
   FieldDefId,
+  TripDoc,
   TripEvent,
 } from '@trip/crdt';
 import { BOOKING_STATUSES } from '@trip/crdt';
@@ -12,6 +13,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { formatTime, setTimeOfDay, zoneFor } from '../lib/time';
 import { Attachments } from './Attachments';
+import { DescriptionEditor } from './DescriptionEditor';
 import { FlightFields } from './FlightFields';
 import { PlacePicker } from './PlacePicker';
 
@@ -50,6 +52,9 @@ export interface EventEditorProps {
   onAddAttachment: (id: string, attachment: EventAttachment) => void;
   onRemoveAttachment: (id: string) => void;
   onDelete: () => void;
+  /** The whole trip, so a description can offer the rest of it to point at. */
+  doc: TripDoc | undefined;
+  onOpenEvent: (eventId: string) => void;
 }
 
 /**
@@ -70,6 +75,8 @@ export function EventEditor({
   onAddAttachment,
   onRemoveAttachment,
   onDelete,
+  doc,
+  onOpenEvent,
 }: EventEditorProps) {
   const zone = zoneFor(event.timezone, homeTimezone);
   const time = event.startsAt === undefined ? '' : formatTime(event.startsAt, zone);
@@ -303,12 +310,12 @@ export function EventEditor({
         </div>
       </div>
 
-      <TextField
-        label="Description"
-        multiline
-        defaultValue={event.description ?? ''}
-        placeholder="Go before the coaches arrive"
-        onBlur={(e) => onPatch({ description: e.currentTarget.value.trim() || undefined })}
+      <DescriptionEditor
+        value={event.description ?? ''}
+        doc={doc}
+        eventId={event.id}
+        onChange={(description) => onPatch({ description: description.trim() || undefined })}
+        onOpenEvent={onOpenEvent}
       />
 
       <section className="flex flex-col gap-2">

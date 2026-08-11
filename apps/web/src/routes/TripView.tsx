@@ -482,6 +482,8 @@ export function TripView() {
                                 deleteEvent(current, event.id, { userId: 'me' }),
                               )
                             }
+                            doc={doc}
+                            onOpenEvent={focusEvent}
                           />
                           </div>
                         )}

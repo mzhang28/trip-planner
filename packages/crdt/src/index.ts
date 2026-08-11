@@ -35,7 +35,7 @@ export {
   type NewEvent,
 } from './doc';
 
-export { eventSearchText, renderCustomValue } from './search';
+export { eventSearchText, renderCustomValue, stripMentionMarkup } from './search';
 
 export {
   canSyncIncrementally,

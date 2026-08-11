@@ -3,6 +3,7 @@ import type {
   EventAttachment,
   FieldDef,
   FieldDefId,
+  TripDoc,
   TripEvent,
 } from '@trip/crdt';
 import { Card, StatusChip, StatusSpine, cn } from '@trip/ui';
@@ -25,6 +26,8 @@ export interface EventRowProps {
   onAddAttachment: (id: string, attachment: EventAttachment) => void;
   onRemoveAttachment: (id: string) => void;
   onDelete: () => void;
+  doc: TripDoc | undefined;
+  onOpenEvent: (eventId: string) => void;
   /**
    * Held by the list rather than by the card.
    *
@@ -61,6 +64,8 @@ export function EventRow({
   onAddAttachment,
   onRemoveAttachment,
   onDelete,
+  doc,
+  onOpenEvent,
   isOpen,
   onToggle,
   isSelected,
@@ -148,6 +153,8 @@ export function EventRow({
           onAddAttachment={onAddAttachment}
           onRemoveAttachment={onRemoveAttachment}
           onDelete={onDelete}
+          doc={doc}
+          onOpenEvent={onOpenEvent}
         />
       )}
     </Card>

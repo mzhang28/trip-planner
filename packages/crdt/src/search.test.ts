@@ -120,6 +120,17 @@ describe('eventSearchText', () => {
     expect(text).toContain('guided');
   });
 
+  it('indexes a mention by the words, not by the markup around them', () => {
+    const text = eventSearchText(
+      event({ description: 'Meet at @[Nishiki Market](event:e2) first' }),
+    );
+
+    expect(text).toContain('Meet at Nishiki Market first');
+    // An id is not something anyone would ever type into a search box.
+    expect(text).not.toContain('event:e2');
+    expect(text).not.toContain('@[');
+  });
+
   it('leaves out empty and missing values instead of padding with blanks', () => {
     expect(eventSearchText(event())).toBe('Fushimi Inari');
   });

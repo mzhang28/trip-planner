@@ -1,6 +1,16 @@
 import type { CustomValue, FieldDef, FieldDefId, TripEvent } from './types';
 
 /**
+ * Replaces `@[label](kind:id)` with the label that was written.
+ *
+ * Kept here rather than resolved against the trip: this runs over one event at
+ * a time, and the written label is what the person typed and will search for.
+ */
+export function stripMentionMarkup(text: string): string {
+  return text.replace(/@\[([^\]]*)\]\((?:event|place|file):[^)]+\)/g, '$1');
+}
+
+/**
  * Renders one custom field value the way it reads on screen.
  *
  * Findable by what it looks like, not by what it looks like in storage: a date
@@ -66,7 +76,10 @@ export function eventSearchText(
     event.city,
     event.location?.label,
     event.location?.address,
-    event.description,
+    // Mentions are stored as markup. Indexing the raw form would make a
+    // description findable by an id nobody has ever seen and not by the name
+    // they actually read.
+    event.description === undefined ? undefined : stripMentionMarkup(event.description),
     event.booking.note,
     event.booking.confirmationCode,
     event.transitIn?.note,
