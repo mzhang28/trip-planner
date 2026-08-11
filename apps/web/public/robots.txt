@@ -1,0 +1,4 @@
+# A trip is reached by an unguessable link, and the links are meant to be
+# passed between people rather than found. Nothing here should be indexed.
+User-agent: *
+Disallow: /

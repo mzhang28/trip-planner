@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "pnpm build:icons && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:icons": "node scripts/build-icons.mjs"
   },
   "dependencies": {
     "@automerge/automerge": "^3.4.0",
@@ -31,6 +32,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^5.2.0",
+    "sharp": "^0.35.3",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vite": "^7.3.6",

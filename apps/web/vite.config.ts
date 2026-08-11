@@ -39,7 +39,17 @@ export default defineConfig({
         display: 'standalone',
         background_color: '#e7eaee',
         theme_color: '#12161c',
-        icons: [],
+        icons: [
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+          // Padded, so a platform that crops to a circle keeps the whole mark.
+          {
+            src: '/icon-maskable-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
       },
       workbox: {
         /*

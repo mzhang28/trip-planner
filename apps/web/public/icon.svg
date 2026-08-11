@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <pattern id="hatch" width="38.4" height="38.4" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <rect width="19.2" height="38.4" fill="#b06e12"/>
+    </pattern>
+    <pattern id="dashes" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect width="48" height="24" fill="#6c7787"/>
+    </pattern>
+  </defs>
+  <rect width="512" height="512" rx="80" fill="#12161c"/>
+  <rect x="112" y="96" width="48" height="320" rx="24" fill="#2fa98a"/>
+  <rect x="232" y="96" width="48" height="320" rx="24" fill="url(#hatch)"/>
+  <rect x="352" y="96" width="48" height="320" rx="24" fill="url(#dashes)"/>
+</svg>
