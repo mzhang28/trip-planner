@@ -51,13 +51,19 @@ export function formatTime(at: Instant, timeZone: string): string {
   }).format(at);
 }
 
-export function formatDayHeading(at: Instant, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
+export function formatDayHeading(
+  at: Instant,
+  timeZone: string,
+  locale?: string | string[],
+): string {
+  return new Intl.DateTimeFormat(locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     timeZone,
-  }).format(at);
+  })
+    .format(at)
+    .replace(/,\s*/g, ' ');
 }
 
 /**

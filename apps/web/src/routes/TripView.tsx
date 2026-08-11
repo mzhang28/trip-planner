@@ -26,7 +26,7 @@ import {
   type TripEvent,
 } from '@trip/crdt';
 import { Button, IconButton, SegmentedControl, TextField, ThemeToggle } from '@trip/ui';
-import { GripVertical, Plus, Settings, Share2 } from 'lucide-react';
+import { ChevronRight, GripVertical, Plus, Settings, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ApiError, api, type TripSummary } from '../lib/api';
@@ -523,19 +523,21 @@ export function TripView() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
       <header className="z-10 shrink-0 border-b border-line bg-page/95 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[100rem] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline">
-            All trips
-          </Link>
-          <h1 className="truncate text-lg">{trip?.name ?? 'Trip'}</h1>
-          <Link
-            to={`/t/${tripId}/fields`}
-            className="text-xs text-ink-muted underline-offset-2 hover:underline"
-          >
-            Fields
-          </Link>
-          <SyncBadge state={state} />
-          <div className="hidden sm:flex sm:min-w-56 sm:flex-1 sm:basis-64">
+        <div className="relative mx-auto flex w-full max-w-[100rem] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline">
+              All trips
+            </Link>
+            <h1 className="max-w-48 truncate text-lg xl:max-w-80">{trip?.name ?? 'Trip'}</h1>
+            <Link
+              to={`/t/${tripId}/fields`}
+              className="text-xs text-ink-muted underline-offset-2 hover:underline"
+            >
+              Fields
+            </Link>
+            <SyncBadge state={state} />
+          </div>
+          <div className="absolute left-1/2 hidden w-[36vw] min-w-64 max-w-lg -translate-x-1/2 lg:flex">
             <SearchBar
               doc={doc}
               homeTimezone={homeTimezone}
@@ -544,22 +546,24 @@ export function TripView() {
               onRunCommand={runCommand}
             />
           </div>
-          <SegmentedControl
-            label="Calendar view"
-            options={VIEW_OPTIONS}
-            value={view}
-            onChange={setView}
-          />
-          <HeaderActions
-            canShare={trip?.role === 'owner'}
-            zonePreference={zonePreference}
-            onChangeZone={setZonePreference}
-            onShare={share}
-          />
+          <div className="ml-auto flex items-center gap-3">
+            <SegmentedControl
+              label="Calendar view"
+              options={VIEW_OPTIONS}
+              value={view}
+              onChange={setView}
+            />
+            <HeaderActions
+              canShare={trip?.role === 'owner'}
+              zonePreference={zonePreference}
+              onChangeZone={setZonePreference}
+              onShare={share}
+            />
+          </div>
         </div>
 
-        {/* Below the small breakpoint the search box gets the whole row. */}
-        <div className="mx-auto w-full max-w-[100rem] px-4 pb-3 sm:hidden">
+        {/* Below the large breakpoint the search box gets the whole row. */}
+        <div className="mx-auto w-full max-w-[100rem] px-4 pb-3 lg:hidden">
           <SearchBar
             doc={doc}
             homeTimezone={homeTimezone}
@@ -667,14 +671,27 @@ export function TripView() {
           {days.map(([key, dayEvents]) => (
             <section key={key} className="mb-8">
               <h2 className="mb-2 text-sm text-ink-muted">
-                {key === UNSCHEDULED
-                  ? 'No date yet'
-                  : /*
+                {key === UNSCHEDULED ? (
+                  'No date yet'
+                ) : (
+                  <button
+                    type="button"
+                    data-testid={`day-heading-${key}`}
+                    onClick={() => {
+                      moveAnchor(key);
+                      setView('week');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-sm hover:text-ink focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-2"
+                  >
+                    {/*
                      * From the day itself, not from its first event. A day the
                      * person navigated to has no events to ask, which is
                      * exactly when it needs a heading.
-                     */
-                    formatDayHeading(Date.parse(`${key}T12:00:00Z`), 'UTC')}
+                     */}
+                    {formatDayHeading(Date.parse(`${key}T12:00:00Z`), 'UTC')}
+                    <ChevronRight aria-hidden="true" className="size-3.5" />
+                  </button>
+                )}
               </h2>
 
               <DayDropZone dayKey={key} disabled={readOnly || key === UNSCHEDULED}>

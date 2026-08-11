@@ -205,6 +205,18 @@ test.describe('week and month views', () => {
     await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
   });
+
+  test('a day heading opens the week focused on that day', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    await page.getByTestId(`day-heading-${ON}`).click();
+
+    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    await expect(page.getByTestId('go-to-date')).toHaveValue(ON);
+    await expect(page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' })).toBeVisible();
+  });
 });
 
 test.describe('flights and the map', () => {

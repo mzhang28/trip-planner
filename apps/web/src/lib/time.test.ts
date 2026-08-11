@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { dayKey, formatTime, moveToDay, setTimeOfDay } from './time';
+import { dayKey, formatDayHeading, formatTime, moveToDay, setTimeOfDay } from './time';
 
 const TOKYO = 'Asia/Tokyo';
 const NEW_YORK = 'America/New_York';
+
+describe('formatDayHeading', () => {
+  it('uses the date order of the selected locale without decorative punctuation', () => {
+    const friday = Date.UTC(2026, 7, 21, 12);
+
+    expect(formatDayHeading(friday, 'UTC', 'en-US')).toBe('Friday August 21');
+    expect(formatDayHeading(friday, 'UTC', 'en-GB')).toBe('Friday 21 August');
+  });
+});
 
 describe('dayKey', () => {
   it('gives the local calendar day, not the UTC one', () => {

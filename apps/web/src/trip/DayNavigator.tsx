@@ -1,4 +1,5 @@
-import { Button, cn } from '@trip/ui';
+import { Button, IconButton, cn } from '@trip/ui';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DayKey } from '../lib/calendar';
 import { addDays } from '../lib/calendar';
 import {
@@ -62,15 +63,29 @@ export function DayNavigator({ view, anchor, today, onChange }: DayNavigatorProp
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <Button size="sm" onPress={() => onChange(addDays(anchor, -step))}>
-        Earlier
-      </Button>
-      <Button size="sm" onPress={() => onChange(today)}>
-        Today
-      </Button>
-      <Button size="sm" onPress={() => onChange(addDays(anchor, step))}>
-        Later
-      </Button>
+      <div role="group" aria-label="Date navigation" className="inline-flex">
+        <IconButton
+          label="Earlier"
+          size="sm"
+          variant="secondary"
+          onPress={() => onChange(addDays(anchor, -step))}
+          className="rounded-r-none border-r-0 shadow-none before:inset-0"
+        >
+          <ChevronLeft aria-hidden="true" />
+        </IconButton>
+        <Button size="sm" onPress={() => onChange(today)} className="rounded-none shadow-none">
+          Today
+        </Button>
+        <IconButton
+          label="Later"
+          size="sm"
+          variant="secondary"
+          onPress={() => onChange(addDays(anchor, step))}
+          className="rounded-l-none border-l-0 shadow-none before:inset-0"
+        >
+          <ChevronRight aria-hidden="true" />
+        </IconButton>
+      </div>
 
       <label className="flex items-center gap-2">
         <span className="sr-only">Go to a date</span>
