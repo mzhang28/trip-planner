@@ -38,6 +38,9 @@ export interface EventRowProps {
    */
   isOpen: boolean;
   onToggle: () => void;
+  /** Fields asked for during this sitting, held by the list for the same reason. */
+  revealed: ReadonlySet<string>;
+  onReveal: (key: string) => void;
   isSelected: boolean;
   onToggleSelected: () => void;
   /** Once anything is ticked, every card shows its box. */
@@ -68,6 +71,8 @@ export function EventRow({
   doc,
   onOpenEvent,
   isOpen,
+  revealed,
+  onReveal,
   onToggle,
   isSelected,
   onToggleSelected,
@@ -76,7 +81,10 @@ export function EventRow({
 }: EventRowProps) {
   const displayZone = useDisplayZone();
   const zone = displayZone(event.timezone, homeTimezone);
-  const time = event.startsAt === undefined ? null : formatTime(event.startsAt, zone);
+  // An event on a day with no hour yet reads the same as one with no day: the
+  // card says nothing about when, and the day it sits under says the rest.
+  const time =
+    event.startsAt === undefined || event.timeUndecided ? null : formatTime(event.startsAt, zone);
 
   const linkCount = Object.keys(event.links).length;
   const summary = [
@@ -173,6 +181,8 @@ export function EventRow({
           onDelete={onDelete}
           doc={doc}
           onOpenEvent={onOpenEvent}
+          revealed={revealed}
+          onReveal={onReveal}
         />
       )}
     </Card>

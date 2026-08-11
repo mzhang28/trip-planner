@@ -154,14 +154,15 @@ export function toDateInput(at: Instant, timeZone: string): string {
 /**
  * Puts an instant on a given calendar day, keeping its time of day.
  *
- * An event with no time yet lands at midday rather than midnight: it reads as
- * "this day, time still to work out" instead of claiming to start at 00:00.
+ * An event with no time yet lands at midnight, and the event records that its
+ * time is undecided. The instant then does nothing but name the day, which is
+ * the whole of what has been decided. It used to land at midday, so picking a
+ * Thursday produced an event that said it started at 12:00.
  */
-export function setDay(
-  at: Instant | undefined,
-  timeZone: string,
-  day: string,
-): Instant | null {
+export function setDay(at: Instant | undefined, timeZone: string, day: string): Instant | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
-  return moveToDay(at ?? Date.parse(`${day}T12:00:00Z`), timeZone, day);
+  if (at !== undefined) return moveToDay(at, timeZone, day);
+
+  const midnightAsUtc = Date.parse(`${day}T00:00:00Z`);
+  return midnightAsUtc - offsetAt(midnightAsUtc, timeZone);
 }

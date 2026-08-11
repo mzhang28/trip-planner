@@ -136,6 +136,15 @@ export interface TripEvent {
   city?: string;
   location?: Place;
   startsAt?: Instant;
+  /**
+   * Set when the day is decided and the hour is not. `startsAt` then points at
+   * midnight in `timezone`, which puts the event on the right day without
+   * claiming it begins then. Absent means the time is part of the plan.
+   *
+   * A trip is planned in this order — "Thursday, some time" comes days before
+   * "Thursday at nine" — and an instant on its own cannot say it.
+   */
+  timeUndecided?: boolean;
   /** IANA zone of the place. Falls back to the trip's home zone. */
   timezone?: string;
   durationMinutes?: number;

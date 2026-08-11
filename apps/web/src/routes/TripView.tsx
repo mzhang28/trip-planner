@@ -53,6 +53,9 @@ import { setZonePreference, useZonePreference } from '../trip/useDisplayZone';
 
 const UNSCHEDULED = 'unscheduled';
 
+/** Shared so a card without revealed fields is not handed a new set each render. */
+const NOTHING_REVEALED: ReadonlySet<string> = new Set();
+
 /*
  * Times read in the zone of the place by default: a 09:00 entry in Kyoto is
  * 09:00 whether you are there or at home, which is what a plan is for. The
@@ -173,6 +176,12 @@ export function TripView() {
   const [sharing, setSharing] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [openEventId, setOpenEventId] = useState<string | null>(null);
+
+  /*
+   * Which optional fields each open event has been asked to show. Held here
+   * because setting a date moves the card to another day and remounts it.
+   */
+  const [revealedFields, setRevealedFields] = useState<Record<string, ReadonlySet<string>>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mergePrimary, setMergePrimary] = useState<string | null>(null);
   const addBoxRef = useRef<HTMLDivElement>(null);
@@ -283,14 +292,25 @@ export function TripView() {
     if (!event || targetDay === UNSCHEDULED) return;
 
     const zone = event.timezone ?? homeTimezone;
-    // Something with no time yet gets one when it lands on a day: midday, which
-    // reads as "this day, time still to work out" rather than midnight.
-    const from = event.startsAt ?? Date.parse(`${targetDay}T12:00:00Z`);
-    const startsAt = moveToDay(from, zone, targetDay);
+
+    /*
+     * Dropping on a day says which day and nothing about the hour, so one that
+     * had no time still has none. Its instant is midnight there, which names
+     * the day without claiming to be when it starts.
+     */
+    const timed = event.startsAt !== undefined && !event.timeUndecided;
+    const startsAt = timed
+      ? moveToDay(event.startsAt!, zone, targetDay)
+      : setDay(undefined, zone, targetDay);
     if (startsAt === null || startsAt === event.startsAt) return;
 
     store.change((current) =>
-      updateEvent(current, event.id, { startsAt, timezone: zone }, { userId: 'me' }),
+      updateEvent(
+        current,
+        event.id,
+        { startsAt, timezone: zone, timeUndecided: timed ? undefined : true },
+        { userId: 'me' },
+      ),
     );
   }
 
@@ -308,21 +328,24 @@ export function TripView() {
     const id = `e_${randomId()}`;
 
     /*
-     * Midday when the gesture said nothing about the hour: it reads as "this
-     * day, time still to work out" rather than claiming to start at midnight.
-     *
      * The minutes come from the grid, which is drawn in the zone the trip is
      * shown in -- so they are a wall-clock time there, not an offset from
      * midnight UTC. Treating them as the latter put a nine o'clock drag at six
      * in the evening in Tokyo.
+     *
+     * A tap on a day says nothing about the hour, and the event records that
+     * rather than being given one.
      */
-    const minutes = options.startMinutes ?? 12 * 60;
-    const clock = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(
-      minutes % 60,
-    ).padStart(2, '0')}`;
-
     const onThatDay = setDay(undefined, homeTimezone, day);
-    const startsAt = onThatDay === null ? null : setTimeOfDay(onThatDay, homeTimezone, clock);
+    const minutes = options.startMinutes;
+    const startsAt =
+      onThatDay === null || minutes === undefined
+        ? onThatDay
+        : setTimeOfDay(
+            onThatDay,
+            homeTimezone,
+            `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`,
+          );
 
     store.change((current) => {
       let next = addEvent(current, { id, name: '' }, { userId: 'me' });
@@ -332,6 +355,7 @@ export function TripView() {
         id,
         {
           ...(startsAt === null ? {} : { startsAt }),
+          ...(minutes === undefined ? { timeUndecided: true } : {}),
           timezone: homeTimezone,
           // How long only when the gesture said so. A tap on a day says which
           // day and nothing about length.
@@ -653,6 +677,13 @@ export function TripView() {
                             }
                             doc={doc}
                             onOpenEvent={focusEvent}
+                            revealed={revealedFields[event.id] ?? NOTHING_REVEALED}
+                            onReveal={(key) =>
+                              setRevealedFields((current) => ({
+                                ...current,
+                                [event.id]: new Set(current[event.id]).add(key),
+                              }))
+                            }
                           />
                           </div>
                         )}

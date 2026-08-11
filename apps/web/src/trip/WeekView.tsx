@@ -57,7 +57,10 @@ function positionEvents(
   fitToView: boolean,
 ): PositionedEvent[] {
   const timed = events
-    .filter((event): event is TripEvent & { startsAt: number } => event.startsAt !== undefined)
+    .filter(
+      (event): event is TripEvent & { startsAt: number } =>
+        event.startsAt !== undefined && !event.timeUndecided,
+    )
     .map((event) => {
       const actualStart = minutesSinceMidnight(
         event.startsAt,
@@ -364,6 +367,14 @@ export function WeekView({
   const cities = citySegments(byDay, days);
   const beds = lodgingSpans(events, homeTimezone).filter((span) => spanWithin(span, days));
 
+  // Split off the ones on a day but not at an hour. They belong to the day and
+  // to no point in it, so they get a row of their own above the grid.
+  const untimed = new Map<DayKey, TripEvent[]>();
+  for (const day of days) {
+    const waiting = (byDay.get(day) ?? []).filter((event) => event.timeUndecided);
+    if (waiting.length > 0) untimed.set(day, waiting);
+  }
+
   return (
     <div
       className="flex h-full min-h-0 flex-col overflow-hidden"
@@ -453,6 +464,42 @@ export function WeekView({
                 );
               })}
             </div>
+
+            {/*
+              Events on a day with no hour yet, above the hours rather than in
+              them. Drawing one at midnight would put a "Thursday, some time"
+              plan at the top of the grid as though that were the plan.
+            */}
+            {untimed.size > 0 && (
+              <div className="grid gap-px border-x border-line bg-line" style={{ gridTemplateColumns }}>
+                <div className="sticky left-0 z-20 bg-page py-0.5 pr-1 text-right text-2xs text-ink-muted">
+                  Any
+                </div>
+                {days.map((day) => (
+                  <div key={day} className="flex min-w-0 flex-col gap-0.5 bg-card p-0.5">
+                    {(untimed.get(day) ?? []).map((event) => (
+                      <button
+                        key={event.id}
+                        type="button"
+                        data-testid="week-untimed-event"
+                        onClick={() => onOpenEvent(event.id)}
+                        className="flex gap-1 overflow-hidden rounded-sm border border-dashed border-line bg-card px-1 py-0.5 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
+                      >
+                        <StatusSpine status={event.booking.status} />
+                        <span
+                          className={cn(
+                            'min-w-0 flex-1 truncate text-xs',
+                            event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                          )}
+                        >
+                          {event.name || 'Unnamed'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Time scroll is independent; every rendered day stays aligned. */}

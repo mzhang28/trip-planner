@@ -1,154 +1,312 @@
 # UX review
 
-Reviewed the live app at `localhost:5173` on 11 August 2026 in a Chromium browser, including a new trip, creating and editing events, calendar/search/share controls, and the available trip-settings flows. I also checked the responsive states and the related UI behavior for custom fields, files, mentions, maps, weather, collaboration, and recovery.
+I reviewed the live app at `localhost:5173` on 11 August 2026.
 
-## Highest-impact journeys
+The review used Chromium at 1440 × 1000 and 390 × 844. I used separate owner and viewer sessions.
 
-### 1. Planning anything beyond today is unnecessarily difficult
+I also ran the end-to-end suite on phone, tablet, and desktop layouts. It passed 140 of 141 tests.
 
-**Journey:** Create a trip, add “Morning temple”, then try to put it on a future travel day.
+The failed test exposed a timing race in the collaborator list. The other tests confirmed the main paths and accessibility rules.
 
-- A new event starts under **“No time yet”**. Its editor has a **Start time** field but no date field.
-- Entering `09:00` silently gives the event *today’s date* (observed: Tuesday 11 August), not a date the user chose.
-- The only apparent way to reach another date is then to switch calendar view and drag the event. An unscheduled event is not shown in Week or Month, so the user has to discover the accidental-today step first.
-- Day view only shows days that already contain events. There is no date navigator or empty future day that can receive an event.
-- Flight departure/arrival and lodging check-in/check-out repeat the problem: they use text fields and derive a missing date from today. This is especially risky for a trip planner, where dates are core data.
+## Coverage
 
-**Improve:** Make date and time explicit, preferably with a date picker (and optional time) in the primary event form. Let users navigate and add directly to any day in Day view. Keep “No date yet” as a deliberate state, not the default route to scheduling.
+The review included these journeys and states:
 
-### 2. Viewers cannot actually view event details
+- Create a trip, open it again, and open an invalid trip address.
+- Add, schedule, edit, move, merge, and delete events.
+- Use activity, lodging, flight, and note event types.
+- Add places, transit, booking data, links, files, descriptions, and mentions.
+- Create and use all custom-field types.
+- Use Day, Week, and Month views, including calendar-based creation.
+- Use search, date navigation, time-zone display, weather, and the day map.
+- Create viewer and editor links, copy links, revoke links, and remove members.
+- Open read-only event details and read-only field settings.
+- Edit offline, reconnect, recover old local work, and review agent activity.
+- Use light, dark, and system themes with keyboard and touch input.
 
-**Journey:** Open a shared trip as a viewer and inspect a booking.
+## Highest-priority journeys
 
-- Event cards are disabled for viewers, so they cannot open.
-- The collapsed card exposes only time, name, a little location/link-count metadata, and status. Description, booking code/note, links, files, flight information, custom fields, and place details are inaccessible.
+### 1. An invalid trip looks editable and claims that work is safe
 
-This makes a “viewer” share role much less useful than its name suggests: a traveller cannot use it as an itinerary or booking reference.
+**Journey:** Open an old, removed, or incorrect `/t/:tripId` address.
 
-**Improve:** Allow cards to open in a read-only details view. Hide or disable edit controls within that view, rather than disabling the one route to the content.
+- The page shows a trip named “Trip” instead of an access or not-found message.
+- The page shows event controls and accepts new local work.
+- The status says “Saved on this device,” although the server rejects the trip.
+- A removed member can get the same state from an old local copy.
 
-### 3. Sharing is fragile and does not match the user’s choices
+This state can cause silent work loss. It also gives a false impression that access still exists.
 
-**Journey:** Owner shares a trip.
+**Improve:** Block editing until the trip request succeeds. Show distinct not-found, access-removed, and offline-copy states.
 
-- The UI only creates an **editor** link, although the API supports viewer and editor roles. Owners cannot choose read-only sharing.
-- The result is a long raw URL in a code block with no Copy button, QR option, or share-sheet action.
-- “Anyone with this link can edit the trip. It is shown once.” is alarming and ambiguous. The link stays on screen until navigation, and there is no clear explanation of whether it remains valid, where it can be revoked, or how to make another safely.
-- There is no visible list of members/links or permission management.
+### 2. A date without a time becomes 12:00
 
-**Improve:** Use a share dialog with role selection, Copy, and clear lifecycle language. Provide a Collaborators area that shows access, lets owners revoke links, and makes the current sharing state visible.
+**Journey:** Add an event, reveal Date, and select a day without selecting a time.
 
-### 4. First-time trip setup lacks the essentials
+- The card immediately shows `12:00`.
+- The time field also shows `12:00`.
+- Clearing a time puts the event back at noon.
+- The interface says that a blank time means that the user has not decided it.
 
-**Journey:** Create “Japan, April.”
+The stored model cannot represent a known date with an unknown time. Noon can look like a real booking time.
 
-- The only setup question is the name. Home time zone is silently taken from the current device; dates are deferred completely.
-- The empty state tells users to “work out the dates later,” but there is no obvious later setup screen for trip dates, home time zone, destination, or collaborators.
-- A trip list card shows only name and role. It gives no dates, destination, progress, next activity, or last update, so a list of several trips will be hard to scan.
+**Improve:** Store a date-only state. Display “Time not set” until the user supplies a time.
 
-**Improve:** Keep quick creation, then offer a lightweight trip setup/onboarding panel for date range and home time zone. Show useful summaries on trip cards once known.
+### 3. A date change resets the editor
 
-## Editing and calendar issues
+**Journey:** Reveal Date, Duration, City, Place, and Booking. Then set the date.
 
-### 5. The event editor is an intimidating ungrouped form
+- The event moves from “No date yet” to the selected day.
+- The editor stays open, but the unfilled revealed fields disappear.
+- The user must find and reveal those fields again.
+- Draft text in a field can disappear if the field did not commit before the move.
 
-Opening a simple event expands a long single-column form: name, kind, city/place, time/duration, transit, time zone, booking, description, links, files, custom fields, and delete. Most fields are irrelevant for most events, and several labels repeat (“How long”, “Note”). On a phone this becomes a long scrolling task with no visible save/close affordance.
+**Improve:** Keep the revealed-field state above the dated sections. Preserve all drafts during event moves.
 
-**Improve:** Preserve quick inline editing, but use progressive disclosure: show name/date/place/status first; put optional logistics, booking, files, and advanced metadata in collapsible sections. Provide an explicit Close/Done action and a compact read-only summary on the card.
+### 4. Long event editing has no clear exit
 
-### 6. Invalid inputs fail silently
+**Journey:** Open an event on a phone and reveal most optional fields.
 
-Time, date, duration, and time-zone inputs are free text. Invalid dates/times are simply ignored; invalid durations can be stored as values such as negative minutes; an invalid IANA time zone can later make formatting fail. There is no input format example beyond placeholders, validation message, or confirmation of the saved value.
+- The editor becomes much taller than the screen.
+- The card header scrolls out of view.
+- The only close action is another press on that hidden header.
+- “Delete event” is the only action at the bottom.
 
-**Improve:** Use appropriate date/time controls where possible, validate on blur, retain erroneous text with a specific fix message, and constrain duration to positive values. Offer searchable time-zone selection rather than requiring an exact identifier.
+**Improve:** Add a sticky Done action. Keep the event name and close action visible during long edits.
 
-### 7. Calendar navigation is fragmented
+### 5. Trip setup stops after the name
 
-- **Earlier / Today / Later** only appears in Week and Month. Day view—the primary view—has no equivalent navigation.
-- Month cells only show a count (“3 things”), so users must switch views to learn what those things are.
-- Week is intentionally horizontally scrollable on narrow screens, but the actual week label and navigation live above it; it is easy to lose orientation while scrolling.
-- The current anchor starts at today, even if the trip’s events are all in a different period.
+**Journey:** Create a trip, then try to set its main details.
 
-**Improve:** Give every view a consistent date picker/range navigator and open a trip on its nearest upcoming (or first) event. In Month, show one or two compact event labels when space permits and a clear “+n” affordance.
+- Creation asks only for a name.
+- The app copies the device time zone without showing it.
+- “Trip settings” contains only custom fields and recent changes.
+- There is no interface to change the trip name, time zone, date range, or destination.
+- There is no interface to archive or delete a trip.
 
-### 8. Drag-and-drop is doing too much work
+These missing controls affect calendar grouping, default event times, and trip-list usefulness.
 
-Moving between days depends on a tiny, low-contrast grip that is visually absent from the normal event-card flow. The destination is only a currently visible day/calendar cell, and bulk selections are global while “All in this day” means the map’s anchor day—not necessarily the day(s) containing the selection.
+**Improve:** Add a Basics section to Trip settings. Include the name, home time zone, dates, destination, archive, and delete controls.
 
-**Improve:** Add a Move to date command to each event and bulk-action bar, plus a visible date selector. Label the bulk action with the actual day (for example, “Select all — Tue 11 Aug”) or scope it to selected events’ day.
+## Calendar and planning issues
 
-### 9. Deletion is too easy to trigger
+### 6. Week cards hide the event name by default
 
-Single-event Delete and bulk Delete act immediately, with no confirmation and no undo toast. Field deletion is likewise immediate, despite field values potentially disappearing from every event. Merge at least provides a preview; destructive actions should have comparable recovery.
+**Journey:** Add short events at 09:00 and 19:00. Open the Week view with default display settings.
 
-**Improve:** Use an undo snackbar for event deletion, confirm high-impact field deletion with the affected-value count, and explain whether bulk deletion can be recovered.
+- The timetable compresses 09:00 through midnight into the available height.
+- A short event gets a 24-pixel card with two text lines.
+- The time remains visible, but the event name is clipped.
+- The result looks like two unnamed time markers.
 
-### 10. Selection controls are hard to discover and can obscure content
+**Improve:** Use a single-line card in compressed mode. Put the name first and add the time on the same line.
 
-Event checkboxes are fully transparent until hover/focus or after one item is selected. Hover is unavailable on touch devices, and users may not discover multi-select. Once active, the fixed bottom toolbar can cover the lower card/content; it has several similarly weighted actions including destructive Delete.
+### 7. Month view gives weak itinerary information
 
-**Improve:** Provide an explicit “Select” mode or always-visible lightweight selection affordance on touch. Reserve bottom padding while the bar is present and visually separate/desaturate destructive actions.
+**Journey:** Open a month that has two events on one day.
 
-## Search, place, and information quality
+- The cell says only “2 things.”
+- Event names and booking states are unavailable until the user opens the day.
+- An empty cell creates an event, but its add target is invisible without hover.
+- A touch user can create an unnamed event without seeing the action first.
 
-### 11. Search has weak failure states and keyboard ambiguity
+**Improve:** Show one or two compact event names and a `+n` count. Give the add target a visible touch affordance.
 
-The prominent search box returns events, dates, and commands, but it gives no “no matches” feedback and has no visible shortcut hint for Cmd/Ctrl+K. Its active-result bookkeeping counts results while its DOM also includes group headings, so screen-reader focus/selected indication can point at a different row after a category change.
+### 8. Day navigation changes two different concepts
 
-**Improve:** Add an empty state, shortcut hint, and ensure the active descendant/visual highlight follows the same rendered-option index. Consider an explicit command palette trigger on smaller screens.
+**Journey:** View several dated sections in Day view. Then press Earlier or Later.
 
-### 12. Place lookup is pointer-first and opaque while loading
+- The itinerary list still contains every trip day.
+- The navigation changes the map day and the range label.
+- The list does not always move to the new anchor day.
+- “All in this day” also uses the hidden anchor, not the visible section.
 
-Place results appear after a 400 ms delay with no loading state. The input has no keyboard navigation or Enter-to-select behavior; results are effectively mouse/touch choices. A failed lookup is indistinguishable from no matches, and manually typing a place keeps a label but silently drops the map pin.
+**Improve:** Either filter Day view to one day or scroll it to the anchor. Name the selected day in bulk actions.
 
-**Improve:** Implement combobox keyboard controls, show loading/no-result/offline states, and tell users explicitly when a manual edit will remove coordinates. Offer “keep existing pin” only when safe.
+### 9. Unscheduled events disappear from Week and Month
 
-### 13. Weather can mislead on multi-city trips
+**Journey:** Add several events without dates. Then switch away from Day view.
 
-Weather is fetched from the first event with coordinates in the entire trip and then shown by date across calendar views. A trip that moves from Kyoto to Osaka (or across countries) can display the first location’s forecast for later locations without identifying the forecast city.
+- Week and Month do not show the unscheduled events.
+- The user gets no count or tray that shows pending scheduling work.
+- Search can still find the events, but the calendar gives no clue that they exist.
 
-**Improve:** Fetch/group forecasts by dated location, or show weather only when its location is clear (for example, “Kyoto forecast”).
+**Improve:** Add an Unscheduled tray or count to every calendar view. Support moving an item from the tray to a day.
 
-### 14. Map and descriptive content are separated from the task
+### 10. Touch creation and selection are difficult to discover
 
-The day map is tied to the hidden/current anchor day. In Day view, users cannot easily change that day, and the blank-map message competes with the main event list. Descriptions and mention previews are only exposed in the expanded editor; after closing it, there is no readable description on the event card.
+**Journey:** Use Week view or bulk selection on a phone.
 
-**Improve:** Let the user choose the map day or follow the selected event. Show a short description preview on expanded/read-only event details and make mention links available there.
+- Week drag creation is unavailable for touch input.
+- The empty week columns do not expose a clear alternative action.
+- Event selection boxes stay transparent until selection starts.
+- Touch has no hover state that can reveal the first selection box.
 
-## Settings, permissions, and secondary flows
+**Improve:** Add a visible Select mode. Add a clear “Add here” action to each week day on touch devices.
 
-### 15. Trip settings expose a powerful schema editor without enough safeguards
+## Event data issues
 
-The “Fields” link is terse and easy to overlook. Field types are described only by a small “Holds” select; there is no preview of how each type appears on an event or warning about changing/deleting an existing field. A viewer can also reach `/t/:tripId/fields`; this screen does not apply the trip’s read-only state before offering write controls.
+### 11. Flight entry can assign the wrong date or break the view
 
-**Improve:** Rename/describe this as “Custom fields”, add type previews and impact warnings, prevent duplicate/confusing field labels, and enforce role-based read-only UI on this route.
+**Journey:** Change an event to Flight and enter the flight data first.
 
-### 16. Audit and recovery are buried and jargon-heavy
+- Departure time uses today when the event has no date.
+- Arrival has a time but no explicit date.
+- An earlier arrival time always means the next day.
+- Trips longer than 24 hours need a workaround.
+- Flight time-zone fields do not use the validation from the general time-zone field.
+- An unknown flight time zone can make time formatting fail for the event.
 
-Audit history is at the bottom of Trip settings rather than near collaboration or recent changes. The offline recovery banner is commendably explicit, but “reloaded from the server because this device had been away too long” does not say what happened in user terms or what “Put them back” will do to conflicts.
+**Improve:** Use date and time fields for both ends. Validate both time zones before the event changes.
 
-**Improve:** Put activity/history in a discoverable Trip activity area. In recovery, state which edits are affected, offer a review option, and make the consequence of restoring them explicit.
+### 12. Lodging dates use unchecked text fields
 
-### 17. Attachments lack a clear task flow
+**Journey:** Change an event to Stay and enter check-in and check-out dates.
 
-Files use the browser’s native file picker only. There is no drag-and-drop, image preview, file-type guidance, aggregate progress, retry action, or visible empty-state instruction; only the per-file 25 MB error appears after selection. “Not sent yet” is useful, but the next action is not obvious if syncing remains blocked.
+- These fields are text inputs, unlike the main event date.
+- An invalid value disappears without a message.
+- The app does not warn when check-out is before check-in.
+- The values use UTC times rather than the lodging time zone.
 
-**Improve:** Add a drop zone/Attach button, accepted-file and size guidance before selection, previews for images/PDFs where appropriate, and retry/status detail for queued files.
+**Improve:** Use date controls and validate the range. Apply the lodging or event time zone.
 
-## Responsive and language details
+### 13. Destructive event actions lack recovery
 
-### 18. Important controls disappear on mobile
+**Journey:** Delete one event, delete selected events, or remove event content.
 
-The “Show times in” Local time/My time toggle is hidden below the medium breakpoint. Time-zone comparison is often most useful while travelling—precisely when someone may be using a phone. The header also contains several persistent controls that compete for space before the itinerary itself.
+- Event deletion happens immediately.
+- Bulk deletion also happens immediately.
+- Link, attachment, and choice removal have no undo action.
+- The activity log cannot restore ordinary web edits.
+- Field deletion has a warning, but event deletion does not.
 
-**Improve:** Move display-zone choice into an overflow/settings menu on small screens instead of removing it. Prioritize the trip name, search, and one calendar control in the compact header.
+**Improve:** Add an undo message after event deletion. Add a confirmation for large deletions and removals that affect stored values.
 
-### 19. Labels are occasionally clever rather than clear
+### 14. Basic text and link errors remain unclear
 
-Examples include “Holds” for field type, “Thing to do” for event kind, “No time yet” for undated events, and “It is shown once” for a share link. They require interpretation at moments where users need confidence.
+**Journey:** Clear an event name or add a malformed link.
 
-**Improve:** Prefer direct labels such as “Field type”, “Activity”, “Unscheduled”, and “Copy this link now; you can create or revoke links later.”
+- A blank name remains visible until the editor closes, then the old name returns.
+- The app gives no explanation for the rejected blank name.
+- A link accepts any text and can become a broken relative address.
 
-## What is already working well
+**Improve:** Show inline errors for required names and invalid addresses. Keep rejected text visible until the user corrects it.
 
-The app has a strong quick-add concept, clear empty states, offline-save status, keyboard-accessible calendar drag handles, status chips, a useful booking/transit model, and a thoughtfully concise week lodging rail. The changes above would preserve those strengths while making the central planning path much more direct and dependable.
+## Map, place, and weather issues
+
+### 15. The empty map dominates the main task
+
+**Journey:** Plan events before adding map places.
+
+- A blank map panel uses about half of the desktop content width.
+- The phone layout adds a large blank panel after the itinerary.
+- The same instruction repeats until any event gets coordinates.
+
+**Improve:** Collapse the map until a pin exists. Provide a compact “Add places to use the map” action.
+
+### 16. Map pins can become stale
+
+**Journey:** Change a pinned place or reorder the times of pinned events.
+
+- The map update key contains event IDs and booking states.
+- It does not contain coordinates or start times.
+- A moved place can leave its old marker until another tracked value changes.
+- Reordered events can keep old pin numbers.
+
+**Improve:** Refresh markers when coordinates, times, or ordering change.
+
+### 17. Weather can describe the wrong city
+
+**Journey:** Add pinned events in several cities across different days.
+
+- The forecast uses the first pinned place in the whole trip.
+- Later days can show that first place's weather.
+- The calendar does not name the forecast location.
+
+**Improve:** Group forecasts by dated place. Show the city beside every forecast group.
+
+## Sharing and account issues
+
+### 18. Collaboration identities are not useful
+
+**Journey:** Share the trip with several people and review “On this trip.”
+
+- Anonymous members appear as “Someone.”
+- The owner cannot tell two members apart.
+- The owner cannot change a member between read and edit access.
+- The panel does not refresh automatically when a member joins.
+- The phone test exposed a race where a new member did not appear in time.
+
+**Improve:** Add member names or device labels. Add role controls and refresh the list while the panel is open.
+
+### 19. Share-link controls do not expose their full lifecycle
+
+**Journey:** Create a viewer link and decide how long it must work.
+
+- The server supports link expiration, but the interface does not expose it.
+- The generated sentence says, “This link lets anyone who has it can read.”
+- There is no system share action or QR code for phone-to-phone sharing.
+- Offline creation fails without a visible error.
+
+**Improve:** Add an expiration choice, correct the sentence, and show network errors. Add the system share action where the browser supports it.
+
+## Secondary flows
+
+### 20. Custom-field settings can remove data too quietly
+
+**Journey:** Create choice fields, use their choices, and edit the field later.
+
+- “Holds” is an unclear label for the field type.
+- Duplicate field names and duplicate choices are accepted.
+- Removing a choice also clears that choice from every event.
+- Choice removal gives no affected-event count or warning.
+- Currency accepts any text despite the three-letter hint.
+
+**Improve:** Use “Field type.” Prevent duplicates and validate currencies. Warn before removing a used choice.
+
+### 21. Attachments have a minimal task flow
+
+**Journey:** Attach booking documents online and offline.
+
+- The native file input gives no drop target or preview.
+- Size guidance appears only after a file is too large.
+- Pending files show “Not sent yet,” but there is no retry action or error detail.
+- Removing a file has no undo action.
+
+**Improve:** Add an Attach button or drop zone. Show limits first, add previews, and provide retry details.
+
+### 22. Network failures can look like empty data
+
+**Journey:** Open the app or settings while the server is unavailable.
+
+- A failed trip-list request becomes “No trips yet.”
+- A failed access request can make the share panel look empty.
+- A failed activity request can look like an empty history.
+- These messages can cause incorrect decisions about trips, links, and changes.
+
+**Improve:** Keep empty and unavailable states separate. Provide a retry action for every server-backed panel.
+
+### 23. Trip cards do not help users scan several trips
+
+**Journey:** Return to the trip list after creating several trips.
+
+- Each card shows only the trip name and access role.
+- The card omits dates, destination, next event, and last activity.
+- Several similar trip names become difficult to tell apart.
+
+**Improve:** Add a compact date range, destination, next event, and recent-activity line.
+
+## What works well
+
+- Quick event creation needs only a name.
+- Direct date selection and empty-day creation remove major scheduling friction.
+- Generic time, duration, and time-zone fields now explain invalid input.
+- Search shows its keyboard shortcut and gives a useful no-results message.
+- Place lookup now has keyboard controls and clear loading, empty, and offline states.
+- Viewers can open full read-only event details.
+- Owners can create read or edit links, copy them, revoke them, and remove members.
+- Offline edits survive reloads and synchronize after reconnection.
+- Mentions stay connected to renamed events and mark deleted targets.
+- Transit warnings explain when travel does not fit between events.
+- Field deletion reports how many events will lose a value.
+- The tested layouts passed automated accessibility scans in light and dark themes.

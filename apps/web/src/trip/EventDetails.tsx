@@ -63,9 +63,9 @@ export function EventDetails({
               day: 'numeric',
               month: 'short',
               timeZone: zone,
-            }).format(event.startsAt)} · ${formatTime(event.startsAt, zone)}${
-              event.durationMinutes ? ` · ${event.durationMinutes} min` : ''
-            }`}
+            }).format(event.startsAt)} · ${
+              event.timeUndecided ? 'time not set' : formatTime(event.startsAt, zone)
+            }${event.durationMinutes ? ` · ${event.durationMinutes} min` : ''}`}
       </Row>
 
       {(event.city || event.location?.label) && (

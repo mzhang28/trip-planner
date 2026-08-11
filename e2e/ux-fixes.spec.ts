@@ -320,3 +320,75 @@ test.describe('searching', () => {
     await expect(page.getByTestId('event-editor')).toBeVisible();
   });
 });
+
+test.describe('a day decided before an hour', () => {
+  test('picking a date does not invent a time', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Ryokan').click();
+    await reveal(page, 'when');
+
+    await page.getByTestId('event-date').fill('2026-09-03');
+
+    // The day is decided and the hour is not, and both the card and the field
+    // say so. A 12:00 here reads as a booking somebody made.
+    const editor = page.getByTestId('event-editor');
+    await expect(editor.getByRole('textbox', { name: /Time \(/ })).toHaveValue('');
+    await expect(editor.getByText('The day is enough')).toBeVisible();
+    await expect(eventRow(page, 'Ryokan')).toContainText('--:--');
+
+    // It sits on its day all the same, above the hours rather than inside them.
+    await page.getByTestId('go-to-date').fill('2026-09-03');
+    await page
+      .getByRole('radiogroup', { name: 'Calendar view' })
+      .getByText('Week', { exact: true })
+      .click();
+    await expect(page.getByTestId('week-untimed-event')).toContainText('Ryokan');
+    await expect(page.getByTestId('week-event')).toHaveCount(0);
+  });
+
+  test('a time given, then taken away, leaves the day behind', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Ryokan').click();
+    await reveal(page, 'when');
+
+    await page.getByTestId('event-date').fill('2026-09-03');
+    const time = page.getByRole('textbox', { name: /Time \(/ });
+    await time.fill('15:00');
+    await time.blur();
+    await expect(eventRow(page, 'Ryokan')).toContainText('15:00');
+
+    await time.fill('');
+    await time.blur();
+    await expect(eventRow(page, 'Ryokan')).toContainText('--:--');
+    await expect(page.getByTestId('event-date')).toHaveValue('2026-09-03');
+  });
+
+  test('setting a date keeps the fields that were opened for it', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Ryokan').click();
+
+    await reveal(page, 'when');
+    await reveal(page, 'city');
+    await reveal(page, 'duration');
+
+    // Setting the date moves the event to another day's section, which used to
+    // take every empty field on screen with it.
+    await page.getByTestId('event-date').fill('2026-09-03');
+
+    const editor = page.getByTestId('event-editor');
+    await expect(editor.getByTestId('field-city')).toBeVisible();
+    await expect(editor.getByTestId('field-duration')).toBeVisible();
+  });
+});

@@ -60,6 +60,15 @@ export interface EventEditorProps {
   onDelete: () => void;
   doc: TripDoc | undefined;
   onOpenEvent: (eventId: string) => void;
+  /**
+   * Fields asked for during this sitting, kept by the list.
+   *
+   * Setting a date moves the event to another day's section, which re-parents
+   * this card and throws away anything held here -- so every field somebody had
+   * just opened vanished at the moment the date landed.
+   */
+  revealed: ReadonlySet<string>;
+  onReveal: (key: string) => void;
 }
 
 interface Section {
@@ -95,19 +104,16 @@ export function EventEditor({
   onDelete,
   doc,
   onOpenEvent,
+  revealed,
+  onReveal,
 }: EventEditorProps) {
   const zone = zoneFor(event.timezone, homeTimezone);
-  const time = event.startsAt === undefined ? '' : formatTime(event.startsAt, zone);
+  const time =
+    event.startsAt === undefined || event.timeUndecided ? '' : formatTime(event.startsAt, zone);
 
   const [linkUrl, setLinkUrl] = useState('');
   const [linkTitle, setLinkTitle] = useState('');
 
-  /*
-   * Asked for during this sitting. Kept separate from what is filled in so a
-   * field does not disappear the moment its box is emptied, which would take
-   * the cursor with it.
-   */
-  const [revealed, setRevealed] = useState<Set<string>>(new Set());
 
   const applicable = fieldDefs.filter(
     (def) => !def.appliesTo || def.appliesTo.includes(event.kind),
@@ -151,10 +157,21 @@ export function EventEditor({
                 value={event.startsAt === undefined ? '' : toDateInput(event.startsAt, zone)}
                 onChange={(e) => {
                   const day = e.target.value;
-                  if (!day) return onPatch({ startsAt: undefined });
+                  if (!day) return onPatch({ startsAt: undefined, timeUndecided: undefined });
 
-                  const next = setDay(event.startsAt, zone, day);
-                  if (next !== null) onPatch({ startsAt: next, timezone: zone });
+                  // A day on its own is a day on its own. Whether the hour is
+                  // known does not change by picking a date, so an event that
+                  // had a time keeps it and one that had none still has none.
+                  const timed = event.startsAt !== undefined && !event.timeUndecided;
+                  const next = setDay(timed ? event.startsAt : undefined, zone, day);
+
+                  if (next !== null) {
+                    onPatch({
+                      startsAt: next,
+                      timezone: zone,
+                      timeUndecided: timed ? undefined : true,
+                    });
+                  }
                 }}
                 className={cn(
                   'h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-ink',
@@ -170,7 +187,9 @@ export function EventEditor({
               hint={
                 event.startsAt === undefined
                   ? 'Pick a date first.'
-                  : 'Leave blank while you are still working out when.'
+                  : event.timeUndecided
+                    ? 'Not set. The day is enough until you know the hour.'
+                    : 'Leave blank while you are still working out when.'
               }
               onCommit={(raw) => {
                 if (raw === '') {
@@ -178,13 +197,16 @@ export function EventEditor({
                   // event is in before anyone has decided the hour.
                   const day = toDateInput(event.startsAt!, zone);
                   const next = setDay(undefined, zone, day);
-                  return next === null ? 'That is not a time' : (onPatch({ startsAt: next }), null);
+                  if (next === null) return 'That is not a time';
+
+                  onPatch({ startsAt: next, timeUndecided: true });
+                  return null;
                 }
 
                 const next = setTimeOfDay(event.startsAt ?? Date.now(), zone, raw);
                 if (next === null) return 'Use a 24-hour time, like 09:00';
 
-                onPatch({ startsAt: next, timezone: zone });
+                onPatch({ startsAt: next, timezone: zone, timeUndecided: undefined });
                 return null;
               }}
             />
@@ -599,7 +621,7 @@ export function EventEditor({
 
       <FieldPalette
         chips={chips}
-        onAdd={(key) => setRevealed((current) => new Set(current).add(key))}
+        onAdd={onReveal}
       />
 
       <div className="flex justify-end">
