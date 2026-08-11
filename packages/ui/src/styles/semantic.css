@@ -71,6 +71,12 @@
   --accent-ink: var(--grey-0);
 
   --accent-now: var(--vermilion-500);
+  /*
+   * A step darker, for when now is said in words rather than drawn as a line.
+   * The mark only owes 3:1; today's date is text and owes 4.5:1, and the mark
+   * colour lands at 4.47 on white.
+   */
+  --accent-now-text: var(--vermilion-600);
   --accent-now-soft: var(--vermilion-100);
 
   --danger: var(--vermilion-600);
@@ -128,6 +134,7 @@
   --accent-ink: var(--grey-950);
 
   --accent-now: var(--vermilion-400);
+  --accent-now-text: var(--vermilion-400);
   --accent-now-soft: var(--vermilion-900);
 
   --danger: var(--vermilion-400);

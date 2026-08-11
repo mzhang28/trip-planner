@@ -38,6 +38,24 @@ apps/api           Hono server: sync, blobs, weather, OAuth, MCP
 apps/web           the PWA
 ```
 
+## Connecting an agent
+
+The MCP server is at `/mcp` and speaks OAuth, so any client that can register
+itself can reach it. Point one at the server's URL; it will find the metadata at
+`/.well-known/oauth-protected-resource`, register, and send you to a consent
+screen where you pick which trips it may see and whether it may write.
+
+Every change an agent makes is recorded with who authorised it and through which
+client, and the ones that replaced a value can be put back from the trip's audit
+list.
+
+## Attachments
+
+Files go to `data/blobs` by default. To use object storage instead, set
+`BLOB_STORE=s3` along with `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and
+`S3_SECRET_ACCESS_KEY`. `S3_ENDPOINT` points it at R2, MinIO, or B2; leave it
+unset for AWS.
+
 ## Running it
 
 ```sh

@@ -54,6 +54,12 @@ export const CONTRAST_CONTRACT: ContrastPair[] = [
   },
   { foreground: 'text-muted', background: 'surface-page', minRatio: TEXT, usage: 'column headers' },
   {
+    foreground: 'text-muted',
+    background: 'surface-sunken',
+    minRatio: TEXT,
+    usage: 'dates either side of the month',
+  },
+  {
     foreground: 'text-inverse',
     background: 'surface-inverse',
     minRatio: TEXT,
@@ -199,6 +205,18 @@ export const CONTRAST_CONTRACT: ContrastPair[] = [
     background: 'surface-card',
     minRatio: GRAPHIC,
     usage: 'current-time line',
+  },
+  {
+    foreground: 'accent-now-text',
+    background: 'surface-card',
+    minRatio: TEXT,
+    usage: "today's date in the calendar",
+  },
+  {
+    foreground: 'accent-now-text',
+    background: 'surface-page',
+    minRatio: TEXT,
+    usage: "today's date on the page",
   },
   {
     foreground: 'accent-now',

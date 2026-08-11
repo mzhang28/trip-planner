@@ -20,6 +20,7 @@
     "free-test-ports": "node -e \"const{execSync}=require('node:child_process');for(const p of[5273,8887]){try{execSync('fuser -k '+p+'/tcp',{stdio:'ignore'})}catch{}}\""
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^24.10.1",
     "prettier": "^3.6.2",

@@ -63,7 +63,17 @@ export function WeekView({
   const beds = lodgingSpans(events, homeTimezone).filter((span) => spanWithin(span, days));
 
   return (
-    <div className="overflow-x-auto">
+    /*
+     * The wrapper is focusable because it scrolls sideways. A region that can
+     * be scrolled but not focused cannot be reached by anyone driving the page
+     * from the keyboard.
+     */
+    <div
+      className="overflow-x-auto"
+      tabIndex={0}
+      role="group"
+      aria-label="This week, scroll sideways for the other days"
+    >
       <div className="min-w-3xl">
         {/* City bands: the same device the month view uses, one row high. */}
         {cities.length > 0 && (
@@ -99,7 +109,7 @@ export function WeekView({
                 <div
                   className={cn(
                     'text-2xs',
-                    day === today ? 'font-semibold text-now' : 'text-ink-muted',
+                    day === today ? 'font-semibold text-now-text' : 'text-ink-muted',
                   )}
                 >
                   {new Intl.DateTimeFormat('en-GB', {
@@ -110,7 +120,7 @@ export function WeekView({
                 <div
                   className={cn(
                     'tabular text-sm',
-                    day === today ? 'font-semibold text-now' : 'text-ink',
+                    day === today ? 'font-semibold text-now-text' : 'text-ink',
                   )}
                 >
                   {Number(day.slice(8))}

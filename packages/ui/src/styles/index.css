@@ -62,6 +62,7 @@
   --color-accent-ink: var(--accent-ink);
 
   --color-now: var(--accent-now);
+  --color-now-text: var(--accent-now-text);
   --color-now-soft: var(--accent-now-soft);
 
   --color-danger: var(--danger);

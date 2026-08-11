@@ -101,10 +101,11 @@ export function MonthView({
                     key={day}
                     className={cn(
                       'truncate px-1.5 py-0.5 text-2xs font-medium',
-                      segment ? 'bg-accent-soft text-accent-text' : 'bg-card text-transparent',
+                      segment ? 'bg-accent-soft text-accent-text' : 'bg-card',
                     )}
                   >
-                    {startsHere ? segment.label : ' '}
+                    {/* Empty, not transparent: see the week view. */}
+                    {startsHere ? segment.label : ''}
                   </div>
                 );
               })}
@@ -130,9 +131,13 @@ export function MonthView({
                         className={cn(
                           'tabular text-xs',
                           day === today
-                            ? 'font-semibold text-now'
+                            ? 'font-semibold text-now-text'
                             : outside
-                              ? 'text-ink-placeholder'
+                              ? // Muted rather than placeholder: a date either
+                                // side of the month is still a date someone
+                                // reads, and placeholder does not clear 4.5:1
+                                // against the sunken surface it sits on.
+                                'text-ink-muted'
                               : 'text-ink',
                         )}
                       >
