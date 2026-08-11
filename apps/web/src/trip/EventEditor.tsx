@@ -508,48 +508,71 @@ export function EventEditor({
         key: 'lodging',
         label: 'Nights',
         filled: true,
-        render: () => (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField
-              label="Check in"
-              defaultValue={
-                event.lodging?.checkIn
-                  ? new Date(event.lodging.checkIn).toISOString().slice(0, 10)
-                  : ''
-              }
-              placeholder="2026-08-14"
-              description="Shown along the bottom of the week."
-              onBlur={(e) => {
-                const parsed = Date.parse(`${e.currentTarget.value.trim()}T15:00:00Z`);
-                onPatch({
-                  lodging: {
-                    ...event.lodging,
-                    checkIn: Number.isNaN(parsed) ? undefined : parsed,
-                  },
-                });
-              }}
-            />
-            <TextField
-              label="Check out"
-              defaultValue={
-                event.lodging?.checkOut
-                  ? new Date(event.lodging.checkOut).toISOString().slice(0, 10)
-                  : ''
-              }
-              placeholder="2026-08-17"
-              description="The day you leave, not the last night."
-              onBlur={(e) => {
-                const parsed = Date.parse(`${e.currentTarget.value.trim()}T10:00:00Z`);
-                onPatch({
-                  lodging: {
-                    ...event.lodging,
-                    checkOut: Number.isNaN(parsed) ? undefined : parsed,
-                  },
-                });
-              }}
-            />
-          </div>
-        ),
+        render: () => {
+          /*
+           * Date controls rather than text boxes, and read in the zone of the
+           * place. Typing a date built an instant at 15:00 UTC, which is the
+           * previous evening in Tokyo -- so a stay drawn along the bottom of
+           * the week began a day early.
+           */
+          const stay = event.lodging;
+          const checkIn = stay?.checkIn;
+          const checkOut = stay?.checkOut;
+          const wrongWayRound =
+            checkIn !== undefined && checkOut !== undefined && checkOut <= checkIn;
+
+          return (
+            <div className="flex flex-col gap-1">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-ink-secondary">Check in</span>
+                  <input
+                    type="date"
+                    data-testid="check-in"
+                    value={checkIn === undefined ? '' : toDateInput(checkIn, zone)}
+                    onChange={(e) => {
+                      const day = e.target.value;
+                      const at = day ? setTimeOfDay(setDay(undefined, zone, day)!, zone, '15:00') : undefined;
+                      onPatch({ lodging: { ...stay, checkIn: at ?? undefined } });
+                    }}
+                    className={cn(
+                      'h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-ink',
+                      'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                    )}
+                  />
+                  <span className="text-2xs text-ink-muted">Shown along the bottom of the week.</span>
+                </label>
+
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-ink-secondary">Check out</span>
+                  <input
+                    type="date"
+                    data-testid="check-out"
+                    value={checkOut === undefined ? '' : toDateInput(checkOut, zone)}
+                    min={checkIn === undefined ? undefined : toDateInput(checkIn, zone)}
+                    onChange={(e) => {
+                      const day = e.target.value;
+                      const at = day ? setTimeOfDay(setDay(undefined, zone, day)!, zone, '10:00') : undefined;
+                      onPatch({ lodging: { ...stay, checkOut: at ?? undefined } });
+                    }}
+                    className={cn(
+                      'h-9 w-full rounded-md border bg-card px-2.5 text-ink',
+                      'focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                      wrongWayRound ? 'border-danger' : 'border-line-input focus:border-accent',
+                    )}
+                  />
+                  <span className="text-2xs text-ink-muted">The day you leave, not the last night.</span>
+                </label>
+              </div>
+
+              {wrongWayRound && (
+                <p className="text-2xs text-danger">
+                  You would be leaving before you arrive. Check the dates over.
+                </p>
+              )}
+            </div>
+          );
+        },
       });
     }
 

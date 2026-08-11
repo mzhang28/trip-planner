@@ -532,8 +532,15 @@ test.describe('trips you cannot open', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await context.setOffline(true);
     await page.goto('/');
+    await expect(page.getByText('Japan, April')).toBeVisible();
+
+    // The shell has to be cached before the network goes, or the reload below
+    // fails to navigate at all and tests nothing about the list.
+    await page.evaluate(() => navigator.serviceWorker.ready);
+
+    await context.setOffline(true);
+    await page.reload();
 
     // "No trips yet" here would send somebody off to make the trip they
     // already have.
@@ -597,5 +604,33 @@ test.describe('reaching things with a finger', () => {
     await expect(done).toBeInViewport();
     await done.click();
     await expect(page.getByTestId('event-editor')).toHaveCount(0);
+  });
+});
+
+test.describe('a stay', () => {
+  test('check-in and check-out are dates, read where the hotel is', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Ryokan').click();
+    await reveal(page, 'kind');
+    await page.getByTestId('event-editor').getByText('Stay', { exact: true }).click();
+
+    // A text box built the instant at 15:00 UTC, which is the small hours of
+    // the next day in Tokyo: the stay was drawn on the wrong nights.
+    await page.getByTestId('check-in').fill('2026-08-14');
+    await page.getByTestId('check-out').fill('2026-08-12');
+    await expect(page.getByText('leaving before you arrive')).toBeVisible();
+
+    await page.getByTestId('check-out').fill('2026-08-17');
+    await expect(page.getByText('leaving before you arrive')).toHaveCount(0);
+
+    // Read back in the hotel's zone, which is what was typed.
+    await page.reload();
+    await eventRow(page, 'Ryokan').click();
+    await expect(page.getByTestId('check-in')).toHaveValue('2026-08-14');
+    await expect(page.getByTestId('check-out')).toHaveValue('2026-08-17');
   });
 });
