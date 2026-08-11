@@ -3,6 +3,7 @@ import { StatusSpine, cn } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
 import type { DayKey } from '../lib/calendar';
 import { citySegments, eventsByDay, monthGrid, monthOf } from '../lib/calendar';
+import { EventKindIcon } from './EventKind';
 import { weatherGlyph, type DailyWeather } from './useWeather';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -215,6 +216,10 @@ export function MonthView({
                             className="flex min-w-0 items-center gap-1 text-2xs text-ink"
                           >
                             <StatusSpine status={event.booking.status} className="h-2.5 w-0.5" />
+                            <EventKindIcon
+                              kind={event.kind}
+                              className="size-3 shrink-0 text-ink-muted"
+                            />
                             <span
                               className={cn(
                                 'truncate',

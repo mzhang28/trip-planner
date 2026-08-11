@@ -22,6 +22,7 @@ import { CheckedField } from './CheckedField';
 import { TimeField } from './TimeField';
 import { Attachments } from './Attachments';
 import { DescriptionEditor } from './DescriptionEditor';
+import { EVENT_KIND_OPTIONS, EventKindIcon } from './EventKind';
 import { FieldPalette, type PaletteChip } from './FieldPalette';
 import { FlightFields } from './FlightFields';
 import { PlacePicker } from './PlacePicker';
@@ -30,13 +31,6 @@ const STATUS_OPTIONS = BOOKING_STATUSES.map((status) => ({
   value: status,
   label: { idea: 'Idea', in_progress: 'Holding', booked: 'Booked' }[status],
 }));
-
-const KIND_OPTIONS = [
-  { value: 'activity', label: 'Thing to do' },
-  { value: 'lodging', label: 'Stay' },
-  { value: 'flight', label: 'Flight' },
-  { value: 'note', label: 'Note' },
-] as const;
 
 const TRANSIT_MODES = [
   { value: 'walk', label: 'Walk' },
@@ -126,13 +120,15 @@ export function EventEditor({
       {
         key: 'kind',
         label: 'Kind',
-        filled: event.kind !== 'activity',
+        // Kind belongs to every event, including the default kind. It is not
+        // optional metadata that should disappear behind the field palette.
+        filled: true,
         render: () => (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-ink-secondary">Kind</span>
             <SegmentedControl
               label="What this is"
-              options={KIND_OPTIONS}
+              options={EVENT_KIND_OPTIONS}
               value={event.kind}
               onChange={(kind) => onPatch({ kind })}
             />
@@ -698,13 +694,16 @@ export function EventEditor({
         of them. The name comes along so it is clear what is being edited.
       */}
       <div className="sticky bottom-0 -mx-3 -mb-4 flex items-center gap-3 border-t border-line bg-card px-3 py-2">
-        <span
-          className={cn(
-            'min-w-0 flex-1 truncate text-xs',
-            event.name ? 'text-ink-secondary' : 'text-ink-placeholder italic',
-          )}
-        >
-          {event.name || 'Unnamed'}
+        <span className="flex min-w-0 flex-1 items-center gap-1.5">
+          <EventKindIcon kind={event.kind} className="size-3.5 shrink-0 text-ink-muted" />
+          <span
+            className={cn(
+              'truncate text-xs',
+              event.name ? 'text-ink-secondary' : 'text-ink-placeholder italic',
+            )}
+          >
+            {event.name || 'Unnamed'}
+          </span>
         </span>
 
         {/* Said in full to a screen reader, short on a phone where it sits

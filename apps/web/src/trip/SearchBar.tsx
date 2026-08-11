@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { SearchResult } from './search';
 import { buildIndex, search, type CommandId } from './search';
 import type { TripDoc } from '@trip/crdt';
+import { EventKindIcon } from './EventKind';
 
 const GROUP_LABEL: Record<SearchResult['kind'], string> = {
   day: 'Days',
@@ -191,7 +192,15 @@ export function SearchBar({
                   position === active && 'bg-accent-soft',
                 )}
               >
-                <span className="truncate text-sm text-ink">{result.label}</span>
+                <span className="flex min-w-0 items-center gap-1.5 text-sm text-ink">
+                  {result.kind === 'event' && (
+                    <EventKindIcon
+                      kind={result.event.kind}
+                      className="size-3.5 shrink-0 text-ink-muted"
+                    />
+                  )}
+                  <span className="truncate">{result.label}</span>
+                </span>
                 <span className="shrink-0 text-2xs text-ink-muted">{result.detail}</span>
               </div>
             </li>

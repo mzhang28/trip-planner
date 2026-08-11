@@ -256,6 +256,9 @@ test.describe('flights and the map', () => {
     const editor = page.getByTestId('event-editor');
     await revealField(page, 'kind');
     await editor.getByRole('radiogroup', { name: 'What this is' }).getByText('Flight').click();
+    await expect(
+      eventRow(page, 'Flight to Osaka').getByRole('img', { name: 'Flight' }),
+    ).toBeVisible();
 
     // The route card is the only editor for the flight's schedule and places.
     await expect(editor.getByTestId('event-date')).toHaveCount(0);
@@ -429,8 +432,14 @@ test.describe('filling an event in gradually', () => {
 
     const editor = page.getByTestId('event-editor');
 
-    // Just a name. An event that is only a name is finished, not unfinished.
+    // Kind belongs to every entry rather than being optional metadata. The
+    // general-purpose default is called Event and is visible beside its name.
     await expect(editor.getByRole('textbox', { name: 'Name' })).toBeVisible();
+    await expect(editor.getByTestId('field-kind')).toBeVisible();
+    await expect(
+      editor.getByRole('radiogroup', { name: 'What this is' }).getByRole('radio', { name: 'Event' }),
+    ).toBeChecked();
+    await expect(eventRow(page, 'Fushimi Inari').getByRole('img', { name: 'Event' })).toBeVisible();
     await expect(editor.getByTestId('field-city')).toHaveCount(0);
     await expect(editor.getByTestId('field-when')).toHaveCount(0);
 

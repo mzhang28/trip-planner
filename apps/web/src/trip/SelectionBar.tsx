@@ -2,6 +2,7 @@ import type { TripEvent } from '@trip/crdt';
 import { Button, cn } from '@trip/ui';
 import { Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import { EventKindIcon } from './EventKind';
 
 /** Above this many, deleting asks first rather than only offering undo. */
 const ASK_ABOVE = 3;
@@ -158,6 +159,7 @@ export function MergePreview({
                 checked={event.id === primary.id}
                 onChange={() => onChangePrimary(event.id)}
               />
+              <EventKindIcon kind={event.kind} className="size-3.5 shrink-0 text-ink-muted" />
               <span className="truncate">{event.name}</span>
             </label>
           ))}

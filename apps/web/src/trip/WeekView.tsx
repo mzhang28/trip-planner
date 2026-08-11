@@ -13,6 +13,7 @@ import {
   spanWithin,
 } from '../lib/calendar';
 import { formatTime } from '../lib/time';
+import { EventKindIcon } from './EventKind';
 import { useCalendarDisplaySettings } from './useCalendarDisplaySettings';
 import { useDisplayZone } from './useDisplayZone';
 import { weatherGlyph, type DailyWeather } from './useWeather';
@@ -571,6 +572,10 @@ export function WeekView({
                         className="flex gap-1 overflow-hidden rounded-sm border border-dashed border-line bg-card px-1 py-0.5 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
                       >
                         <StatusSpine status={event.booking.status} />
+                        <EventKindIcon
+                          kind={event.kind}
+                          className="size-3 shrink-0 text-ink-muted"
+                        />
                         <span
                           className={cn(
                             'min-w-0 flex-1 truncate text-xs',
@@ -717,13 +722,19 @@ export function WeekView({
                                 )}
                               </span>
                             )}
-                            <span
-                              className={cn(
-                                'block truncate text-xs',
-                                event.name ? 'text-ink' : 'text-ink-placeholder italic',
-                              )}
-                            >
-                              {event.name || 'Unnamed'}
+                            <span className="flex min-w-0 items-center gap-1">
+                              <EventKindIcon
+                                kind={event.kind}
+                                className="size-3 shrink-0 text-ink-muted"
+                              />
+                              <span
+                                className={cn(
+                                  'truncate text-xs',
+                                  event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                                )}
+                              >
+                                {event.name || 'Unnamed'}
+                              </span>
                             </span>
                           </span>
                         </button>
@@ -786,6 +797,10 @@ export function WeekView({
                           status={span.event.booking.status}
                           orientation="horizontal"
                           className="w-4 shrink-0"
+                        />
+                        <EventKindIcon
+                          kind={span.event.kind}
+                          className="size-3 shrink-0 text-ink-muted"
                         />
                         <span className="truncate">{span.event.name}</span>
                       </button>

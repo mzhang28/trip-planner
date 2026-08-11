@@ -13,6 +13,7 @@ import { formatTime } from '../lib/time';
 import { useDisplayZone } from './useDisplayZone';
 import { EventDetails } from './EventDetails';
 import { EventEditor } from './EventEditor';
+import { EventKindIcon } from './EventKind';
 import { FlightSummary } from './FlightFields';
 
 export interface EventRowProps {
@@ -139,13 +140,16 @@ export function EventRow({
 
           <span className="min-w-0 flex-1">
             {/* An event made by picking a day is real before it is named. */}
-            <span
-              className={cn(
-                'block truncate text-sm font-medium',
-                event.name ? 'text-ink' : 'text-ink-placeholder italic',
-              )}
-            >
-              {event.name || 'Unnamed'}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <EventKindIcon kind={event.kind} className="size-3.5 shrink-0 text-ink-muted" />
+              <span
+                className={cn(
+                  'truncate text-sm font-medium',
+                  event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                )}
+              >
+                {event.name || 'Unnamed'}
+              </span>
             </span>
             {summary.length > 0 && (
               <span className="block truncate text-2xs text-ink-muted">{summary.join(' · ')}</span>
