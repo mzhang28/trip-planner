@@ -4,12 +4,25 @@ import { Button, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { formatTime, setTimeOfDay, zoneFor } from '../lib/time';
+import { FlightFields } from './FlightFields';
 import { PlacePicker } from './PlacePicker';
 
 const STATUS_OPTIONS = BOOKING_STATUSES.map((status) => ({
   value: status,
   label: { idea: 'Idea', in_progress: 'Holding', booked: 'Booked' }[status],
 }));
+
+/*
+ * What an event is decides what else it can hold: a flight gets both airports,
+ * somewhere to sleep gets nights rather than a start time, and both are drawn
+ * differently on the calendar.
+ */
+const KIND_OPTIONS = [
+  { value: 'activity', label: 'Thing to do' },
+  { value: 'lodging', label: 'Stay' },
+  { value: 'flight', label: 'Flight' },
+  { value: 'note', label: 'Note' },
+] as const;
 
 export interface EventEditorProps {
   event: TripEvent;
@@ -66,6 +79,66 @@ export function EventEditor({
           if (next && next !== event.name) onPatch({ name: next });
         }}
       />
+
+      <div className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-ink-secondary">Kind</span>
+        <SegmentedControl
+          label="What this is"
+          options={KIND_OPTIONS}
+          value={event.kind}
+          onChange={(kind) => onPatch({ kind })}
+        />
+      </div>
+
+      {event.kind === 'lodging' && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            label="Check in"
+            type="text"
+            defaultValue={
+              event.lodging?.checkIn ? new Date(event.lodging.checkIn).toISOString().slice(0, 10) : ''
+            }
+            placeholder="2026-08-14"
+            description="Shown along the bottom of the week."
+            onBlur={(e) => {
+              const parsed = Date.parse(`${e.currentTarget.value.trim()}T15:00:00Z`);
+              onPatch({
+                lodging: {
+                  ...event.lodging,
+                  checkIn: Number.isNaN(parsed) ? undefined : parsed,
+                },
+              });
+            }}
+          />
+          <TextField
+            label="Check out"
+            defaultValue={
+              event.lodging?.checkOut
+                ? new Date(event.lodging.checkOut).toISOString().slice(0, 10)
+                : ''
+            }
+            placeholder="2026-08-17"
+            description="The day you leave, not the last night."
+            onBlur={(e) => {
+              const parsed = Date.parse(`${e.currentTarget.value.trim()}T10:00:00Z`);
+              onPatch({
+                lodging: {
+                  ...event.lodging,
+                  checkOut: Number.isNaN(parsed) ? undefined : parsed,
+                },
+              });
+            }}
+          />
+        </div>
+      )}
+
+      {event.kind === 'flight' && (
+        <FlightFields
+          event={event}
+          homeTimezone={homeTimezone}
+          onPatch={(patch) => onPatch(patch)}
+        />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField

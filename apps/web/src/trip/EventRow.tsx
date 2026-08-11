@@ -5,6 +5,7 @@ import { Button } from 'react-aria-components';
 import { formatTime } from '../lib/time';
 import { useDisplayZone } from './useDisplayZone';
 import { EventEditor } from './EventEditor';
+import { FlightSummary } from './FlightFields';
 
 export interface EventRowProps {
   event: TripEvent;
@@ -90,6 +91,12 @@ export function EventRow({
           <StatusChip status={event.booking.status} short />
         </Button>
       </div>
+
+      {event.kind === 'flight' && (
+        <div className="px-3 pb-2">
+          <FlightSummary event={event} homeTimezone={homeTimezone} />
+        </div>
+      )}
 
       {isOpen && !readOnly && (
         <EventEditor

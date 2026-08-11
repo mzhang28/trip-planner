@@ -55,7 +55,7 @@ export default defineConfig({
           {
             // Map tiles: keep what has been looked at so a day already viewed
             // still shows its map with no signal.
-            urlPattern: /^https:\/\/[abc]\.tile\.openstreetmap\.org\/.*/,
+            urlPattern: /^https:\/\/(?:[abc]\.)?tile\.openstreetmap\.org\/.*/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'osm-tiles',

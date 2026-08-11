@@ -135,3 +135,53 @@ test.describe('week and month views', () => {
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
   });
 });
+
+test.describe('flights and the map', () => {
+  test('a flight shows both airports in their own local times', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Flight to Osaka');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Flight to Osaka').click();
+
+    const editor = page.getByTestId('event-editor');
+    await editor.getByRole('radiogroup', { name: 'What this is' }).getByText('Flight').click();
+
+    await editor.getByRole('textbox', { name: 'Airline' }).fill('ANA');
+    await editor.getByRole('textbox', { name: 'Flight number' }).fill('nh017');
+
+    // Each end names itself, so neither the test nor a screen reader has to
+    // work out which of two fields called "Airport" is which.
+    await editor.getByRole('textbox', { name: 'Leaving from' }).fill('nrt');
+    await editor.getByRole('textbox', { name: 'Departure time zone' }).fill('Asia/Tokyo');
+    await editor.getByRole('textbox', { name: /Departs/ }).fill('17:05');
+    await editor.getByRole('textbox', { name: /Departs/ }).blur();
+
+    await editor.getByRole('textbox', { name: 'Arriving at' }).fill('lhr');
+    await editor.getByRole('textbox', { name: 'Arrival time zone' }).fill('Europe/London');
+    await editor.getByRole('textbox', { name: /Arrives/ }).fill('21:30');
+    await editor.getByRole('textbox', { name: /Arrives/ }).blur();
+
+    const summary = page.getByTestId('flight-summary');
+    await expect(summary).toContainText('NRT');
+    await expect(summary).toContainText('17:05');
+    await expect(summary).toContainText('LHR');
+    await expect(summary).toContainText('21:30');
+
+    // Codes are upper-cased on the way in, so what was typed lower-case reads
+    // the way it does on a boarding pass.
+    await expect(summary).not.toContainText('nrt');
+
+    // Tokyo is eight hours ahead of London, so the clocks go back.
+    await expect(summary).toContainText(/clocks back 8h/);
+  });
+
+  test('the day map says what to do when nothing has a place yet', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    await expect(page.getByText(/Nothing on the map yet/)).toBeVisible();
+  });
+});

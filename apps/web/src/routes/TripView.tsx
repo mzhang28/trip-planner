@@ -26,7 +26,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, type TripSummary } from '../lib/api';
 import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
-import { addDays, startOfWeek, type DayKey } from '../lib/calendar';
+import { addDays, eventDay, startOfWeek, type DayKey } from '../lib/calendar';
+import { DayMap } from '../trip/DayMap';
 import { MonthView } from '../trip/MonthView';
 import { WeekView } from '../trip/WeekView';
 import { useWeather } from '../trip/useWeather';
@@ -107,6 +108,16 @@ export function TripView() {
   const [view, setView] = useState<CalendarView>('day');
   const [anchor, setAnchor] = useState<DayKey>(() => new Date().toISOString().slice(0, 10));
   const today = dayKey(Date.now(), homeTimezone);
+
+  /*
+   * The map shows the day the list is anchored on, not the whole trip. Pins
+   * numbered one to forty across three weeks would say nothing about the order
+   * of anything.
+   */
+  const mappable = useMemo(
+    () => events.filter((event) => eventDay(event, homeTimezone) === anchor),
+    [events, homeTimezone, anchor],
+  );
 
   /*
    * The keyboard sensor is not optional. Dragging is the only way to move an
@@ -319,8 +330,10 @@ export function TripView() {
             />
           )}
 
-          {view === 'day' &&
-            days.map(([key, dayEvents]) => (
+          {view === 'day' && (
+            <div className="lg:flex lg:items-start lg:gap-4">
+              <div className="min-w-0 lg:flex-1">
+          {days.map(([key, dayEvents]) => (
             <section key={key} className="mb-8">
               <h2 className="mb-2 text-sm text-ink-muted">
                 {key === UNSCHEDULED
@@ -411,7 +424,26 @@ export function TripView() {
                 </div>
               </DayDropZone>
             </section>
-            ))}
+          ))}
+              </div>
+
+              {/*
+                Beside the timeline from the large breakpoint up, and below it
+                on anything narrower. A map squeezed into a phone column shows
+                less than the list it is competing with for the space.
+              */}
+              <aside className="mt-6 h-80 lg:sticky lg:top-24 lg:mt-0 lg:h-[32rem] lg:w-96">
+                <DayMap
+                  events={mappable}
+                  selectedId={highlighted}
+                  onSelect={(eventId) => {
+                    setHighlighted(eventId);
+                    setOpenEventId(eventId);
+                  }}
+                />
+              </aside>
+            </div>
+          )}
         </DndContext>
 
         {trip?.role === 'owner' && (
