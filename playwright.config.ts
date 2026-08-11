@@ -59,9 +59,14 @@ export default defineConfig({
       stderr: 'pipe',
     },
     {
-      command: 'pnpm --filter @trip/web dev',
+      // Built and previewed rather than run from the dev server, so the service
+      // worker under test is the one that ships. In dev, Vite serves unbundled
+      // modules the worker never precaches, and an offline reload fails for a
+      // reason that does not exist in the built app.
+      command: 'pnpm --filter @trip/web build && pnpm --filter @trip/web preview',
       env: { WEB_PORT, API_PORT },
       url: WEB_URL,
+      timeout: 180_000,
       reuseExistingServer: !process.env.CI,
       stdout: 'pipe',
       stderr: 'pipe',

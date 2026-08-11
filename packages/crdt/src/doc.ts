@@ -198,14 +198,23 @@ export function deleteFieldDef(doc: Doc, id: FieldDefId, now = Date.now()): Doc 
   });
 }
 
+/*
+ * Both of these tolerate a document with nothing in it.
+ *
+ * A replica starts empty and stays that way until its first sync brings the
+ * trip down, so between opening a trip and hearing back from the server there
+ * is a real document with no `events` key at all. That is a trip with no events
+ * yet, not a broken one.
+ */
+
 /** Events that are not tombstoned, which is what every view shows. */
-export function liveEvents(doc: TripDoc): TripEvent[] {
-  return Object.values(doc.events).filter((event) => event.deletedAt === undefined);
+export function liveEvents(doc: TripDoc | undefined): TripEvent[] {
+  return Object.values(doc?.events ?? {}).filter((event) => event.deletedAt === undefined);
 }
 
 /** Field definitions that are not tombstoned, in the order they are shown. */
-export function liveFieldDefs(doc: TripDoc): FieldDef[] {
-  return Object.values(doc.fieldDefs)
+export function liveFieldDefs(doc: TripDoc | undefined): FieldDef[] {
+  return Object.values(doc?.fieldDefs ?? {})
     .filter((def) => def.deletedAt === undefined)
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
 }

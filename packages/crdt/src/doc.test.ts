@@ -123,6 +123,17 @@ describe('offline edits merging', () => {
   });
 });
 
+describe('a replica that has not synced yet', () => {
+  it('reads as an empty trip rather than throwing', () => {
+    // What the browser holds between opening a trip and hearing back from the
+    // server: a real Automerge document with none of the keys in it.
+    const empty = A.init<TripDoc>() as TripDoc;
+
+    expect(liveEvents(empty)).toEqual([]);
+    expect(liveEvents(undefined)).toEqual([]);
+  });
+});
+
 describe('tombstone sweep', () => {
   const now = 1_800_000_000_000;
 
