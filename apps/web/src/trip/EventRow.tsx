@@ -1,23 +1,20 @@
-import { BOOKING_STATUSES, type BookingStatus, type TripEvent } from '@trip/crdt';
-import { Card, SegmentedControl, StatusChip, StatusSpine, TextField, cn } from '@trip/ui';
-import { GripVertical } from 'lucide-react';
+import type { CustomValue, FieldDef, FieldDefId, TripEvent } from '@trip/crdt';
+import { Card, StatusChip, StatusSpine, cn } from '@trip/ui';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Button } from 'react-aria-components';
-import { formatTime, setTimeOfDay, zoneFor } from '../lib/time';
-
-const STATUS_OPTIONS = BOOKING_STATUSES.map((status) => ({
-  value: status,
-  label: { idea: 'Idea', in_progress: 'Holding', booked: 'Booked' }[status],
-}));
+import { formatTime, zoneFor } from '../lib/time';
+import { EventEditor } from './EventEditor';
 
 export interface EventRowProps {
   event: TripEvent;
   homeTimezone: string;
+  fieldDefs: FieldDef[];
   readOnly: boolean;
-  onRename: (name: string) => void;
-  onSetTime: (startsAt: number | undefined) => void;
-  onSetStatus: (status: BookingStatus) => void;
+  onPatch: (patch: Record<string, unknown>) => void;
+  onAddLink: (url: string, title: string | undefined) => void;
+  onRemoveLink: (linkId: string) => void;
+  onSetCustomField: (fieldId: FieldDefId, value: CustomValue | undefined) => void;
   onDelete: () => void;
   /** Rendered as the grip. Absent for a viewer, who cannot move anything. */
   dragHandle?: ReactNode;
@@ -33,16 +30,25 @@ export interface EventRowProps {
 export function EventRow({
   event,
   homeTimezone,
+  fieldDefs,
   readOnly,
-  onRename,
-  onSetTime,
-  onSetStatus,
+  onPatch,
+  onAddLink,
+  onRemoveLink,
+  onSetCustomField,
   onDelete,
   dragHandle,
 }: EventRowProps) {
   const [open, setOpen] = useState(false);
   const zone = zoneFor(event.timezone, homeTimezone);
   const time = event.startsAt === undefined ? null : formatTime(event.startsAt, zone);
+
+  const linkCount = Object.keys(event.links).length;
+  const summary = [
+    event.city,
+    event.location?.label,
+    linkCount > 0 ? `${linkCount} link${linkCount === 1 ? '' : 's'}` : undefined,
+  ].filter(Boolean);
 
   return (
     <Card className="overflow-hidden">
@@ -62,59 +68,29 @@ export function EventRow({
           )}
         >
           <span className="tabular w-11 shrink-0 text-xs text-ink-muted">{time ?? '--:--'}</span>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{event.name}</span>
+
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-ink">{event.name}</span>
+            {summary.length > 0 && (
+              <span className="block truncate text-2xs text-ink-muted">{summary.join(' · ')}</span>
+            )}
+          </span>
+
           <StatusChip status={event.booking.status} short />
         </Button>
       </div>
 
       {open && !readOnly && (
-        <div className="flex flex-col gap-4 border-t border-line px-3 py-3">
-          <TextField
-            label="Name"
-            defaultValue={event.name}
-            onBlur={(e) => {
-              const next = e.currentTarget.value.trim();
-              if (next && next !== event.name) onRename(next);
-            }}
-          />
-
-          <TextField
-            label={`Start time (${zone})`}
-            defaultValue={time ?? ''}
-            placeholder="09:00"
-            description="Leave blank while you are still working out when."
-            onBlur={(e) => {
-              const raw = e.currentTarget.value.trim();
-              if (raw === '') {
-                onSetTime(undefined);
-                return;
-              }
-              // Anchor to the event's own day if it has one, otherwise today.
-              const anchor = event.startsAt ?? Date.now();
-              const next = setTimeOfDay(anchor, zone, raw);
-              if (next !== null) onSetTime(next);
-            }}
-          />
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-ink-secondary">Booking</span>
-            <SegmentedControl
-              label="Booking status"
-              options={STATUS_OPTIONS}
-              value={event.booking.status}
-              onChange={onSetStatus}
-            />
-          </div>
-
-          <div className="flex justify-end">
-            <Button
-              onPress={onDelete}
-              className="cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-danger data-hovered:bg-danger-soft data-focus-visible:outline-focus data-focus-visible:outline-2"
-            >
-              Delete event
-            </Button>
-          </div>
-        </div>
+        <EventEditor
+          event={event}
+          homeTimezone={homeTimezone}
+          fieldDefs={fieldDefs}
+          onPatch={onPatch}
+          onAddLink={onAddLink}
+          onRemoveLink={onRemoveLink}
+          onSetCustomField={onSetCustomField}
+          onDelete={onDelete}
+        />
       )}
     </Card>
   );

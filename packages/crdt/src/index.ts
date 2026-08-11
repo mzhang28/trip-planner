@@ -9,6 +9,7 @@ export {
 export {
   addEvent,
   addFieldDef,
+  addFieldOption,
   addLink,
   createTrip,
   deleteEvent,
@@ -17,11 +18,15 @@ export {
   liveFieldDefs,
   removeLink,
   restoreEvent,
+  removeFieldOption,
   setCustomField,
   updateEvent,
+  updateFieldDef,
+  valueMatchesType,
   type Author,
   type Doc,
   type EditableEventFields,
+  type EditableFieldDef,
   type NewEvent,
 } from './doc';
 

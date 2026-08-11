@@ -1,5 +1,9 @@
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './components/Button';
 export { Card, type CardProps } from './components/Card';
+export {
+  CustomFieldInput,
+  type CustomFieldInputProps,
+} from './components/CustomFieldInput';
 export { IconButton, type IconButtonProps } from './components/IconButton';
 export {
   SegmentedControl,

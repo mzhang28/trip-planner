@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router';
 import { useIdentity } from './lib/useIdentity';
 import { Join } from './routes/Join';
+import { TripFields } from './routes/TripFields';
 import { TripList } from './routes/TripList';
 import { TripView } from './routes/TripView';
 
@@ -22,6 +23,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<TripList />} />
         <Route path="/t/:tripId" element={<TripView />} />
+        <Route path="/t/:tripId/fields" element={<TripFields />} />
         <Route path="/join/:token" element={<Join />} />
       </Routes>
     </BrowserRouter>

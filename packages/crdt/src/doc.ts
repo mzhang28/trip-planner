@@ -5,8 +5,10 @@ import type {
   EventKind,
   FieldDef,
   FieldDefId,
+  FieldOption,
   Instant,
   LinkId,
+  OptionId,
   TripDoc,
   TripEvent,
   UserId,
@@ -188,6 +190,93 @@ export function addFieldDef(doc: Doc, def: FieldDef): Doc {
   return A.change(doc, (d) => {
     d.fieldDefs[def.id] = def;
   });
+}
+
+/** What a caller may change about a field definition after it exists. */
+export type EditableFieldDef = Pick<FieldDef, 'label' | 'type' | 'unit' | 'currency' | 'order'>;
+
+export function updateFieldDef(
+  doc: Doc,
+  id: FieldDefId,
+  patch: Partial<EditableFieldDef>,
+): Doc {
+  return A.change(doc, (d) => {
+    const def = d.fieldDefs[id];
+    if (!def) return;
+
+    const target = def as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined) delete target[key];
+      else target[key] = value;
+    }
+  });
+}
+
+export function addFieldOption(
+  doc: Doc,
+  fieldId: FieldDefId,
+  optionId: OptionId,
+  option: FieldOption,
+): Doc {
+  return A.change(doc, (d) => {
+    const def = d.fieldDefs[fieldId];
+    if (!def) return;
+
+    // Created lazily: a field only becomes a choice field when it has choices,
+    // and retyping one to text should not leave an empty options map behind.
+    def.options ??= {};
+    def.options[optionId] = option;
+  });
+}
+
+/**
+ * Removes an option from a choice field, and from every event that had it
+ * ticked.
+ *
+ * Leaving the ticks behind would show a count that does not match what is
+ * listed, since a tick with no option renders as nothing.
+ */
+export function removeFieldOption(doc: Doc, fieldId: FieldDefId, optionId: OptionId): Doc {
+  return A.change(doc, (d) => {
+    const def = d.fieldDefs[fieldId];
+    if (!def?.options) return;
+
+    delete def.options[optionId];
+
+    for (const event of Object.values(d.events)) {
+      const value = event.customFields[fieldId];
+      if (value?.kind === 'options') delete value.selected[optionId];
+    }
+  });
+}
+
+/**
+ * Whether a stored value still matches what its field says it holds.
+ *
+ * Retyping a field does not rewrite the values already on events, so this is
+ * what lets the editor show one as needing attention rather than rendering a
+ * number as though it were a date.
+ */
+export function valueMatchesType(value: CustomValue, def: FieldDef): boolean {
+  switch (def.type) {
+    case 'text':
+    case 'longtext':
+    case 'url':
+    case 'email':
+    case 'phone':
+      return value.kind === 'text';
+    case 'number':
+    case 'money':
+      return value.kind === 'number';
+    case 'date':
+    case 'datetime':
+      return value.kind === 'instant';
+    case 'checkbox':
+      return value.kind === 'bool';
+    case 'select':
+    case 'multiselect':
+      return value.kind === 'options';
+  }
 }
 
 export function deleteFieldDef(doc: Doc, id: FieldDefId, now = Date.now()): Doc {

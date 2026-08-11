@@ -8,9 +8,15 @@ import {
 } from '@dnd-kit/core';
 import {
   addEvent,
+  addLink,
   deleteEvent,
+  liveFieldDefs,
+  removeLink,
+  setCustomField,
   updateEvent,
-  type BookingStatus,
+  type CustomValue,
+  type EditableEventFields,
+  type FieldDefId,
   type TripDoc,
   type TripEvent,
 } from '@trip/crdt';
@@ -70,6 +76,7 @@ export function TripView() {
   const homeTimezone = trip?.homeTimezone ?? doc?.meta?.homeTimezone ?? 'UTC';
   const readOnly = trip?.role === 'viewer';
   const days = useMemo(() => groupByDay(events, homeTimezone), [events, homeTimezone]);
+  const fieldDefs = useMemo(() => liveFieldDefs(doc), [doc]);
 
   /*
    * The keyboard sensor is not optional. Dragging is the only way to move an
@@ -145,6 +152,12 @@ export function TripView() {
             All trips
           </Link>
           <h1 className="truncate text-lg">{trip?.name ?? 'Trip'}</h1>
+          <Link
+            to={`/t/${tripId}/fields`}
+            className="text-xs text-ink-muted underline-offset-2 hover:underline"
+          >
+            Fields
+          </Link>
           <SyncBadge state={state} />
           <div className="hidden sm:flex sm:min-w-0 sm:flex-1">
             <SearchBar
@@ -236,32 +249,41 @@ export function TripView() {
                             }
                             event={event}
                             homeTimezone={homeTimezone}
+                            fieldDefs={fieldDefs}
                             readOnly={readOnly}
-                            onRename={(name) =>
-                            store?.change((current) =>
-                              updateEvent(current, event.id, { name }, { userId: 'me' }),
-                            )
-                          }
-                            onSetTime={(startsAt) =>
-                            store?.change((current) =>
-                              updateEvent(
-                                current,
-                                event.id,
-                                { startsAt, timezone: event.timezone ?? homeTimezone },
-                                { userId: 'me' },
-                              ),
-                            )
-                          }
-                            onSetStatus={(status: BookingStatus) =>
-                            store?.change((current) =>
-                              updateEvent(
-                                current,
-                                event.id,
-                                { booking: { ...event.booking, status } },
-                                { userId: 'me' },
-                              ),
-                            )
-                          }
+                            onPatch={(patch) =>
+                              store?.change((current) =>
+                                updateEvent(
+                                  current,
+                                  event.id,
+                                  patch as Partial<EditableEventFields>,
+                                  { userId: 'me' },
+                                ),
+                              )
+                            }
+                            onAddLink={(url, title) =>
+                              store?.change((current) =>
+                                addLink(
+                                  current,
+                                  event.id,
+                                  `l_${crypto.randomUUID()}`,
+                                  { url, title },
+                                  { userId: 'me' },
+                                ),
+                              )
+                            }
+                            onRemoveLink={(linkId) =>
+                              store?.change((current) =>
+                                removeLink(current, event.id, linkId, { userId: 'me' }),
+                              )
+                            }
+                            onSetCustomField={(fieldId: FieldDefId, value: CustomValue | undefined) =>
+                              store?.change((current) =>
+                                setCustomField(current, event.id, fieldId, value, {
+                                  userId: 'me',
+                                }),
+                              )
+                            }
                             onDelete={() =>
                               store?.change((current) =>
                                 deleteEvent(current, event.id, { userId: 'me' }),

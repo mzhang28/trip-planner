@@ -33,6 +33,9 @@ export interface TextFieldProps extends Omit<AriaTextFieldProps, 'children'> {
   /** Renders a multi-line control. */
   multiline?: boolean;
   rows?: number;
+  /** Drives the on-screen keyboard on a phone, and the browser's own checking. */
+  type?: 'text' | 'url' | 'email' | 'tel';
+  inputMode?: 'text' | 'decimal' | 'numeric';
   className?: string;
 }
 
@@ -44,6 +47,8 @@ export function TextField({
   placeholder,
   multiline = false,
   rows = 3,
+  type = 'text',
+  inputMode,
   className,
   ...props
 }: TextFieldProps) {
@@ -58,7 +63,12 @@ export function TextField({
       {multiline ? (
         <TextArea placeholder={placeholder} rows={rows} className={cn(CONTROL, 'resize-y py-2')} />
       ) : (
-        <Input placeholder={placeholder} className={cn(CONTROL, 'h-9')} />
+        <Input
+          placeholder={placeholder}
+          type={type}
+          inputMode={inputMode}
+          className={cn(CONTROL, 'h-9')}
+        />
       )}
 
       {description && !invalid && (
