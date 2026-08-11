@@ -634,3 +634,74 @@ test.describe('a stay', () => {
     await expect(page.getByTestId('check-out')).toHaveValue('2026-08-17');
   });
 });
+
+test.describe('a flight', () => {
+  async function newFlight(page: Page) {
+    await page.getByRole('textbox', { name: 'New event' }).fill('NH017');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'NH017').click();
+    await reveal(page, 'kind');
+    await page.getByTestId('event-editor').getByText('Flight', { exact: true }).click();
+  }
+
+  test('asks for the departure date rather than assuming today', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+    await newFlight(page);
+
+    const editor = page.getByTestId('event-editor');
+    const departs = editor.getByRole('textbox', { name: /Departs/ });
+    await departs.fill('17:05');
+    await departs.blur();
+
+    // Typing a time first used to put the flight on today, whatever day the
+    // ticket says, with nothing on screen to show it had guessed.
+    await expect(editor.getByText('Pick the departure date first')).toBeVisible();
+
+    await editor.getByTestId('departs-date').fill('2026-08-14');
+    await departs.fill('17:05');
+    await departs.blur();
+    await expect(editor.getByText('Pick the departure date first')).toHaveCount(0);
+    await expect(editor.getByTestId('departs-date')).toHaveValue('2026-08-14');
+  });
+
+  test('an arrival has a date of its own, so a long flight needs no trick', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+    await newFlight(page);
+
+    const editor = page.getByTestId('event-editor');
+    await editor.getByTestId('departs-date').fill('2026-08-14');
+    await editor.getByRole('textbox', { name: /Departs/ }).fill('17:05');
+    await editor.getByRole('textbox', { name: /Departs/ }).blur();
+
+    // An hour before departure means the next morning, and the date beside it
+    // now shows which morning rather than leaving the roll invisible.
+    await editor.getByRole('textbox', { name: /Arrives/ }).fill('09:20');
+    await editor.getByRole('textbox', { name: /Arrives/ }).blur();
+    await expect(editor.getByTestId('arrives-date')).toHaveValue('2026-08-15');
+
+    // Two days out is set on the date, not worked around.
+    await editor.getByTestId('arrives-date').fill('2026-08-16');
+    await expect(editor.getByTestId('arrives-date')).toHaveValue('2026-08-16');
+
+    // Landing before take-off is refused where it was typed.
+    await editor.getByTestId('arrives-date').fill('2026-08-13');
+    await expect(editor.getByText('before the flight leaves')).toBeVisible();
+  });
+
+  test('a flight time zone has to be one the browser knows', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+    await newFlight(page);
+
+    const editor = page.getByTestId('event-editor');
+    const zone = editor.getByRole('combobox', { name: 'Departure time zone' });
+    await zone.fill('Japan/Narita');
+    await zone.blur();
+
+    // An unknown zone was stored and then threw from Intl every time the
+    // flight was drawn, which reads as the app breaking.
+    await expect(editor.getByText('Not a time zone')).toBeVisible();
+  });
+});

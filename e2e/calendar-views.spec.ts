@@ -226,12 +226,16 @@ test.describe('flights and the map', () => {
     // Each end names itself, so neither the test nor a screen reader has to
     // work out which of two fields called "Airport" is which.
     await editor.getByRole('textbox', { name: 'Leaving from' }).fill('nrt');
-    await editor.getByRole('textbox', { name: 'Departure time zone' }).fill('Asia/Tokyo');
+    await editor.getByRole('combobox', { name: 'Departure time zone' }).fill('Asia/Tokyo');
+
+    // The date first: a time on its own used to put the flight on today,
+    // whatever day the ticket says.
+    await editor.getByTestId('departs-date').fill(ON);
     await editor.getByRole('textbox', { name: /Departs/ }).fill('17:05');
     await editor.getByRole('textbox', { name: /Departs/ }).blur();
 
     await editor.getByRole('textbox', { name: 'Arriving at' }).fill('lhr');
-    await editor.getByRole('textbox', { name: 'Arrival time zone' }).fill('Europe/London');
+    await editor.getByRole('combobox', { name: 'Arrival time zone' }).fill('Europe/London');
     await editor.getByRole('textbox', { name: /Arrives/ }).fill('21:30');
     await editor.getByRole('textbox', { name: /Arrives/ }).blur();
 
