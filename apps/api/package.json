@@ -1,0 +1,27 @@
+{
+  "name": "@trip/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node --experimental-strip-types src/main.ts",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.9",
+    "@trip/crdt": "workspace:*",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.10.1",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.20.7",
+    "typescript": "^5.9.3"
+  }
+}

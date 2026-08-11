@@ -7,12 +7,7 @@ import { defineConfig } from 'vite';
 // is no library build step here.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: {
-    // Listen on every interface, and accept ephemeral hostnames — ones that
-    // differ from session to session, such as a tunnel or preview host handed
-    // out fresh each time. Vite otherwise rejects any Host header not named in
-    // advance, which is impossible when the name is not known in advance.
-    host: '0.0.0.0',
-    allowedHosts: true,
-  },
+  // No `server` block here. Storybook is the only thing that runs this config,
+  // and it builds its own dev server rather than carrying this one over, so
+  // host settings live in .storybook/main.ts where they take effect.
 });

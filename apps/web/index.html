@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Trip Planner</title>
+    <meta name="description" content="Plan a trip together, with or without a signal." />
+
+    <!--
+      Sets the theme before the first paint. It is inline and blocking on
+      purpose: loaded as a module it would run after the page had already
+      painted, and someone on the dark theme would see a white flash first.
+      Kept in sync with THEME_INIT_SCRIPT in @trip/ui.
+    -->
+    <script>
+      (function () {
+        try {
+          var c = localStorage.getItem('trip-planner:theme');
+          if (c !== 'light' && c !== 'dark') {
+            c = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.dataset.theme = c;
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+/*
+ * The design system's stylesheet plus this app's own sources.
+ *
+ * Tailwind scans for class names relative to the file that declares the source,
+ * so @trip/ui only ever sees its own components. This adds the app's, which is
+ * why the entry point imports this rather than @trip/ui/styles.css directly.
+ */
+@import '@trip/ui/styles.css';
+
+@source './**/*.{ts,tsx}';
