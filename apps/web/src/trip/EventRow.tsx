@@ -26,6 +26,10 @@ export interface EventRowProps {
    */
   isOpen: boolean;
   onToggle: () => void;
+  isSelected: boolean;
+  onToggleSelected: () => void;
+  /** Once anything is ticked, every card shows its box. */
+  selectionActive: boolean;
   /** Rendered as the grip. Absent for a viewer, who cannot move anything. */
   dragHandle?: ReactNode;
 }
@@ -49,6 +53,9 @@ export function EventRow({
   onDelete,
   isOpen,
   onToggle,
+  isSelected,
+  onToggleSelected,
+  selectionActive,
   dragHandle,
 }: EventRowProps) {
   const displayZone = useDisplayZone();
@@ -66,6 +73,27 @@ export function EventRow({
     <Card className="overflow-hidden">
       <div className="flex">
         <StatusSpine status={event.booking.status} />
+
+        {!readOnly && (
+          <label
+            className={cn(
+              'flex cursor-pointer items-center pl-2',
+              // Hidden until something is ticked or the card is hovered, so a
+              // list of events is a list of events rather than a form.
+              !selectionActive && !isSelected && 'opacity-0 focus-within:opacity-100 hover:opacity-100',
+            )}
+          >
+            <span className="sr-only">Select {event.name}</span>
+            <input
+              type="checkbox"
+              data-testid="event-select"
+              checked={isSelected}
+              onChange={onToggleSelected}
+              className="size-4 accent-[var(--accent)]"
+            />
+          </label>
+        )}
+
         {dragHandle}
 
         <Button

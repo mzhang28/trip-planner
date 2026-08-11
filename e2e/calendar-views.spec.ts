@@ -185,3 +185,63 @@ test.describe('flights and the map', () => {
     await expect(page.getByText(/Nothing on the map yet/)).toBeVisible();
   });
 });
+
+test.describe('selecting several events', () => {
+  test('ticking events offers bulk actions, and delete removes them all', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    for (const name of ['Fushimi Inari', 'Nishiki Market', 'Dotonbori']) {
+      await page.getByRole('textbox', { name: 'New event' }).fill(name);
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await expect(eventRow(page, name)).toBeVisible();
+    }
+
+    await page.getByTestId('event-select').nth(0).check();
+    await page.getByTestId('event-select').nth(1).check();
+
+    const bar = page.getByTestId('selection-bar');
+    await expect(bar).toContainText('2 selected');
+
+    await bar.getByRole('button', { name: /Delete 2/ }).click();
+
+    await expect(page.getByTestId('event')).toHaveCount(1);
+    await expect(page.getByTestId('selection-bar')).toHaveCount(0);
+  });
+
+  test('merging folds the others into the one that gives the name', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    for (const name of ['Market, morning', 'Market, afternoon']) {
+      await page.getByRole('textbox', { name: 'New event' }).fill(name);
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await expect(eventRow(page, name)).toBeVisible();
+    }
+
+    await page.getByTestId('event-select').nth(0).check();
+    await page.getByTestId('event-select').nth(1).check();
+    await page.getByTestId('selection-bar').getByRole('button', { name: 'Merge' }).click();
+
+    // The dialog says what survives before anything is folded in.
+    const dialog = page.getByTestId('merge-preview');
+    await expect(dialog).toContainText('Merge 2 events');
+    await dialog.getByRole('button', { name: /Merge into/ }).click();
+
+    await expect(page.getByTestId('event')).toHaveCount(1);
+  });
+
+  test('merging is offered only once there is something to merge with', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Only one');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await page.getByTestId('event-select').first().check();
+
+    // Merging one thing into itself is not an operation.
+    await expect(
+      page.getByTestId('selection-bar').getByRole('button', { name: 'Merge' }),
+    ).toBeDisabled();
+  });
+});

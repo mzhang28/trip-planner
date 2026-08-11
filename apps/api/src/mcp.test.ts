@@ -470,3 +470,116 @@ describe('the OAuth server', () => {
     expect((await rpc(app, token.body.access_token, 'tools/list')).status).toBe(401);
   });
 });
+
+describe('undoing what an agent did', () => {
+  let app: App;
+  let db: Db;
+
+  beforeEach(() => {
+    ({ db } = createDb(':memory:'));
+    runMigrations(db, resolve(import.meta.dirname, '../drizzle'));
+    app = createApp({ db, docs: new DocStore(db), blobs: new FsBlobStore('/tmp/trip-mcp-blobs') });
+  });
+
+  async function setup() {
+    const browser = new Browser(app);
+    const trip = await browser.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+
+    const registered = await browser.request('/oauth/register', {
+      method: 'POST',
+      body: JSON.stringify({ client_name: 'An agent', redirect_uris: [REDIRECT] }),
+    });
+    const { verifier, challenge } = pkce();
+    const consent = await browser.request('/oauth/authorize/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_id: registered.body.client_id,
+        redirect_uri: REDIRECT,
+        scope: 'trips:read trips:write',
+        code_challenge: challenge,
+        trip_ids: [trip.body.id],
+      }),
+    });
+    const token = await browser.request('/oauth/token', {
+      method: 'POST',
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code: new URL(consent.body.redirect_to).searchParams.get('code'),
+        redirect_uri: REDIRECT,
+        client_id: registered.body.client_id,
+        code_verifier: verifier,
+      }),
+    });
+
+    return { browser, tripId: trip.body.id as string, accessToken: token.body.access_token as string };
+  }
+
+  it('puts back the value an agent replaced, and says who did it', async () => {
+    const { browser, tripId, accessToken } = await setup();
+
+    const created = await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Fushimi Inari', city: 'Kyoto' },
+    });
+    const eventId = JSON.parse(created.body.result.content[0].text).eventId;
+
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'update_event',
+      arguments: { tripId, eventId, city: 'Osaka' },
+    });
+
+    const log = await browser.request(`/api/audit/${tripId}?source=mcp`);
+    expect(log.body.entries).toHaveLength(2);
+    expect(log.body.entries[0].summary).toContain('Changed');
+    expect(log.body.entries[0].actor).toBeTruthy();
+
+    const undo = await browser.request(`/api/audit/${tripId}/${log.body.entries[0].id}/undo`, {
+      method: 'POST',
+    });
+    expect(undo.status).toBe(200);
+
+    const after = await rpc(app, accessToken, 'tools/call', {
+      name: 'get_event',
+      arguments: { tripId, eventId },
+    });
+    expect(JSON.parse(after.body.result.content[0].text).event.city).toBe('Kyoto');
+  });
+
+  it('undoes a creation by removing what it made', async () => {
+    const { browser, tripId, accessToken } = await setup();
+
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Should not survive' },
+    });
+
+    const log = await browser.request(`/api/audit/${tripId}`);
+    await browser.request(`/api/audit/${tripId}/${log.body.entries[0].id}/undo`, { method: 'POST' });
+
+    const events = await rpc(app, accessToken, 'tools/call', {
+      name: 'list_events',
+      arguments: { tripId },
+    });
+    expect(events.body.result.content[0].text).not.toContain('Should not survive');
+  });
+
+  it('refuses to undo the same action twice', async () => {
+    const { browser, tripId, accessToken } = await setup();
+
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Once' },
+    });
+
+    const log = await browser.request(`/api/audit/${tripId}`);
+    const path = `/api/audit/${tripId}/${log.body.entries[0].id}/undo`;
+
+    expect((await browser.request(path, { method: 'POST' })).status).toBe(200);
+    // The second one would delete an already-deleted event, which is harmless
+    // here but would not be for an undo that puts a value back.
+    expect((await browser.request(path, { method: 'POST' })).status).toBe(409);
+  });
+});

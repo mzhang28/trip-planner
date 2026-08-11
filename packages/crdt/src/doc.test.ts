@@ -5,7 +5,9 @@ import {
   addLink,
   createTrip,
   deleteEvent,
+  deleteEvents,
   liveEvents,
+  mergeEvents,
   setCustomField,
   updateEvent,
   type Doc,
@@ -207,5 +209,115 @@ describe('who may sync incrementally', () => {
     // It holds a document from somewhere, but nothing says it saw the
     // tombstones, so it has to take a fresh copy.
     expect(canSyncIncrementally(undefined, sweptAt)).toBe(false);
+  });
+});
+
+describe('merging events', () => {
+  const now = 1_800_000_000_000;
+  const hour = 60 * 60 * 1000;
+
+  function pair(): Doc {
+    let doc = createTrip('Japan, April', 'Asia/Tokyo');
+    doc = addEvent(doc, { id: 'a', name: 'Market, morning' }, ada);
+    doc = addEvent(doc, { id: 'b', name: 'Market, afternoon' }, ada);
+    return doc;
+  }
+
+  it('keeps the earliest start and a span covering everything folded in', () => {
+    let doc = pair();
+    doc = updateEvent(doc, 'a', { startsAt: now, durationMinutes: 60 }, ada);
+    doc = updateEvent(doc, 'b', { startsAt: now + 3 * hour, durationMinutes: 60 }, ada);
+
+    doc = mergeEvents(doc, 'a', ['b'], { ...ada, now });
+    const merged = (doc as TripDoc).events.a!;
+
+    expect(merged.startsAt).toBe(now);
+    // Four hours from the first start to the second finish. Keeping the
+    // primary's own hour would shorten an afternoon that was two halves.
+    expect(merged.durationMinutes).toBe(240);
+  });
+
+  it('takes the most settled status', () => {
+    let doc = pair();
+    doc = updateEvent(doc, 'a', { booking: { status: 'idea' } }, ada);
+    doc = updateEvent(doc, 'b', { booking: { status: 'booked' } }, ada);
+
+    doc = mergeEvents(doc, 'a', ['b'], { ...ada, now });
+
+    // A booked half and an idea half together are a booking.
+    expect((doc as TripDoc).events.a!.booking.status).toBe('booked');
+  });
+
+  it('keeps the primary name and fills its gaps from the others', () => {
+    let doc = pair();
+    doc = updateEvent(doc, 'b', { city: 'Kyoto', location: { label: 'Nishiki' } }, ada);
+
+    doc = mergeEvents(doc, 'a', ['b'], { ...ada, now });
+    const merged = (doc as TripDoc).events.a!;
+
+    expect(merged.name).toBe('Market, morning');
+    expect(merged.city).toBe('Kyoto');
+    expect(merged.location?.label).toBe('Nishiki');
+  });
+
+  it('gathers every link rather than keeping one side', () => {
+    let doc = pair();
+    doc = addLink(doc, 'a', 'l1', { url: 'https://one.example' }, ada);
+    doc = addLink(doc, 'b', 'l2', { url: 'https://two.example' }, ada);
+
+    doc = mergeEvents(doc, 'a', ['b'], { ...ada, now });
+
+    expect(Object.keys((doc as TripDoc).events.a!.links).sort()).toEqual(['l1', 'l2']);
+  });
+
+  it('joins the descriptions rather than dropping one', () => {
+    let doc = pair();
+    doc = updateEvent(doc, 'a', { description: 'Go early' }, ada);
+    doc = updateEvent(doc, 'b', { description: 'Bring cash' }, ada);
+
+    doc = mergeEvents(doc, 'a', ['b'], { ...ada, now });
+    const description = (doc as TripDoc).events.a!.description!;
+
+    expect(description).toContain('Go early');
+    expect(description).toContain('Bring cash');
+  });
+
+  it('tombstones what it folded in rather than removing it', () => {
+    let doc = mergeEvents(pair(), 'a', ['b'], { ...ada, now });
+
+    // A peer that was offline has to learn these went away, not merge them back.
+    expect((doc as TripDoc).events.b!.deletedAt).toBe(now);
+    expect(liveEvents(doc as TripDoc).map((event) => event.id)).toEqual(['a']);
+  });
+
+  it('does nothing when there is nothing to merge into it', () => {
+    const doc = pair();
+    const merged = mergeEvents(doc, 'a', ['a'], { ...ada, now });
+
+    expect(liveEvents(merged as TripDoc)).toHaveLength(2);
+  });
+});
+
+describe('deleting several at once', () => {
+  it('tombstones them all in one change, so undoing it is one step', () => {
+    let doc = createTrip('Japan, April', 'Asia/Tokyo');
+    for (const id of ['a', 'b', 'c']) {
+      doc = addEvent(doc, { id, name: id }, ada);
+    }
+
+    const before = A.getAllChanges(doc).length;
+    doc = deleteEvents(doc, ['a', 'b'], { ...ada, now: 1 });
+
+    expect(A.getAllChanges(doc).length).toBe(before + 1);
+    expect(liveEvents(doc as TripDoc).map((event) => event.id)).toEqual(['c']);
+  });
+
+  it('skips what is already gone rather than restamping it', () => {
+    let doc = createTrip('Japan, April', 'Asia/Tokyo');
+    doc = addEvent(doc, { id: 'a', name: 'a' }, ada);
+    doc = deleteEvent(doc, 'a', { ...ada, now: 1 });
+    doc = deleteEvents(doc, ['a'], { ...ada, now: 999 });
+
+    expect((doc as TripDoc).events.a!.deletedAt).toBe(1);
   });
 });

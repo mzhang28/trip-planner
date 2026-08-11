@@ -10,7 +10,9 @@ import {
   addEvent,
   addLink,
   deleteEvent,
+  deleteEvents,
   liveFieldDefs,
+  mergeEvents,
   removeLink,
   setCustomField,
   updateEvent,
@@ -28,6 +30,7 @@ import { api, type TripSummary } from '../lib/api';
 import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
 import { addDays, eventDay, startOfWeek, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
+import { MergePreview, SelectionBar } from '../trip/SelectionBar';
 import { MonthView } from '../trip/MonthView';
 import { WeekView } from '../trip/WeekView';
 import { useWeather } from '../trip/useWeather';
@@ -87,6 +90,8 @@ export function TripView() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [openEventId, setOpenEventId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [mergePrimary, setMergePrimary] = useState<string | null>(null);
   const addBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -175,6 +180,38 @@ export function TripView() {
     setHighlighted(eventId);
     setOpenEventId(eventId);
     document.getElementById(`event-${eventId}`)?.scrollIntoView({ block: 'center' });
+  }
+
+  function toggleSelected(eventId: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(eventId)) next.delete(eventId);
+      else next.add(eventId);
+      return next;
+    });
+  }
+
+  function bulkDelete() {
+    const ids = [...selected];
+    store?.change((current) => deleteEvents(current, ids, { userId: 'me' }));
+    setSelected(new Set());
+  }
+
+  function confirmMerge() {
+    const primary = mergePrimary ?? [...selected][0];
+    if (!primary) return;
+
+    store?.change((current) =>
+      mergeEvents(
+        current,
+        primary,
+        [...selected].filter((id) => id !== primary),
+        { userId: 'me' },
+      ),
+    );
+
+    setSelected(new Set());
+    setMergePrimary(null);
   }
 
   async function share() {
@@ -369,6 +406,9 @@ export function TripView() {
                               ) : undefined
                             }
                             event={event}
+                            isSelected={selected.has(event.id)}
+                            onToggleSelected={() => toggleSelected(event.id)}
+                            selectionActive={selected.size > 0}
                             isOpen={openEventId === event.id}
                             onToggle={() =>
                               setOpenEventId((current) =>
@@ -460,6 +500,29 @@ export function TripView() {
               </div>
             )}
           </section>
+        )}
+        {selected.size > 0 && (
+          <SelectionBar
+            selected={selected}
+            events={events}
+            dayEvents={mappable}
+            onSelectAll={(ids) => setSelected(new Set(ids))}
+            onClear={() => setSelected(new Set())}
+            onDelete={bulkDelete}
+            onMerge={() => setMergePrimary([...selected][0] ?? null)}
+          />
+        )}
+
+        {mergePrimary && (
+          <MergePreview
+            primary={events.find((event) => event.id === mergePrimary)!}
+            others={events.filter(
+              (event) => selected.has(event.id) && event.id !== mergePrimary,
+            )}
+            onChangePrimary={setMergePrimary}
+            onConfirm={confirmMerge}
+            onCancel={() => setMergePrimary(null)}
+          />
         )}
       </main>
     </div>

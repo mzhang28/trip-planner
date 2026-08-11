@@ -4,6 +4,7 @@ import { config } from './config';
 import type { AppEnv, Services } from './context';
 import { renameUser } from './identity';
 import { requireMembership, withIdentity, withServices } from './middleware';
+import { auditRoutes } from './routes/audit';
 import { blobRoutes } from './routes/blobs';
 import { mcpRoutes } from './routes/mcp';
 import { metadataRoutes, oauthRoutes } from './routes/oauth';
@@ -67,6 +68,10 @@ export function createApp(services: Services) {
   // the same check guards every route added under this prefix later.
   app.use('/api/sync/:tripId', requireMembership);
   app.route('/api/sync', syncRoutes());
+
+  app.use('/api/audit/:tripId', requireMembership);
+  app.use('/api/audit/:tripId/*', requireMembership);
+  app.route('/api/audit', auditRoutes());
 
   return app;
 }

@@ -1,4 +1,5 @@
 import * as A from '@automerge/automerge';
+import { higherStatus } from './status';
 import type {
   CustomValue,
   EventId,
@@ -306,4 +307,127 @@ export function liveFieldDefs(doc: TripDoc | undefined): FieldDef[] {
   return Object.values(doc?.fieldDefs ?? {})
     .filter((def) => def.deletedAt === undefined)
     .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label));
+}
+
+/**
+ * Combines several events into one.
+ *
+ * The rules are fixed rather than asked about field by field, because a dialog
+ * with twelve choices in it is slower than doing the merge by hand. What it
+ * keeps is what someone merging two versions of the same plan would keep: the
+ * earliest start, the primary's name and place, a span covering all of them,
+ * everything that was attached to any of them, and the most settled status --
+ * a booked half and an idea half together are a booking.
+ *
+ * The others are tombstoned rather than removed, so a peer that was offline
+ * learns they went away instead of merging them back.
+ */
+export function mergeEvents(
+  doc: Doc,
+  primaryId: EventId,
+  otherIds: EventId[],
+  author: Author,
+): Doc {
+  return A.change(doc, (d) => {
+    const primary = d.events[primaryId];
+    if (!primary) return;
+
+    const others = otherIds
+      .filter((id) => id !== primaryId)
+      .map((id) => d.events[id])
+      .filter((event): event is TripEvent => Boolean(event) && event!.deletedAt === undefined);
+
+    if (others.length === 0) return;
+
+    const all = [primary, ...others];
+    const starts = all.map((event) => event.startsAt).filter((at): at is number => at !== undefined);
+
+    if (starts.length > 0) {
+      const earliest = Math.min(...starts);
+
+      // The span has to cover everything that was folded in, or merging two
+      // adjacent halves of an afternoon would shorten it.
+      const latestEnd = Math.max(
+        ...all.map((event) =>
+          event.startsAt === undefined
+            ? -Infinity
+            : event.startsAt + (event.durationMinutes ?? 0) * 60_000,
+        ),
+      );
+
+      primary.startsAt = earliest;
+      if (Number.isFinite(latestEnd) && latestEnd > earliest) {
+        primary.durationMinutes = Math.round((latestEnd - earliest) / 60_000);
+      }
+    }
+
+    /*
+     * Copies are made rather than the values assigned across.
+     *
+     * Two things go wrong otherwise. Automerge refuses an undefined value, so
+     * `??=` from a field the other event does not have fails outright. And
+     * assigning an object that is already in the document creates a reference
+     * to it, which Automerge also refuses -- the value has to be a plain copy.
+     *
+     * Copied through JSON rather than with structuredClone: values read out of
+     * a document are proxies, and structuredClone cannot clone those.
+     */
+    const copy = <T>(value: T): T =>
+      value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
+
+    for (const other of others) {
+      primary.booking.status = higherStatus(primary.booking.status, other.booking.status);
+
+      if (primary.city === undefined && other.city !== undefined) {
+        primary.city = other.city;
+      }
+      if (primary.location === undefined && other.location !== undefined) {
+        primary.location = copy(other.location);
+      }
+      if (
+        primary.booking.confirmationCode === undefined &&
+        other.booking.confirmationCode !== undefined
+      ) {
+        primary.booking.confirmationCode = other.booking.confirmationCode;
+      }
+
+      for (const [linkId, link] of Object.entries(other.links)) {
+        if (primary.links[linkId] === undefined) primary.links[linkId] = copy(link);
+      }
+      for (const [id, attachment] of Object.entries(other.attachments)) {
+        if (primary.attachments[id] === undefined) primary.attachments[id] = copy(attachment);
+      }
+      for (const [fieldId, value] of Object.entries(other.customFields)) {
+        if (primary.customFields[fieldId] === undefined) {
+          primary.customFields[fieldId] = copy(value);
+        }
+      }
+
+      if (other.description) {
+        primary.description = primary.description
+          ? `${primary.description}\n\n---\n\n${other.description}`
+          : other.description;
+      }
+
+      other.deletedAt = author.now ?? Date.now();
+      stamp(other, author);
+    }
+
+    stamp(primary, author);
+  });
+}
+
+/** Tombstones several events as one change, so undoing it is one step. */
+export function deleteEvents(doc: Doc, ids: EventId[], author: Author): Doc {
+  return A.change(doc, (d) => {
+    const now = author.now ?? Date.now();
+
+    for (const id of ids) {
+      const event = d.events[id];
+      if (!event || event.deletedAt !== undefined) continue;
+
+      event.deletedAt = now;
+      stamp(event, author);
+    }
+  });
 }
