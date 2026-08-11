@@ -157,6 +157,18 @@ export const CONTRAST_CONTRACT: ContrastPair[] = [
     usage: 'label on a primary button',
   },
   {
+    foreground: 'danger-ink',
+    background: 'danger',
+    minRatio: TEXT,
+    usage: 'label on a delete button',
+  },
+  {
+    foreground: 'danger',
+    background: 'surface-card',
+    minRatio: TEXT,
+    usage: 'destructive text action',
+  },
+  {
     foreground: 'focus-ring',
     background: 'surface-page',
     minRatio: GRAPHIC,

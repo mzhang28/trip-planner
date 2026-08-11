@@ -46,13 +46,13 @@ function collectDeclarations(css: string, selectorMatches: (selector: string) =>
   return declarations;
 }
 
-/** `:root` and `:root[data-theme='light']` both carry the light mapping. */
+/** `:root` and `[data-theme='light']` both carry the light mapping. */
 function isBaseSelector(selector: string): boolean {
-  return selector === ':root' || selector === ":root[data-theme='light']";
+  return selector === ':root' || selector === "[data-theme='light']";
 }
 
 function isDarkSelector(selector: string): boolean {
-  return selector === ":root[data-theme='dark']";
+  return selector === "[data-theme='dark']";
 }
 
 /** Follows `var()` chains until a literal falls out. */

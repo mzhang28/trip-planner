@@ -1,6 +1,11 @@
 @import 'tailwindcss';
 
-@import '@fontsource-variable/archivo';
+/*
+ * The width axis, not the default weight-only cut. Headings are set slightly
+ * expanded to read as signage, and that axis is the whole reason this face was
+ * chosen over a static one.
+ */
+@import '@fontsource-variable/archivo/wdth.css';
 @import '@fontsource/ibm-plex-sans/400.css';
 @import '@fontsource/ibm-plex-sans/500.css';
 @import '@fontsource/ibm-plex-sans/600.css';
@@ -9,6 +14,7 @@
 
 @import './primitives.css';
 @import './semantic.css';
+@import './components.css';
 
 @source '../**/*.{ts,tsx}';
 
@@ -35,6 +41,7 @@
   --color-line: var(--border-subtle);
   --color-line-default: var(--border-default);
   --color-line-strong: var(--border-strong);
+  --color-line-input: var(--border-input);
 
   --color-booked: var(--status-booked);
   --color-booked-text: var(--status-booked-text);
@@ -56,6 +63,11 @@
 
   --color-now: var(--accent-now);
   --color-now-soft: var(--accent-now-soft);
+
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-soft: var(--danger-soft);
 
   --color-focus: var(--focus-ring);
 
@@ -114,17 +126,17 @@
   }
 
   /*
-   * Display type is set on the width axis, not just the weight axis. That is
-   * what gives headings the compressed signage look the direction asks for, and
-   * it is why the variable font is worth the download over a static cut.
+   * `font-stretch` drives the width axis. Prefer it over font-variation-settings,
+   * which is a low-level override the browser cannot reason about and which
+   * silently discards any axis it does not name.
    */
-  .font-display,
   h1,
   h2,
   h3 {
     font-family: var(--font-display);
-    font-variation-settings: 'wdth' 112;
+    font-stretch: 112%;
     letter-spacing: -0.011em;
+    font-weight: 600;
   }
 
   /* Times, dates, airport codes, and confirmation codes line up in columns. */

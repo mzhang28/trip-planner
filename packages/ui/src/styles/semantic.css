@@ -10,14 +10,18 @@
  * needs 4.5:1, so in the light theme it is a darker step of the same ramp. The
  * contrast story in Storybook asserts both.
  *
- * The theme is chosen by a `data-theme` attribute on <html>, set by an inline
+ * The theme is chosen by a `data-theme` attribute, set on <html> by an inline
  * script before first paint. There is no `prefers-color-scheme` rule here on
  * purpose: the script reads that media query itself, so the preference and the
  * explicit override resolve in one place instead of fighting through the cascade.
+ *
+ * The attribute selectors are not anchored to :root, so nesting one themed
+ * element inside another re-themes just that subtree. Storybook uses it to show
+ * both themes side by side.
  */
 
 :root,
-:root[data-theme='light'] {
+[data-theme='light'] {
   color-scheme: light;
 
   --surface-page: var(--grey-100);
@@ -66,9 +70,13 @@
   --accent-soft: var(--indigo-100);
   --accent-ink: var(--grey-0);
 
-  /* Vermilion appears here and nowhere else. */
   --accent-now: var(--vermilion-500);
   --accent-now-soft: var(--vermilion-100);
+
+  --danger: var(--vermilion-600);
+  --danger-hover: var(--vermilion-700);
+  --danger-ink: var(--grey-0);
+  --danger-soft: var(--vermilion-100);
 
   --focus-ring: var(--indigo-500);
 
@@ -79,7 +87,7 @@
   --depth-drag: var(--elevation-drag);
 }
 
-:root[data-theme='dark'] {
+[data-theme='dark'] {
   color-scheme: dark;
 
   --surface-page: var(--grey-900);
@@ -121,6 +129,11 @@
 
   --accent-now: var(--vermilion-400);
   --accent-now-soft: var(--vermilion-900);
+
+  --danger: var(--vermilion-400);
+  --danger-hover: var(--vermilion-350);
+  --danger-ink: var(--grey-950);
+  --danger-soft: var(--vermilion-900);
 
   --focus-ring: var(--indigo-350);
 

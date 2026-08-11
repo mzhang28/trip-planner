@@ -50,11 +50,13 @@
   --amber-900: #33230a;
   --amber-950: #241806;
 
-  /* Vermilion: reserved for now. The current-time line and today's marker. */
+  /* Vermilion: the current-time line, today's marker, and destructive actions. */
   --vermilion-100: #fbddd7;
+  --vermilion-350: #ff8770;
   --vermilion-400: #ff6a4d;
   --vermilion-500: #d93f2b;
   --vermilion-600: #b83122;
+  --vermilion-700: #96271b;
   --vermilion-900: #3d130d;
 
   /* Indigo: interactive and selected. Signage blue rather than a link blue. */
