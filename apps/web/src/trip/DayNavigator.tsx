@@ -92,6 +92,20 @@ export function DayNavigator({ view, anchor, today, onChange }: DayNavigatorProp
           </summary>
           <div className="absolute top-full left-0 z-20 mt-1 flex w-56 flex-col gap-3 rounded-lg border border-line bg-raised p-3 shadow-lg">
             <p className="text-xs text-ink-secondary">Week timetable hours</p>
+            <label className="flex items-center gap-2 text-xs text-ink">
+              <input
+                type="checkbox"
+                checked={display.weekFitToView}
+                onChange={(e) =>
+                  setCalendarDisplaySettings({
+                    ...display,
+                    weekFitToView: e.target.checked,
+                  })
+                }
+                className="size-4 accent-[var(--accent)]"
+              />
+              Fit hours to view
+            </label>
             <label className="flex items-center justify-between gap-2 text-xs text-ink">
               Starts
               <select

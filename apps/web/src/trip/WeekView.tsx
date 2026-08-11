@@ -16,8 +16,8 @@ const DEFAULT_EVENT_MINUTES = 30;
 
 interface PositionedEvent {
   event: TripEvent;
-  top: number;
-  height: number;
+  top: number | string;
+  height: number | string;
   column: number;
   columns: number;
 }
@@ -47,6 +47,7 @@ function positionEvents(
   homeTimezone: string,
   windowStart: number,
   windowEnd: number,
+  fitToView: boolean,
 ): PositionedEvent[] {
   const timed = events
     .filter((event): event is TripEvent & { startsAt: number } => event.startsAt !== undefined)
@@ -94,15 +95,23 @@ function positionEvents(
   }
   finishGroup();
 
-  return positioned.map((item) => ({
-    event: item.event,
-    top: (item.start - windowStart) * MINUTE_HEIGHT,
-    // Leave a small visible gap between back-to-back appointments. The minimum
-    // keeps an undetailed event tappable.
-    height: Math.max(30, (item.end - item.start) * MINUTE_HEIGHT - 2),
-    column: item.column,
-    columns: item.columns,
-  }));
+  const visibleMinutes = windowEnd - windowStart;
+
+  return positioned.map((item) => {
+    const offset = item.start - windowStart;
+    const duration = item.end - item.start;
+
+    return {
+      event: item.event,
+      top: fitToView ? `${(offset / visibleMinutes) * 100}%` : offset * MINUTE_HEIGHT,
+      // A minimum keeps short events usable after a long range is compressed.
+      height: fitToView
+        ? `max(24px, calc(${(duration / visibleMinutes) * 100}% - 2px))`
+        : Math.max(30, duration * MINUTE_HEIGHT - 2),
+      column: item.column,
+      columns: item.columns,
+    };
+  });
 }
 
 export interface WeekViewProps {
@@ -137,6 +146,7 @@ function DayColumn({
   band,
   windowStart,
   windowEnd,
+  fitToView,
 }: {
   day: DayKey;
   children: React.ReactNode;
@@ -145,9 +155,10 @@ function DayColumn({
   onStart: (minutes: number) => void;
   onMove: (minutes: number) => void;
   onFinish: () => void;
-  band: { top: number; height: number } | null;
+  band: { top: number | string; height: number | string } | null;
   windowStart: number;
   windowEnd: number;
+  fitToView: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day:${day}`, disabled });
 
@@ -158,8 +169,10 @@ function DayColumn({
    * to correct.
    */
   function minutesAt(e: React.PointerEvent<HTMLDivElement>): number {
-    const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
-    const minutes = windowStart + Math.round(y / MINUTE_HEIGHT / 15) * 15;
+    const bounds = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - bounds.top;
+    const minutes =
+      windowStart + Math.round(((y / bounds.height) * (windowEnd - windowStart)) / 15) * 15;
 
     return Math.max(windowStart, Math.min(windowEnd, minutes));
   }
@@ -196,9 +209,12 @@ function DayColumn({
         !disabled && 'cursor-cell',
       )}
       style={{
-        height: (windowEnd - windowStart) * MINUTE_HEIGHT,
+        height: fitToView ? '100%' : (windowEnd - windowStart) * MINUTE_HEIGHT,
         backgroundImage:
-          'repeating-linear-gradient(to bottom, transparent 0, transparent 55px, var(--border-subtle) 56px)',
+          'linear-gradient(to bottom, transparent calc(100% - 1px), var(--border-subtle) 1px)',
+        backgroundSize: fitToView
+          ? `100% ${100 / ((windowEnd - windowStart) / 60)}%`
+          : `100% ${HOUR_HEIGHT}px`,
       }}
     >
       {/* What the drag has picked so far, so the gesture shows its result. */}
@@ -347,11 +363,14 @@ export function WeekView({
       <div
         data-testid="week-timetable-scroll"
         tabIndex={0}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-b-lg border-x border-b border-line"
+        className={cn(
+          'min-h-0 flex-1 overscroll-contain rounded-b-lg border-x border-b border-line',
+          displaySettings.weekFitToView ? 'overflow-hidden' : 'overflow-y-auto',
+        )}
       >
         <div
           className="grid grid-cols-[2.5rem_repeat(7,minmax(0,1fr))] gap-px bg-line"
-          style={{ height: timetableHeight }}
+          style={{ height: displaySettings.weekFitToView ? '100%' : timetableHeight }}
         >
           <div aria-hidden="true" className="relative bg-page text-right text-2xs text-ink-muted">
             {Array.from(
@@ -360,8 +379,17 @@ export function WeekView({
             ).map((hour) => (
               <span
                 key={hour}
-                style={{ top: (hour - displaySettings.weekStartHour) * HOUR_HEIGHT }}
-                className="absolute right-1 -translate-y-1/2 tabular"
+                style={{
+                  top: displaySettings.weekFitToView
+                    ? `${((hour - displaySettings.weekStartHour) / (displaySettings.weekEndHour - displaySettings.weekStartHour)) * 100}%`
+                    : (hour - displaySettings.weekStartHour) * HOUR_HEIGHT,
+                }}
+                className={cn(
+                  'absolute right-1 tabular',
+                  hour === displaySettings.weekEndHour
+                    ? '-translate-y-full'
+                    : '-translate-y-1/2',
+                )}
               >
                 {hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`}
               </span>
@@ -375,6 +403,7 @@ export function WeekView({
               homeTimezone,
               windowStart,
               windowEnd,
+              displaySettings.weekFitToView,
             );
 
             return (
@@ -386,8 +415,12 @@ export function WeekView({
                 band={
                   selecting && selecting.day === day
                     ? {
-                        top: (selecting.start - windowStart) * MINUTE_HEIGHT,
-                        height: (selecting.end - selecting.start) * MINUTE_HEIGHT,
+                        top: displaySettings.weekFitToView
+                          ? `${((selecting.start - windowStart) / (windowEnd - windowStart)) * 100}%`
+                          : (selecting.start - windowStart) * MINUTE_HEIGHT,
+                        height: displaySettings.weekFitToView
+                          ? `${((selecting.end - selecting.start) / (windowEnd - windowStart)) * 100}%`
+                          : (selecting.end - selecting.start) * MINUTE_HEIGHT,
                       }
                     : null
                 }
@@ -400,6 +433,7 @@ export function WeekView({
                 onFinish={finishDrag}
                 windowStart={windowStart}
                 windowEnd={windowEnd}
+                fitToView={displaySettings.weekFitToView}
               >
                 {positioned.map(({ event, top, height, column, columns }) => (
                   <button
