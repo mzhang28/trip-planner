@@ -26,6 +26,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, type TripSummary } from '../lib/api';
 import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
+import { addDays, startOfWeek, type DayKey } from '../lib/calendar';
+import { MonthView } from '../trip/MonthView';
+import { WeekView } from '../trip/WeekView';
+import { useWeather } from '../trip/useWeather';
 import { DayDropZone, DraggableEvent } from '../trip/DayDropZone';
 import { EventRow } from '../trip/EventRow';
 import { SearchBar } from '../trip/SearchBar';
@@ -41,6 +45,14 @@ const UNSCHEDULED = 'unscheduled';
  * 09:00 whether you are there or at home, which is what a plan is for. The
  * other setting is for working out whether you can call someone.
  */
+type CalendarView = 'day' | 'week' | 'month';
+
+const VIEW_OPTIONS = [
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+] as const;
+
 const ZONE_OPTIONS = [
   { value: 'event', label: 'Local time' },
   { value: 'device', label: 'My time' },
@@ -73,6 +85,7 @@ export function TripView() {
   const [draft, setDraft] = useState('');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [openEventId, setOpenEventId] = useState<string | null>(null);
   const addBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,6 +102,11 @@ export function TripView() {
   const days = useMemo(() => groupByDay(events, homeTimezone), [events, homeTimezone]);
   const fieldDefs = useMemo(() => liveFieldDefs(doc), [doc]);
   const zonePreference = useZonePreference();
+  const weather = useWeather(events);
+
+  const [view, setView] = useState<CalendarView>('day');
+  const [anchor, setAnchor] = useState<DayKey>(() => new Date().toISOString().slice(0, 10));
+  const today = dayKey(Date.now(), homeTimezone);
 
   /*
    * The keyboard sensor is not optional. Dragging is the only way to move an
@@ -132,11 +150,19 @@ export function TripView() {
 
   function goToDay(at: number) {
     const key = dayKey(at, homeTimezone);
-    document.querySelector(`[data-testid="day-${key}"]`)?.scrollIntoView({ block: 'center' });
+    setAnchor(key);
+
+    // The day may not be on screen yet in week or month view, so move the
+    // window first and scroll once React has drawn it.
+    requestAnimationFrame(() =>
+      document.querySelector(`[data-testid="day-${key}"]`)?.scrollIntoView({ block: 'center' }),
+    );
   }
 
   function focusEvent(eventId: string) {
+    setView('day');
     setHighlighted(eventId);
+    setOpenEventId(eventId);
     document.getElementById(`event-${eventId}`)?.scrollIntoView({ block: 'center' });
   }
 
@@ -180,6 +206,12 @@ export function TripView() {
               onRunCommand={runCommand}
             />
           </div>
+          <SegmentedControl
+            label="Calendar view"
+            options={VIEW_OPTIONS}
+            value={view}
+            onChange={setView}
+          />
           <SegmentedControl
             label="Show times in"
             className="hidden md:inline-flex"
@@ -230,8 +262,65 @@ export function TripView() {
           </p>
         )}
 
+        {view !== 'day' && (
+          <div className="mb-4 flex items-center gap-2">
+            <Button
+              size="sm"
+              onPress={() => setAnchor((at) => addDays(at, view === 'week' ? -7 : -28))}
+            >
+              Earlier
+            </Button>
+            <Button size="sm" onPress={() => setAnchor(today)}>
+              Today
+            </Button>
+            <Button
+              size="sm"
+              onPress={() => setAnchor((at) => addDays(at, view === 'week' ? 7 : 28))}
+            >
+              Later
+            </Button>
+            <span className="tabular text-xs text-ink-muted">
+              {view === 'week'
+                ? `Week of ${startOfWeek(anchor)}`
+                : new Intl.DateTimeFormat('en-GB', {
+                    month: 'long',
+                    year: 'numeric',
+                    timeZone: 'UTC',
+                  }).format(Date.parse(`${anchor}T12:00:00Z`))}
+            </span>
+          </div>
+        )}
+
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          {days.map(([key, dayEvents]) => (
+          {view === 'week' && (
+            <WeekView
+              anchor={anchor}
+              events={events}
+              homeTimezone={homeTimezone}
+              weather={weather}
+              today={today}
+              readOnly={readOnly}
+              onOpenEvent={focusEvent}
+            />
+          )}
+
+          {view === 'month' && (
+            <MonthView
+              anchor={anchor}
+              events={events}
+              homeTimezone={homeTimezone}
+              weather={weather}
+              today={today}
+              readOnly={readOnly}
+              onOpenDay={(day) => {
+                setAnchor(day);
+                setView('day');
+              }}
+            />
+          )}
+
+          {view === 'day' &&
+            days.map(([key, dayEvents]) => (
             <section key={key} className="mb-8">
               <h2 className="mb-2 text-sm text-ink-muted">
                 {key === UNSCHEDULED
@@ -267,6 +356,12 @@ export function TripView() {
                               ) : undefined
                             }
                             event={event}
+                            isOpen={openEventId === event.id}
+                            onToggle={() =>
+                              setOpenEventId((current) =>
+                                current === event.id ? null : event.id,
+                              )
+                            }
                             homeTimezone={homeTimezone}
                             fieldDefs={fieldDefs}
                             readOnly={readOnly}
@@ -316,7 +411,7 @@ export function TripView() {
                 </div>
               </DayDropZone>
             </section>
-          ))}
+            ))}
         </DndContext>
 
         {trip?.role === 'owner' && (

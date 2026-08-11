@@ -57,7 +57,7 @@ export function EventEditor({
   }
 
   return (
-    <div className="flex flex-col gap-5 border-t border-line px-3 py-4">
+    <div data-testid="event-editor" className="flex flex-col gap-5 border-t border-line px-3 py-4">
       <TextField
         label="Name"
         defaultValue={event.name}

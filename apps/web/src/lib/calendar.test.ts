@@ -1,0 +1,173 @@
+import type { TripEvent } from '@trip/crdt';
+import { describe, expect, it } from 'vitest';
+import {
+  addDays,
+  citySegments,
+  eventsByDay,
+  lodgingSpans,
+  monthGrid,
+  spanWithin,
+  startOfWeek,
+  weekOf,
+  weekdayOf,
+} from './calendar';
+
+const TOKYO = 'Asia/Tokyo';
+
+function event(overrides: Partial<TripEvent>): TripEvent {
+  return {
+    id: Math.random().toString(36).slice(2),
+    kind: 'activity',
+    name: 'Something',
+    booking: { status: 'idea' },
+    links: {},
+    attachments: {},
+    customFields: {},
+    updatedAt: 0,
+    updatedBy: 'u1',
+    timezone: TOKYO,
+    ...overrides,
+  };
+}
+
+/** Midday on the given day in Tokyo, so the day is unambiguous. */
+function at(day: string, hour = 12): number {
+  return Date.parse(`${day}T${String(hour).padStart(2, '0')}:00:00+09:00`);
+}
+
+describe('day arithmetic', () => {
+  it('crosses month and year ends', () => {
+    expect(addDays('2026-08-31', 1)).toBe('2026-09-01');
+    expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28');
+  });
+
+  it('starts weeks on Monday', () => {
+    // 14 August 2026 is a Friday.
+    expect(weekdayOf('2026-08-14')).toBe(4);
+    expect(startOfWeek('2026-08-14')).toBe('2026-08-10');
+    expect(startOfWeek('2026-08-10')).toBe('2026-08-10');
+    // Sunday belongs to the week that began the previous Monday.
+    expect(startOfWeek('2026-08-16')).toBe('2026-08-10');
+  });
+
+  it('gives seven days for a week', () => {
+    expect(weekOf('2026-08-14')).toEqual([
+      '2026-08-10',
+      '2026-08-11',
+      '2026-08-12',
+      '2026-08-13',
+      '2026-08-14',
+      '2026-08-15',
+      '2026-08-16',
+    ]);
+  });
+
+  it('draws a month as whole weeks', () => {
+    const grid = monthGrid('2026-08-14');
+
+    expect(grid.length % 7).toBe(0);
+    expect(grid[0]).toBe('2026-07-27');
+    expect(grid).toContain('2026-08-01');
+    expect(grid).toContain('2026-08-31');
+    // A trip starting on the 30th needs its row complete, so the days either
+    // side of the month are real cells rather than blanks.
+    expect(grid[grid.length - 1]!).toBe('2026-09-06');
+  });
+});
+
+describe('city segments', () => {
+  const days = weekOf('2026-08-10');
+
+  it('joins consecutive days in one city into a single run', () => {
+    const byDay = eventsByDay(
+      [
+        event({ city: 'Kyoto', startsAt: at('2026-08-10') }),
+        event({ city: 'Kyoto', startsAt: at('2026-08-11') }),
+        event({ city: 'Osaka', startsAt: at('2026-08-13') }),
+      ],
+      TOKYO,
+    );
+
+    expect(citySegments(byDay, days)).toEqual([
+      { label: 'Kyoto', from: '2026-08-10', to: '2026-08-12' },
+      { label: 'Osaka', from: '2026-08-13', to: '2026-08-16' },
+    ]);
+  });
+
+  it('carries a city through days with nothing planned', () => {
+    // You do not leave Kyoto by failing to label Wednesday.
+    const byDay = eventsByDay([event({ city: 'Kyoto', startsAt: at('2026-08-10') })], TOKYO);
+
+    expect(citySegments(byDay, days)).toEqual([
+      { label: 'Kyoto', from: '2026-08-10', to: '2026-08-16' },
+    ]);
+  });
+
+  it('leaves the days before any city is named blank', () => {
+    const byDay = eventsByDay([event({ city: 'Osaka', startsAt: at('2026-08-14') })], TOKYO);
+
+    expect(citySegments(byDay, days)).toEqual([
+      { label: 'Osaka', from: '2026-08-14', to: '2026-08-16' },
+    ]);
+  });
+
+  it('finds nothing when no event names a city', () => {
+    const byDay = eventsByDay([event({ startsAt: at('2026-08-12') })], TOKYO);
+    expect(citySegments(byDay, days)).toEqual([]);
+  });
+});
+
+describe('lodging spans', () => {
+  it('runs to the last night, not the checkout day', () => {
+    const hotel = event({
+      kind: 'lodging',
+      name: 'Ryokan',
+      lodging: { checkIn: at('2026-08-10', 15), checkOut: at('2026-08-13', 10) },
+    });
+
+    // Checked out on the 13th means the last night was the 12th.
+    expect(lodgingSpans([hotel], TOKYO)).toEqual([
+      { event: hotel, from: '2026-08-10', to: '2026-08-12' },
+    ]);
+  });
+
+  it('covers one night when no checkout is known yet', () => {
+    const hotel = event({ kind: 'lodging', lodging: { checkIn: at('2026-08-10', 15) } });
+    expect(lodgingSpans([hotel], TOKYO)[0]).toMatchObject({ from: '2026-08-10', to: '2026-08-10' });
+  });
+
+  it('ignores anything that is not somewhere to sleep', () => {
+    expect(lodgingSpans([event({ startsAt: at('2026-08-10') })], TOKYO)).toEqual([]);
+  });
+});
+
+describe('placing a span in a run of days', () => {
+  const days = weekOf('2026-08-10');
+
+  it('gives the column it starts in and how many it covers', () => {
+    expect(spanWithin({ from: '2026-08-11', to: '2026-08-13' }, days)).toEqual({
+      start: 1,
+      length: 3,
+    });
+  });
+
+  it('clips a span that began before this week', () => {
+    expect(spanWithin({ from: '2026-08-05', to: '2026-08-12' }, days)).toEqual({
+      start: 0,
+      length: 3,
+    });
+  });
+
+  it('clips a span that runs past the end of this week', () => {
+    expect(spanWithin({ from: '2026-08-15', to: '2026-08-20' }, days)).toEqual({
+      start: 5,
+      length: 2,
+    });
+  });
+
+  it('gives nothing for a span that misses this week entirely', () => {
+    expect(spanWithin({ from: '2026-09-01', to: '2026-09-03' }, days)).toBeNull();
+    expect(spanWithin({ from: '2026-07-01', to: '2026-07-03' }, days)).toBeNull();
+  });
+});

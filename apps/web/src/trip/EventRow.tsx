@@ -1,7 +1,6 @@
 import type { CustomValue, FieldDef, FieldDefId, TripEvent } from '@trip/crdt';
 import { Card, StatusChip, StatusSpine, cn } from '@trip/ui';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
 import { Button } from 'react-aria-components';
 import { formatTime } from '../lib/time';
 import { useDisplayZone } from './useDisplayZone';
@@ -17,6 +16,15 @@ export interface EventRowProps {
   onRemoveLink: (linkId: string) => void;
   onSetCustomField: (fieldId: FieldDefId, value: CustomValue | undefined) => void;
   onDelete: () => void;
+  /**
+   * Held by the list rather than by the card.
+   *
+   * Setting a time moves the event to another day, which re-parents the card
+   * and would reset state living here -- so the editor would snap shut at the
+   * moment someone finished typing into it.
+   */
+  isOpen: boolean;
+  onToggle: () => void;
   /** Rendered as the grip. Absent for a viewer, who cannot move anything. */
   dragHandle?: ReactNode;
 }
@@ -38,9 +46,10 @@ export function EventRow({
   onRemoveLink,
   onSetCustomField,
   onDelete,
+  isOpen,
+  onToggle,
   dragHandle,
 }: EventRowProps) {
-  const [open, setOpen] = useState(false);
   const displayZone = useDisplayZone();
   const zone = displayZone(event.timezone, homeTimezone);
   const time = event.startsAt === undefined ? null : formatTime(event.startsAt, zone);
@@ -60,9 +69,9 @@ export function EventRow({
 
         <Button
           data-testid="event"
-          onPress={() => setOpen((was) => !was)}
+          onPress={onToggle}
           isDisabled={readOnly}
-          aria-expanded={open}
+          aria-expanded={isOpen}
           className={cn(
             'flex flex-1 items-center gap-3 px-3 py-2.5 text-left',
             'data-hovered:bg-sunken data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-2',
@@ -82,7 +91,7 @@ export function EventRow({
         </Button>
       </div>
 
-      {open && !readOnly && (
+      {isOpen && !readOnly && (
         <EventEditor
           event={event}
           homeTimezone={homeTimezone}
