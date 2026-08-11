@@ -56,49 +56,58 @@ export function syncRoutes() {
       return c.json({ type: 'resync_required', sweptAt: trip.sweptAt }, 409);
     }
 
-    const current = docs.load(tripId);
-    if (!current) return c.json({ error: 'no_such_trip' }, 404);
+    /*
+     * From here to the response there is nothing to await, which is what keeps
+     * two concurrent syncs of one trip from interleaving. Automerge marks a
+     * document outdated once a message has been applied to it, so anything
+     * added in between would need a lock to stop the second request advancing a
+     * handle the first had already superseded.
+     */
+    {
+      const current = docs.load(tripId);
+      if (!current) return c.json({ error: 'no_such_trip' }, 404);
 
-    let state = parsed.data.syncState
-      ? A.decodeSyncState(decode(parsed.data.syncState))
-      : A.initSyncState();
+      let state = parsed.data.syncState
+        ? A.decodeSyncState(decode(parsed.data.syncState))
+        : A.initSyncState();
 
-    let doc: Doc = current;
-    const incoming = decode(parsed.data.message);
+      let doc: Doc = current;
+      const incoming = decode(parsed.data.message);
 
-    if (incoming.length > 0) {
-      [doc, state] = A.receiveSyncMessage(current, state, incoming);
+      if (incoming.length > 0) {
+        [doc, state] = A.receiveSyncMessage(current, state, incoming);
 
-      /*
-       * Whether this was a write is decided by what the message turned out to
-       * contain, not by whether one was sent. Every sync message carries the
-       * sender's heads so the other side knows what to send back, so a viewer
-       * doing nothing but reading still posts messages — refusing those would
-       * stop a viewer seeing the trip at all.
-       */
-      const contributed = A.getChanges(current, doc);
-
-      if (contributed.length > 0 && !canEdit(membership.role)) {
         /*
-         * Drop the cached document rather than keeping either version. The
-         * changes were refused so `doc` must not be kept, and `current` is
-         * outdated the moment a message is applied to it, so the next request
-         * reads a fresh copy from SQLite.
+         * Whether this was a write is decided by what the message turned out to
+         * contain, not by whether one was sent. Every sync message carries the
+         * sender's heads so the other side knows what to send back, so a viewer
+         * doing nothing but reading still posts messages — refusing those would
+         * stop a viewer seeing the trip at all.
          */
-        docs.forget(tripId);
-        return c.json({ error: 'read_only' }, 403);
+        const contributed = A.getChanges(current, doc);
+
+        if (contributed.length > 0 && !canEdit(membership.role)) {
+          /*
+           * Drop the cached document rather than keeping either version. The
+           * changes were refused so `doc` must not be kept, and `current` is
+           * outdated the moment a message is applied to it, so the next request
+           * reads a fresh copy from SQLite.
+           */
+          docs.forget(tripId);
+          return c.json({ error: 'read_only' }, 403);
+        }
+
+        docs.commit(tripId, doc, contributed, membership.userId);
       }
 
-      docs.commit(tripId, doc, contributed, membership.userId);
+      const [nextState, reply] = A.generateSyncMessage(doc, state);
+
+      return c.json({
+        syncState: encode(A.encodeSyncState(nextState)),
+        message: reply ? encode(reply) : null,
+        syncedAt: Date.now(),
+      });
     }
-
-    const [nextState, reply] = A.generateSyncMessage(doc, state);
-
-    return c.json({
-      syncState: encode(A.encodeSyncState(nextState)),
-      message: reply ? encode(reply) : null,
-      syncedAt: Date.now(),
-    });
   });
 
   return app;

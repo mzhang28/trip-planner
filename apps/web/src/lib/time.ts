@@ -67,6 +67,29 @@ export function setTimeOfDay(at: Instant, timeZone: string, hhmm: string): Insta
   return asUtc - offsetAt(asUtc, timeZone);
 }
 
+/**
+ * Moves an instant onto another calendar day, keeping its time of day.
+ *
+ * Dragging an event from Tuesday to Thursday should leave a 09:00 booking at
+ * 09:00, not shift it by exactly 48 hours — which would land it at 08:00 or
+ * 10:00 whenever a daylight-saving change falls in between.
+ */
+export function moveToDay(at: Instant, timeZone: string, targetDay: string): Instant | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDay)) return null;
+
+  const time = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone,
+  }).format(at);
+
+  const asUtc = Date.parse(`${targetDay}T${time}:00Z`);
+  if (Number.isNaN(asUtc)) return null;
+
+  return asUtc - offsetAt(asUtc, timeZone);
+}
+
 /** How far ahead of UTC the zone is at that instant, in milliseconds. */
 function offsetAt(at: Instant, timeZone: string): number {
   const parts = new Intl.DateTimeFormat('en-US', {

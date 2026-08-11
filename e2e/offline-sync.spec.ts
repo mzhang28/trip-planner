@@ -8,6 +8,17 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
  * for reasons that have nothing to do with that.
  */
 async function newTrip(page: Page, name: string) {
+  /*
+   * Wait for the app before calling the API from inside it.
+   *
+   * The server mints a person for any request that arrives without a session,
+   * and the app settles its identity on load. Firing a request before that has
+   * finished creates a second person, and the trip ends up owned by whichever
+   * of them lost the race for the cookie -- so the browser is refused on a trip
+   * it just made.
+   */
+  await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
+
   const trip = await page.evaluate(async (tripName) => {
     const res = await fetch('/api/trips', {
       method: 'POST',
@@ -32,7 +43,17 @@ async function newTrip(page: Page, name: string) {
 async function addEvent(page: Page, name: string) {
   await page.getByRole('textbox', { name: 'New event' }).fill(name);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(page.getByRole('button', { name: new RegExp(name) })).toBeVisible();
+  await expect(eventRow(page, name)).toBeVisible();
+}
+
+/**
+ * The card for one event.
+ *
+ * By test id rather than by role and name: the drag handle beside the card
+ * names the event too, so a name-based query matches both.
+ */
+function eventRow(page: Page, name: string) {
+  return page.getByTestId('event').filter({ hasText: name });
 }
 
 /** Waits for the app to say the change has reached the server. */
@@ -71,8 +92,8 @@ test.describe('offline editing', () => {
     await otherPage.goto(`/join/${token}`);
     await expect(otherPage).toHaveURL(new RegExp(`/t/${tripId}`));
 
-    await expect(otherPage.getByRole('button', { name: /Fushimi Inari at dawn/ })).toBeVisible();
-    await expect(otherPage.getByRole('button', { name: /Nishiki Market lunch/ })).toBeVisible();
+    await expect(eventRow(otherPage, 'Fushimi Inari at dawn')).toBeVisible();
+    await expect(eventRow(otherPage, 'Nishiki Market lunch')).toBeVisible();
 
     await other.close();
   });
@@ -91,7 +112,7 @@ test.describe('offline editing', () => {
     const other = await browser.newContext();
     const otherPage = await other.newPage();
     await otherPage.goto(`/join/${token}`);
-    await expect(otherPage.getByRole('button', { name: /Fushimi Inari/ })).toBeVisible();
+    await expect(eventRow(otherPage, 'Fushimi Inari')).toBeVisible();
     await expectSaved(otherPage);
 
     // Both go offline before touching anything.
@@ -99,11 +120,11 @@ test.describe('offline editing', () => {
     await other.setOffline(true);
 
     // One sets the time, the other sets the booking status.
-    await page.getByRole('button', { name: /Fushimi Inari/ }).click();
+    await eventRow(page, 'Fushimi Inari').click();
     await page.getByRole('textbox', { name: /Start time/ }).fill('05:30');
     await page.getByRole('textbox', { name: /Start time/ }).blur();
 
-    await otherPage.getByRole('button', { name: /Fushimi Inari/ }).click();
+    await eventRow(otherPage, 'Fushimi Inari').click();
     await otherPage
       .getByRole('radiogroup', { name: 'Booking status' })
       .getByText('Booked', { exact: true })
@@ -123,7 +144,7 @@ test.describe('offline editing', () => {
 
     // Neither edit was lost: the time from one, the status from the other.
     for (const target of [page, otherPage]) {
-      const row = target.getByRole('button', { name: /Fushimi Inari/ });
+      const row = eventRow(target, 'Fushimi Inari');
       await expect(row).toContainText('05:30');
       await expect(row).toContainText('Booked');
     }
@@ -143,7 +164,7 @@ test.describe('offline editing', () => {
     await page.reload();
 
     // Served by the service worker, and the trip read back out of IndexedDB.
-    await expect(page.getByRole('button', { name: /Fushimi Inari/ })).toBeVisible();
+    await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
     await expect(page.getByTestId('sync-status')).toHaveText("Saved on this device");
   });
 });
@@ -169,10 +190,10 @@ test.describe('sharing', () => {
     const otherPage = await other.newPage();
     await otherPage.goto(`/join/${viewerToken}`);
 
-    await expect(otherPage.getByRole('button', { name: /Fushimi Inari/ })).toBeVisible();
+    await expect(eventRow(otherPage, 'Fushimi Inari')).toBeVisible();
     // No way in to change anything: no add box and the row does not open.
     await expect(otherPage.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
-    await expect(otherPage.getByRole('button', { name: /Fushimi Inari/ })).toBeDisabled();
+    await expect(eventRow(otherPage, 'Fushimi Inari')).toBeDisabled();
 
     await other.close();
   });
@@ -196,6 +217,108 @@ test.describe('sharing', () => {
     // Back to the list, with no link in hand this time.
     await otherPage.goto('/');
     await expect(otherPage.getByRole('link', { name: /Japan, April/ })).toBeVisible();
+
+    await other.close();
+  });
+});
+
+test.describe('finding things', () => {
+  test('search finds an event and jumps to a day', async ({ page }) => {
+    await page.goto('/');
+    const { tripId } = await newTrip(page, 'Japan, April');
+    await openTrip(page, tripId);
+
+    await addEvent(page, 'Fushimi Inari at dawn');
+    await addEvent(page, 'Nishiki Market lunch');
+    await expectSaved(page);
+
+    const box = page.getByRole('combobox', { name: 'Search this trip' }).first();
+
+    // An entity match takes you to the event.
+    await box.fill('nishiki');
+    await expect(page.getByRole('option', { name: /Nishiki Market lunch/ })).toBeVisible();
+    await box.press('Enter');
+    await expect(box).toHaveValue('');
+
+    // A date reads as a day rather than as a name.
+    await box.fill('aug 20');
+    await expect(page.getByRole('option', { name: /Jump to this day/ })).toBeVisible();
+
+    // And an action is offered by what it does.
+    await box.fill('invite');
+    await expect(page.getByRole('option', { name: /Share this trip/ })).toBeVisible();
+  });
+
+  test('a typo still finds the event', async ({ page }) => {
+    await page.goto('/');
+    const { tripId } = await newTrip(page, 'Japan, April');
+    await openTrip(page, tripId);
+    await addEvent(page, 'Dotonbori at night');
+    await expectSaved(page);
+
+    const box = page.getByRole('combobox', { name: 'Search this trip' }).first();
+    await box.fill('dotonbri');
+    await expect(page.getByRole('option', { name: /Dotonbori at night/ })).toBeVisible();
+  });
+});
+
+test.describe('moving events', () => {
+  test('an event can be moved to another day from the keyboard', async ({ page }) => {
+    await page.goto('/');
+    const { tripId } = await newTrip(page, 'Japan, April');
+    await openTrip(page, tripId);
+
+    await addEvent(page, 'Fushimi Inari');
+    await eventRow(page, 'Fushimi Inari').click();
+    await page.getByRole('textbox', { name: /Start time/ }).fill('09:00');
+    await page.getByRole('textbox', { name: /Start time/ }).blur();
+    await eventRow(page, 'Fushimi Inari').click();
+    await expectSaved(page);
+
+    const before = await page.locator('main section h2').first().textContent();
+
+    /*
+     * Driven by keyboard rather than by a synthesised mouse drag. Moving an
+     * event between days is the only way to reschedule it, so it has to work
+     * without a pointer -- and asserting that here covers the pointer path too,
+     * since both end in the same drop handler.
+     */
+    const grip = page.getByRole('button', { name: /Move Fushimi Inari to another day/ });
+    await grip.focus();
+    await page.keyboard.press('Space');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+
+    // The time of day survives the move, whichever day it landed on.
+    await expect(eventRow(page, 'Fushimi Inari')).toContainText('09:00');
+    await expect(page.locator('main section h2').first()).toHaveText(String(before));
+  });
+
+  test('a viewer gets no grip, because there is nothing they may move', async ({
+    page,
+    browser,
+  }) => {
+    await page.goto('/');
+    const { tripId } = await newTrip(page, 'Japan, April');
+    await openTrip(page, tripId);
+    await addEvent(page, 'Fushimi Inari');
+    await expectSaved(page);
+
+    const viewerToken = await page.evaluate(async (id) => {
+      const res = await fetch(`/api/trips/${id}/share`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ role: 'viewer' }),
+      });
+      return ((await res.json()) as { token: string }).token;
+    }, tripId);
+
+    const other = await browser.newContext();
+    const otherPage = await other.newPage();
+    await otherPage.goto(`/join/${viewerToken}`);
+
+    await expect(eventRow(otherPage, 'Fushimi Inari')).toBeVisible();
+    await expect(otherPage.getByRole('button', { name: /Move .* to another day/ })).toHaveCount(0);
 
     await other.close();
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayKey, formatTime, setTimeOfDay } from './time';
+import { dayKey, formatTime, moveToDay, setTimeOfDay } from './time';
 
 const TOKYO = 'Asia/Tokyo';
 const NEW_YORK = 'America/New_York';
@@ -56,5 +56,32 @@ describe('setTimeOfDay', () => {
   it('accepts a single-digit hour', () => {
     const at = Date.UTC(2026, 7, 14, 3, 0);
     expect(formatTime(setTimeOfDay(at, TOKYO, '9:05')!, TOKYO)).toBe('09:05');
+  });
+});
+
+describe('moveToDay', () => {
+  it('lands on the target day at the same wall-clock time', () => {
+    const at = setTimeOfDay(Date.UTC(2026, 7, 14, 3, 0), TOKYO, '09:00')!;
+    const moved = moveToDay(at, TOKYO, '2026-08-17')!;
+
+    expect(dayKey(moved, TOKYO)).toBe('2026-08-17');
+    expect(formatTime(moved, TOKYO)).toBe('09:00');
+  });
+
+  it('keeps the time of day across a daylight-saving change', () => {
+    // Dragging from before the change to after it. Shifting by a fixed number
+    // of hours instead would land this an hour out.
+    const at = setTimeOfDay(Date.UTC(2026, 9, 30, 15, 0), NEW_YORK, '09:00')!;
+    const moved = moveToDay(at, NEW_YORK, '2026-11-05')!;
+
+    expect(dayKey(moved, NEW_YORK)).toBe('2026-11-05');
+    expect(formatTime(moved, NEW_YORK)).toBe('09:00');
+  });
+
+  it('refuses anything that is not a calendar day', () => {
+    const at = Date.UTC(2026, 7, 14, 3, 0);
+    for (const input of ['', 'tomorrow', '2026-8-14', '14/08/2026']) {
+      expect(moveToDay(at, TOKYO, input), input).toBeNull();
+    }
   });
 });

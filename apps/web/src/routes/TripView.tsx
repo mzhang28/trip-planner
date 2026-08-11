@@ -1,4 +1,12 @@
 import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
   addEvent,
   deleteEvent,
   updateEvent,
@@ -7,13 +15,16 @@ import {
   type TripEvent,
 } from '@trip/crdt';
 import { Button, TextField, ThemeToggle } from '@trip/ui';
-import { Plus } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { GripVertical, Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, type TripSummary } from '../lib/api';
-import { dayKey, formatDayHeading } from '../lib/time';
+import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
+import { DayDropZone, DraggableEvent } from '../trip/DayDropZone';
 import { EventRow } from '../trip/EventRow';
+import { SearchBar } from '../trip/SearchBar';
 import { SyncBadge } from '../trip/SyncBadge';
+import type { CommandId } from '../trip/search';
 import { useEvents, useTripState, useTripStore } from '../trip/useTrip';
 
 const UNSCHEDULED = 'unscheduled';
@@ -44,29 +55,86 @@ export function TripView() {
   const [trip, setTrip] = useState<TripSummary | null>(null);
   const [draft, setDraft] = useState('');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const addBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!tripId) return;
-    void api.getTrip(tripId).then(setTrip).catch(() => setTrip(null));
+    void api
+      .getTrip(tripId)
+      .then(setTrip)
+      .catch(() => setTrip(null));
   }, [tripId]);
 
-  const homeTimezone = trip?.homeTimezone ?? (state?.doc as TripDoc | undefined)?.meta?.homeTimezone ?? 'UTC';
+  const doc = state?.doc as TripDoc | undefined;
+  const homeTimezone = trip?.homeTimezone ?? doc?.meta?.homeTimezone ?? 'UTC';
   const readOnly = trip?.role === 'viewer';
   const days = useMemo(() => groupByDay(events, homeTimezone), [events, homeTimezone]);
 
-  function create() {
+  /*
+   * The keyboard sensor is not optional. Dragging is the only way to move an
+   * event between days, so without it that operation would be unreachable for
+   * anyone not using a pointer. The grip is a real button, so it is tabbed to
+   * and driven with the arrow keys.
+   */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  const create = useCallback(() => {
     const name = draft.trim();
     if (!name || !store) return;
 
-    const id = `e_${crypto.randomUUID()}`;
-    store.change((doc) => addEvent(doc, { id, name }, { userId: 'me' }));
+    store.change((current) =>
+      addEvent(current, { id: `e_${crypto.randomUUID()}`, name }, { userId: 'me' }),
+    );
     setDraft('');
+  }, [draft, store]);
+
+  function onDragEnd({ active, over }: DragEndEvent) {
+    if (!over || !store) return;
+
+    const targetDay = String(over.id).replace(/^day:/, '');
+    const event = events.find((candidate) => candidate.id === active.id);
+    if (!event || targetDay === UNSCHEDULED) return;
+
+    const zone = event.timezone ?? homeTimezone;
+    // Something with no time yet gets one when it lands on a day: midday, which
+    // reads as "this day, time still to work out" rather than midnight.
+    const from = event.startsAt ?? Date.parse(`${targetDay}T12:00:00Z`);
+    const startsAt = moveToDay(from, zone, targetDay);
+    if (startsAt === null || startsAt === event.startsAt) return;
+
+    store.change((current) =>
+      updateEvent(current, event.id, { startsAt, timezone: zone }, { userId: 'me' }),
+    );
+  }
+
+  function goToDay(at: number) {
+    const key = dayKey(at, homeTimezone);
+    document.querySelector(`[data-testid="day-${key}"]`)?.scrollIntoView({ block: 'center' });
+  }
+
+  function focusEvent(eventId: string) {
+    setHighlighted(eventId);
+    document.getElementById(`event-${eventId}`)?.scrollIntoView({ block: 'center' });
   }
 
   async function share() {
     if (!tripId) return;
     const { token } = await api.createShareLink(tripId, 'editor');
     setShareUrl(`${location.origin}/join/${token}`);
+  }
+
+  function runCommand(command: CommandId) {
+    if (command === 'new-event') {
+      addBoxRef.current?.querySelector('input')?.focus();
+    } else if (command === 'today') {
+      goToDay(Date.now());
+    } else if (command === 'share') {
+      void share();
+    }
   }
 
   return (
@@ -76,15 +144,35 @@ export function TripView() {
           <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline">
             All trips
           </Link>
-          <h1 className="min-w-0 flex-1 truncate text-lg">{trip?.name ?? 'Trip'}</h1>
+          <h1 className="truncate text-lg">{trip?.name ?? 'Trip'}</h1>
           <SyncBadge state={state} />
+          <div className="hidden sm:flex sm:min-w-0 sm:flex-1">
+            <SearchBar
+              doc={doc}
+              homeTimezone={homeTimezone}
+              onPickEvent={focusEvent}
+              onPickDay={goToDay}
+              onRunCommand={runCommand}
+            />
+          </div>
           <ThemeToggle />
+        </div>
+
+        {/* Below the small breakpoint the search box gets the whole row. */}
+        <div className="mx-auto max-w-3xl px-4 pb-3 sm:hidden">
+          <SearchBar
+            doc={doc}
+            homeTimezone={homeTimezone}
+            onPickEvent={focusEvent}
+            onPickDay={goToDay}
+            onRunCommand={runCommand}
+          />
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         {!readOnly && (
-          <div className="mb-6 flex items-end gap-2">
+          <div ref={addBoxRef} className="mb-6 flex items-end gap-2">
             <TextField
               label="New event"
               labelHidden
@@ -110,55 +198,89 @@ export function TripView() {
           </p>
         )}
 
-        {days.map(([key, dayEvents]) => (
-          <section key={key} className="mb-8">
-            <h2 className="mb-2 text-sm text-ink-muted">
-              {key === UNSCHEDULED
-                ? 'No time yet'
-                : formatDayHeading(dayEvents[0]!.startsAt!, dayEvents[0]!.timezone ?? homeTimezone)}
-            </h2>
-            <div className="flex flex-col gap-2">
-              {dayEvents.map((event) => (
-                <EventRow
-                  key={event.id}
-                  event={event}
-                  homeTimezone={homeTimezone}
-                  readOnly={readOnly}
-                  onRename={(name) =>
-                    store?.change((doc) => updateEvent(doc, event.id, { name }, { userId: 'me' }))
-                  }
-                  onSetTime={(startsAt) =>
-                    store?.change((doc) =>
-                      updateEvent(
-                        doc,
-                        event.id,
-                        { startsAt, timezone: event.timezone ?? homeTimezone },
-                        { userId: 'me' },
-                      ),
-                    )
-                  }
-                  onSetStatus={(status: BookingStatus) =>
-                    store?.change((doc) =>
-                      updateEvent(
-                        doc,
-                        event.id,
-                        { booking: { ...event.booking, status } },
-                        { userId: 'me' },
-                      ),
-                    )
-                  }
-                  onDelete={() =>
-                    store?.change((doc) => deleteEvent(doc, event.id, { userId: 'me' }))
-                  }
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          {days.map(([key, dayEvents]) => (
+            <section key={key} className="mb-8">
+              <h2 className="mb-2 text-sm text-ink-muted">
+                {key === UNSCHEDULED
+                  ? 'No time yet'
+                  : formatDayHeading(
+                      dayEvents[0]!.startsAt!,
+                      dayEvents[0]!.timezone ?? homeTimezone,
+                    )}
+              </h2>
+
+              <DayDropZone dayKey={key} disabled={readOnly || key === UNSCHEDULED}>
+                <div className="flex flex-col gap-2">
+                  {dayEvents.map((event) => (
+                    <DraggableEvent key={event.id} id={event.id} disabled={readOnly}>
+                      {(handle) => (
+                        <div
+                          id={`event-${event.id}`}
+                          className={
+                            highlighted === event.id ? 'rounded-lg ring-2 ring-accent' : undefined
+                          }
+                        >
+                          <EventRow
+                            dragHandle={
+                              handle ? (
+                                <button
+                                  {...handle}
+                                  type="button"
+                                  aria-label={`Move ${event.name} to another day`}
+                                  className="cursor-grab touch-none px-1 text-ink-placeholder hover:text-ink-muted focus-visible:outline-focus focus-visible:outline-2"
+                                >
+                                  <GripVertical aria-hidden="true" className="size-4" />
+                                </button>
+                              ) : undefined
+                            }
+                            event={event}
+                            homeTimezone={homeTimezone}
+                            readOnly={readOnly}
+                            onRename={(name) =>
+                            store?.change((current) =>
+                              updateEvent(current, event.id, { name }, { userId: 'me' }),
+                            )
+                          }
+                            onSetTime={(startsAt) =>
+                            store?.change((current) =>
+                              updateEvent(
+                                current,
+                                event.id,
+                                { startsAt, timezone: event.timezone ?? homeTimezone },
+                                { userId: 'me' },
+                              ),
+                            )
+                          }
+                            onSetStatus={(status: BookingStatus) =>
+                            store?.change((current) =>
+                              updateEvent(
+                                current,
+                                event.id,
+                                { booking: { ...event.booking, status } },
+                                { userId: 'me' },
+                              ),
+                            )
+                          }
+                            onDelete={() =>
+                              store?.change((current) =>
+                                deleteEvent(current, event.id, { userId: 'me' }),
+                              )
+                            }
+                          />
+                        </div>
+                      )}
+                    </DraggableEvent>
+                  ))}
+                </div>
+              </DayDropZone>
+            </section>
+          ))}
+        </DndContext>
 
         {trip?.role === 'owner' && (
           <section className="mt-10 border-t border-line pt-6">
-            <Button onPress={share}>Share trip</Button>
+            <Button onPress={() => void share()}>Share trip</Button>
             {shareUrl && (
               <div className="mt-3">
                 <p className="mb-1 text-xs text-ink-muted">

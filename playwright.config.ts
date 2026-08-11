@@ -54,7 +54,13 @@ export default defineConfig({
       command: 'pnpm --filter @trip/api dev',
       env: { PORT: API_PORT, DATABASE_PATH: 'data/test.db' },
       url: `http://localhost:${API_PORT}/api/health`,
-      reuseExistingServer: !process.env.CI,
+      /*
+       * Started fresh every run. A server left over from earlier answers on this
+       * port whatever database and code it was started with, and a suite that
+       * silently tests something other than the working tree is worse than one
+       * that takes a few seconds longer.
+       */
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
     },
@@ -67,7 +73,13 @@ export default defineConfig({
       env: { WEB_PORT, API_PORT },
       url: WEB_URL,
       timeout: 180_000,
-      reuseExistingServer: !process.env.CI,
+      /*
+       * Never reused. This serves a static build, so a server left over from a
+       * previous run would serve whatever was built then — the suite would pass
+       * or fail against code that is no longer on disk, which is worse than
+       * being slow.
+       */
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
     },

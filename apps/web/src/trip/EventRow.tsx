@@ -1,5 +1,7 @@
 import { BOOKING_STATUSES, type BookingStatus, type TripEvent } from '@trip/crdt';
 import { Card, SegmentedControl, StatusChip, StatusSpine, TextField, cn } from '@trip/ui';
+import { GripVertical } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Button } from 'react-aria-components';
 import { formatTime, setTimeOfDay, zoneFor } from '../lib/time';
@@ -17,6 +19,8 @@ export interface EventRowProps {
   onSetTime: (startsAt: number | undefined) => void;
   onSetStatus: (status: BookingStatus) => void;
   onDelete: () => void;
+  /** Rendered as the grip. Absent for a viewer, who cannot move anything. */
+  dragHandle?: ReactNode;
 }
 
 /**
@@ -34,6 +38,7 @@ export function EventRow({
   onSetTime,
   onSetStatus,
   onDelete,
+  dragHandle,
 }: EventRowProps) {
   const [open, setOpen] = useState(false);
   const zone = zoneFor(event.timezone, homeTimezone);
@@ -43,8 +48,10 @@ export function EventRow({
     <Card className="overflow-hidden">
       <div className="flex">
         <StatusSpine status={event.booking.status} />
+        {dragHandle}
 
         <Button
+          data-testid="event"
           onPress={() => setOpen((was) => !was)}
           isDisabled={readOnly}
           aria-expanded={open}
