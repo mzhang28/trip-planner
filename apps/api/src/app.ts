@@ -5,6 +5,8 @@ import type { AppEnv, Services } from './context';
 import { renameUser } from './identity';
 import { requireMembership, withIdentity, withServices } from './middleware';
 import { blobRoutes } from './routes/blobs';
+import { mcpRoutes } from './routes/mcp';
+import { metadataRoutes, oauthRoutes } from './routes/oauth';
 import { placeRoutes, weatherRoutes } from './routes/places';
 import { shareRoutes, tripRoutes } from './routes/trips';
 import { syncRoutes } from './routes/sync';
@@ -26,7 +28,21 @@ export function createApp(services: Services) {
 
   app.get('/api/health', (c) => c.json({ ok: true, time: Date.now() }));
 
+  /*
+   * Discovery has to sit at the root rather than under /api. A client is given
+   * the server's URL and looks for these paths on it; putting them anywhere
+   * else means nothing finds them.
+   */
+  app.use('/.well-known/*', withServices(services));
+  app.route('/.well-known', metadataRoutes());
+
+  // The MCP endpoint carries a bearer token and never a session cookie, so it
+  // stays outside the middleware that mints a person for anyone who asks.
+  app.use('/mcp', withServices(services));
+  app.route('/mcp', mcpRoutes());
+
   app.use('/api/*', withServices(services), withIdentity);
+  app.use('/oauth/*', withServices(services), withIdentity);
 
   /** Who the browser is currently acting as. */
   app.get('/api/me', (c) => c.json(c.var.identity));
@@ -40,6 +56,7 @@ export function createApp(services: Services) {
     return c.json({ ...c.var.identity, displayName });
   });
 
+  app.route('/oauth', oauthRoutes());
   app.route('/api/blobs', blobRoutes());
   app.route('/api/places', placeRoutes());
   app.route('/api/weather', weatherRoutes());
