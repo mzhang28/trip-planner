@@ -241,7 +241,7 @@ export function TripView() {
   return (
     <div className="min-h-dvh bg-page text-ink">
       <header className="sticky top-0 z-10 border-b border-line bg-page/95 backdrop-blur">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-[100rem] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline">
             All trips
           </Link>
@@ -253,7 +253,7 @@ export function TripView() {
             Fields
           </Link>
           <SyncBadge state={state} />
-          <div className="hidden sm:flex sm:min-w-0 sm:flex-1">
+          <div className="hidden sm:flex sm:min-w-56 sm:flex-1 sm:basis-64">
             <SearchBar
               doc={doc}
               homeTimezone={homeTimezone}
@@ -279,7 +279,7 @@ export function TripView() {
         </div>
 
         {/* Below the small breakpoint the search box gets the whole row. */}
-        <div className="mx-auto max-w-3xl px-4 pb-3 sm:hidden">
+        <div className="mx-auto w-full max-w-[100rem] px-4 pb-3 sm:hidden">
           <SearchBar
             doc={doc}
             homeTimezone={homeTimezone}
@@ -290,7 +290,7 @@ export function TripView() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <main className="mx-auto w-full max-w-[100rem] px-4 py-6 sm:px-6 lg:px-8">
         {!readOnly && (
           <div ref={addBoxRef} className="mb-6 flex items-end gap-2">
             <TextField
@@ -377,7 +377,7 @@ export function TripView() {
 
           {view === 'day' && (
             <div className="lg:flex lg:items-start lg:gap-4">
-              <div className="min-w-0 lg:flex-1">
+              <div className="min-w-0 lg:flex-1 lg:max-w-4xl">
           {days.map(([key, dayEvents]) => (
             <section key={key} className="mb-8">
               <h2 className="mb-2 text-sm text-ink-muted">
@@ -492,7 +492,7 @@ export function TripView() {
                 on anything narrower. A map squeezed into a phone column shows
                 less than the list it is competing with for the space.
               */}
-              <aside className="mt-6 h-80 lg:sticky lg:top-24 lg:mt-0 lg:h-[32rem] lg:w-96">
+              <aside className="mt-6 h-80 lg:sticky lg:top-24 lg:mt-0 lg:h-[calc(100dvh-9rem)] lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]">
                 <DayMap
                   events={mappable}
                   selectedId={highlighted}

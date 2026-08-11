@@ -138,7 +138,7 @@ export function WeekView({
           })}
 
           {days.map((day) => (
-            <div key={day} className="min-h-40 bg-card">
+            <div key={day} className="min-h-40 bg-card lg:min-h-[calc(100dvh-22rem)]">
               <DayColumn day={day} disabled={readOnly}>
                 {(byDay.get(day) ?? []).map((event) => (
                   <button

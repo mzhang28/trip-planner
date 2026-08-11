@@ -39,7 +39,7 @@ function DayCell({
       data-testid={`day-${day}`}
       onClick={onOpen}
       className={cn(
-        'flex min-h-16 flex-col items-stretch gap-0.5 p-1 text-left sm:min-h-20',
+        'flex min-h-16 flex-col items-stretch gap-0.5 p-1 text-left sm:min-h-20 lg:min-h-24 xl:min-h-28',
         'hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2 focus-visible:-outline-offset-2',
         isOver && 'bg-accent-soft',
         className,

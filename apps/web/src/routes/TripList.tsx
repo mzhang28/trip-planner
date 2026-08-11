@@ -27,13 +27,13 @@ export function TripList() {
   return (
     <div className="min-h-dvh bg-page text-ink">
       <header className="border-b border-line">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <h1 className="text-lg">Trips</h1>
           <ThemeToggle />
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-end gap-2">
           <TextField
             label="New trip"
@@ -58,7 +58,7 @@ export function TripList() {
           </p>
         )}
 
-        <div className="flex flex-col gap-2">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {trips?.map((trip) => (
             <Card key={trip.id}>
               <Link
