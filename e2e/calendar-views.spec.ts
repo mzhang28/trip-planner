@@ -35,6 +35,9 @@ async function addEvent(page: Page, name: string, city: string, time: string) {
   const editor = page.getByTestId('event-editor');
   await expect(editor).toHaveCount(1);
 
+  await revealField(page, 'city');
+  await revealField(page, 'time');
+
   await editor.getByRole('textbox', { name: 'City' }).fill(city);
   await editor.getByRole('textbox', { name: /Start time/ }).fill(time);
   await editor.getByRole('textbox', { name: /Start time/ }).blur();
@@ -43,6 +46,28 @@ async function addEvent(page: Page, name: string, city: string, time: string) {
   // so it is not necessarily the one that was clicked to open it.
   await page.locator('[data-testid="event"][aria-expanded="true"]').click();
   await expect(page.getByTestId('event-editor')).toHaveCount(0);
+}
+
+
+/**
+ * Reveals a field before filling it.
+ *
+ * The editor shows what an event has and offers the rest as chips, so a field
+ * that has never been filled in is behind its chip -- which is the behaviour
+ * being relied on here, not worked around.
+ */
+async function revealField(page: Page, key: string) {
+  const editor = page.getByTestId('event-editor');
+  const chip = editor.getByTestId(`add-field-${key}`);
+
+  if ((await chip.count()) === 0) {
+    const more = editor.getByTestId('expand-palette');
+    if ((await more.count()) > 0) await more.click();
+  }
+
+  if ((await editor.getByTestId(`field-${key}`).count()) === 0) {
+    await editor.getByTestId(`add-field-${key}`).click();
+  }
 }
 
 async function switchTo(page: Page, view: 'Day' | 'Week' | 'Month') {
@@ -146,6 +171,7 @@ test.describe('flights and the map', () => {
     await eventRow(page, 'Flight to Osaka').click();
 
     const editor = page.getByTestId('event-editor');
+    await revealField(page, 'kind');
     await editor.getByRole('radiogroup', { name: 'What this is' }).getByText('Flight').click();
 
     await editor.getByRole('textbox', { name: 'Airline' }).fill('ANA');
@@ -257,9 +283,10 @@ test.describe('getting between events', () => {
 
     await eventRow(page, 'Fushimi Inari').click();
     const editor = page.getByTestId('event-editor');
+    await revealField(page, 'transit');
 
-    await editor.getByRole('textbox', { name: 'How long' }).nth(1).fill('45');
-    await editor.getByRole('textbox', { name: 'How long' }).nth(1).blur();
+    await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).fill('45');
+    await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).blur();
     await page.locator('[data-testid="event"][aria-expanded="true"]').click();
 
     const leg = page.getByTestId('transit-leg');
@@ -276,12 +303,132 @@ test.describe('getting between events', () => {
 
     await eventRow(page, 'Fushimi Inari').click();
     const editor = page.getByTestId('event-editor');
-    await editor.getByRole('textbox', { name: 'How long' }).nth(1).fill('20');
-    await editor.getByRole('textbox', { name: 'How long' }).nth(1).blur();
+    await revealField(page, 'transit');
+    await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).fill('20');
+    await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).blur();
     await page.locator('[data-testid="event"][aria-expanded="true"]').click();
 
     const leg = page.getByTestId('transit-leg');
     await expect(leg).toContainText('20 min');
     await expect(leg).not.toContainText('short of the gap');
+  });
+});
+
+test.describe('filling an event in gradually', () => {
+  test('a new event shows almost nothing, and fields arrive when asked for', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Fushimi Inari').click();
+
+    const editor = page.getByTestId('event-editor');
+
+    // Just a name. An event that is only a name is finished, not unfinished.
+    await expect(editor.getByRole('textbox', { name: 'Name' })).toBeVisible();
+    await expect(editor.getByTestId('field-city')).toHaveCount(0);
+    await expect(editor.getByTestId('field-time')).toHaveCount(0);
+
+    await editor.getByTestId('add-field-city').click();
+    await expect(editor.getByTestId('field-city')).toBeVisible();
+
+    // Its chip goes once it is on the event, so nothing is offered twice.
+    await expect(editor.getByTestId('add-field-city')).toHaveCount(0);
+  });
+
+  test('the palette folds the long tail away behind a count', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Fushimi Inari').click();
+
+    const editor = page.getByTestId('event-editor');
+    const expand = editor.getByTestId('expand-palette');
+
+    // Laying every field out at once is the wall this exists to avoid.
+    await expect(expand).toBeVisible();
+    await expect(editor.getByTestId('add-field-timezone')).toHaveCount(0);
+
+    await expand.click();
+    await expect(editor.getByTestId('add-field-timezone')).toBeVisible();
+  });
+
+  test('a field that has something in it is there without being asked for', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    // Reopened from scratch: the city and time show because they hold
+    // something, and are not offered as chips again.
+    await eventRow(page, 'Fushimi Inari').click();
+    const editor = page.getByTestId('event-editor');
+
+    await expect(editor.getByTestId('field-city')).toBeVisible();
+    await expect(editor.getByTestId('field-time')).toBeVisible();
+    await expect(editor.getByTestId('add-field-city')).toHaveCount(0);
+  });
+});
+
+test.describe('making an event from the calendar', () => {
+  test('clicking a day in the month makes an event on that day', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await switchTo(page, 'Month');
+
+    const today = new Date().toISOString().slice(0, 10);
+    await page.getByTestId(`add-on-${today}`).click();
+
+    // It drops into the day, with the day filled in and the name waiting.
+    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+
+    const name = page.getByTestId('event-editor').getByRole('textbox', { name: 'Name' });
+    await expect(name).toBeFocused();
+
+    await name.fill('Decided later');
+    await name.blur();
+    await expect(eventRow(page, 'Decided later')).toBeVisible();
+  });
+
+  test('the date in a month cell opens the day rather than making anything', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    await switchTo(page, 'Month');
+    const today = new Date().toISOString().slice(0, 10);
+    await page.getByRole('button', { name: `Open ${today}` }).click();
+
+    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    // One event, not two: opening a day must not leave something behind.
+    await expect(page.getByTestId('event')).toHaveCount(1);
+  });
+
+  test('dragging across days in the week makes an event spanning them', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await switchTo(page, 'Week');
+
+    const columns = page.locator('[data-testid^="day-2"]');
+    await expect(columns.first()).toBeVisible();
+
+    const box = await columns.first().boundingBox();
+    if (!box) throw new Error('no week column to drag on');
+
+    // Press on one empty column and release two along.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height - 20);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 2.5, box.y + box.height - 20, { steps: 8 });
+    await page.mouse.up();
+
+    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    const editor = page.getByTestId('event-editor');
+    await expect(editor).toBeVisible();
+
+    // The drag said which days, so it said how long. Two days on from the first.
+    await expect(editor.getByTestId('field-duration')).toBeVisible();
   });
 });

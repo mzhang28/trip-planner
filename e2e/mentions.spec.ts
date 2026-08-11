@@ -27,6 +27,21 @@ async function addEvent(page: Page, name: string) {
   await expect(eventRow(page, name)).toBeVisible();
 }
 
+/** Opens an event and reveals its description, which starts behind a chip. */
+async function openWithDescription(page: Page, name: string) {
+  await eventRow(page, name).click();
+
+  const editor = page.getByTestId('event-editor');
+  if ((await editor.getByTestId('field-description').count()) === 0) {
+    if ((await editor.getByTestId('add-field-description').count()) === 0) {
+      await editor.getByTestId('expand-palette').click();
+    }
+    await editor.getByTestId('add-field-description').click();
+  }
+
+  return editor.getByRole('combobox', { name: 'Description' });
+}
+
 test.describe('pointing at the rest of the trip', () => {
   test('typing @ offers things, and the mention resolves to the current name', async ({ page }) => {
     await page.goto('/');
@@ -35,9 +50,7 @@ test.describe('pointing at the rest of the trip', () => {
     await addEvent(page, 'Nishiki Market');
     await addEvent(page, 'Fushimi Inari');
 
-    await eventRow(page, 'Fushimi Inari').click();
-    const editor = page.getByTestId('event-editor');
-    const description = editor.getByRole('combobox', { name: 'Description' });
+    const description = await openWithDescription(page, 'Fushimi Inari');
 
     await description.fill('Eat at @nish');
     await expect(page.getByRole('option', { name: /Nishiki Market/ })).toBeVisible();
@@ -67,8 +80,7 @@ test.describe('pointing at the rest of the trip', () => {
     await addEvent(page, 'Nishiki Market');
     await addEvent(page, 'Fushimi Inari');
 
-    await eventRow(page, 'Fushimi Inari').click();
-    const description = page.getByTestId('event-editor').getByRole('combobox', { name: 'Description' });
+    const description = await openWithDescription(page, 'Fushimi Inari');
     await description.fill('Eat at @nish');
     await expect(page.getByRole('option', { name: /Nishiki Market/ })).toBeVisible();
     await description.press('Enter');
@@ -92,8 +104,7 @@ test.describe('pointing at the rest of the trip', () => {
     await addEvent(page, 'Nishiki Market');
     await addEvent(page, 'Fushimi Inari');
 
-    await eventRow(page, 'Fushimi Inari').click();
-    const description = page.getByTestId('event-editor').getByRole('combobox', { name: 'Description' });
+    const description = await openWithDescription(page, 'Fushimi Inari');
     await description.fill('Eat at @nish');
     await expect(page.getByRole('option', { name: /Nishiki Market/ })).toBeVisible();
     await description.press('Enter');

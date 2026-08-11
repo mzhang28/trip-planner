@@ -56,6 +56,23 @@ function eventRow(page: Page, name: string) {
   return page.getByTestId('event').filter({ hasText: name });
 }
 
+/**
+ * Reveals a field before filling it.
+ *
+ * The editor shows what an event has and offers the rest as chips, so a field
+ * never filled in is behind its chip. That is the behaviour being relied on
+ * here, not worked around.
+ */
+async function revealField(page: Page, key: string) {
+  const editor = page.getByTestId('event-editor');
+  if ((await editor.getByTestId(`field-${key}`).count()) > 0) return;
+
+  if ((await editor.getByTestId(`add-field-${key}`).count()) === 0) {
+    await editor.getByTestId('expand-palette').click();
+  }
+  await editor.getByTestId(`add-field-${key}`).click();
+}
+
 /** Waits for the app to say the change has reached the server. */
 async function expectSaved(page: Page) {
   await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
@@ -121,10 +138,12 @@ test.describe('offline editing', () => {
 
     // One sets the time, the other sets the booking status.
     await eventRow(page, 'Fushimi Inari').click();
+    await revealField(page, 'time');
     await page.getByRole('textbox', { name: /Start time/ }).fill('05:30');
     await page.getByRole('textbox', { name: /Start time/ }).blur();
 
     await eventRow(otherPage, 'Fushimi Inari').click();
+    await revealField(otherPage, 'booking');
     await otherPage
       .getByRole('radiogroup', { name: 'Booking status' })
       .getByText('Booked', { exact: true })
@@ -270,9 +289,10 @@ test.describe('moving events', () => {
 
     await addEvent(page, 'Fushimi Inari');
     await eventRow(page, 'Fushimi Inari').click();
+    await revealField(page, 'time');
     await page.getByRole('textbox', { name: /Start time/ }).fill('09:00');
     await page.getByRole('textbox', { name: /Start time/ }).blur();
-    await eventRow(page, 'Fushimi Inari').click();
+    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
     await expectSaved(page);
 
     const before = await page.locator('main section h2').first().textContent();

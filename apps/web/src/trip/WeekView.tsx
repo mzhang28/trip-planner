@@ -1,6 +1,7 @@
 import type { TripEvent } from '@trip/crdt';
 import { StatusSpine, cn } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
+import { useState } from 'react';
 import type { DayKey } from '../lib/calendar';
 import { citySegments, eventsByDay, lodgingSpans, spanWithin, weekOf } from '../lib/calendar';
 import { formatTime } from '../lib/time';
@@ -15,16 +16,34 @@ export interface WeekViewProps {
   today: DayKey;
   readOnly: boolean;
   onOpenEvent: (eventId: string) => void;
+  /** Makes an event over the days that were dragged across. */
+  onCreateRange: (from: DayKey, to: DayKey) => void;
 }
 
+/**
+ * One day's column: the drop target, the drag surface, and the list, as one
+ * element.
+ *
+ * They were three nested divs, and the outer one was tall while the one
+ * carrying the identity was as short as its contents -- so a press aimed at the
+ * column by its name landed above it. One element cannot disagree with itself.
+ */
 function DayColumn({
   day,
   children,
   disabled,
+  selected,
+  onStart,
+  onEnter,
+  onFinish,
 }: {
   day: DayKey;
   children: React.ReactNode;
   disabled: boolean;
+  selected: boolean;
+  onStart: () => void;
+  onEnter: () => void;
+  onFinish: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day:${day}`, disabled });
 
@@ -32,7 +51,23 @@ function DayColumn({
     <div
       ref={setNodeRef}
       data-testid={`day-${day}`}
-      className={cn('flex min-w-32 flex-col gap-1 p-1', isOver && 'bg-accent-soft')}
+      onPointerDown={(e) => {
+        /*
+         * Anywhere in the column except on an event. A press that started on
+         * one belongs to it, and stealing that would stop it opening.
+         */
+        if (disabled) return;
+        if ((e.target as HTMLElement).closest('[data-testid="week-event"]')) return;
+        onStart();
+      }}
+      onPointerEnter={onEnter}
+      onPointerUp={onFinish}
+      className={cn(
+        'flex min-h-40 min-w-32 flex-col gap-1 bg-card p-1 lg:min-h-[calc(100dvh-22rem)]',
+        isOver && 'bg-accent-soft',
+        selected && 'bg-accent-soft',
+        !disabled && 'cursor-cell',
+      )}
     >
       {children}
     </div>
@@ -55,8 +90,31 @@ export function WeekView({
   today,
   readOnly,
   onOpenEvent,
+  onCreateRange,
 }: WeekViewProps) {
   const days = weekOf(anchor);
+
+  /*
+   * Which days are being dragged across.
+   *
+   * A press picks the first day and moving picks the last, so a drag says both
+   * when something starts and how long it goes on -- which is the whole reason
+   * to drag rather than click. Held here rather than in the document: an
+   * in-progress gesture is nobody else's business until it is finished.
+   */
+  const [dragFrom, setDragFrom] = useState<DayKey | null>(null);
+  const [dragTo, setDragTo] = useState<DayKey | null>(null);
+
+  const selecting =
+    dragFrom && dragTo
+      ? { from: dragFrom < dragTo ? dragFrom : dragTo, to: dragFrom < dragTo ? dragTo : dragFrom }
+      : null;
+
+  function finishDrag() {
+    if (selecting) onCreateRange(selecting.from, selecting.to);
+    setDragFrom(null);
+    setDragTo(null);
+  }
   const byDay = eventsByDay(events, homeTimezone);
   const displayZone = useDisplayZone();
   const cities = citySegments(byDay, days);
@@ -73,6 +131,11 @@ export function WeekView({
       tabIndex={0}
       role="group"
       aria-label="This week, scroll sideways for the other days"
+      // A drag that ends outside the grid is abandoned rather than left armed.
+      onPointerLeave={() => {
+        setDragFrom(null);
+        setDragTo(null);
+      }}
     >
       <div className="min-w-3xl">
         {/* City bands: the same device the month view uses, one row high. */}
@@ -138,8 +201,18 @@ export function WeekView({
           })}
 
           {days.map((day) => (
-            <div key={day} className="min-h-40 bg-card lg:min-h-[calc(100dvh-22rem)]">
-              <DayColumn day={day} disabled={readOnly}>
+            <DayColumn
+              key={day}
+              day={day}
+              disabled={readOnly}
+              selected={Boolean(selecting && day >= selecting.from && day <= selecting.to)}
+              onStart={() => {
+                setDragFrom(day);
+                setDragTo(day);
+              }}
+              onEnter={() => dragFrom && setDragTo(day)}
+              onFinish={finishDrag}
+            >
                 {(byDay.get(day) ?? []).map((event) => (
                   <button
                     key={event.id}
@@ -155,12 +228,18 @@ export function WeekView({
                           {formatTime(event.startsAt, displayZone(event.timezone, homeTimezone))}
                         </span>
                       )}
-                      <span className="block truncate text-xs text-ink">{event.name}</span>
+                      <span
+                        className={cn(
+                          'block truncate text-xs',
+                          event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                        )}
+                      >
+                        {event.name || 'Unnamed'}
+                      </span>
                     </span>
                   </button>
                 ))}
-              </DayColumn>
-            </div>
+            </DayColumn>
           ))}
         </div>
 

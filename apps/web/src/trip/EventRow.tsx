@@ -125,7 +125,15 @@ export function EventRow({
           <span className="tabular w-11 shrink-0 text-xs text-ink-muted">{time ?? '--:--'}</span>
 
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-ink">{event.name}</span>
+            {/* An event made by picking a day is real before it is named. */}
+            <span
+              className={cn(
+                'block truncate text-sm font-medium',
+                event.name ? 'text-ink' : 'text-ink-placeholder italic',
+              )}
+            >
+              {event.name || 'Unnamed'}
+            </span>
             {summary.length > 0 && (
               <span className="block truncate text-2xs text-ink-muted">{summary.join(' · ')}</span>
             )}

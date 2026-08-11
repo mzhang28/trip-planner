@@ -22,6 +22,13 @@ async function addEvent(page: Page, name: string) {
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await page.getByTestId('event').filter({ hasText: name }).click();
   await expect(page.getByTestId('event-editor')).toBeVisible();
+
+  // Files are behind their chip until the event has one.
+  const editor = page.getByTestId('event-editor');
+  if ((await editor.getByTestId('add-field-files').count()) === 0) {
+    await editor.getByTestId('expand-palette').click();
+  }
+  await editor.getByTestId('add-field-files').click();
 }
 
 const FILE = {

@@ -15,38 +15,67 @@ export interface MonthViewProps {
   today: DayKey;
   readOnly: boolean;
   onOpenDay: (day: DayKey) => void;
+  /** Makes an event on that day, with nothing filled in but the day. */
+  onCreateOn: (day: DayKey) => void;
 }
 
+/**
+ * One day in the month.
+ *
+ * The date opens the day and the space below it makes an event on that day.
+ * Two jobs, two targets: a single click that both opened the day and created
+ * something would surprise whichever half was not wanted, and the space is
+ * where a person points when they mean "put something here".
+ */
 function DayCell({
   day,
   disabled,
   children,
   onOpen,
+  onCreate,
   className,
 }: {
   day: DayKey;
   disabled: boolean;
   children: React.ReactNode;
   onOpen: () => void;
+  onCreate: () => void;
   className?: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `day:${day}`, disabled });
 
   return (
-    <button
+    <div
       ref={setNodeRef}
-      type="button"
       data-testid={`day-${day}`}
-      onClick={onOpen}
       className={cn(
-        'flex min-h-16 flex-col items-stretch gap-0.5 p-1 text-left sm:min-h-20 lg:min-h-24 xl:min-h-28',
-        'hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2 focus-visible:-outline-offset-2',
+        'group relative flex min-h-16 flex-col items-stretch gap-0.5 sm:min-h-20 lg:min-h-24 xl:min-h-28',
         isOver && 'bg-accent-soft',
         className,
       )}
     >
       {children}
-    </button>
+
+      {!disabled && (
+        <button
+          type="button"
+          data-testid={`add-on-${day}`}
+          aria-label={`Add an event on ${day}`}
+          onClick={onCreate}
+          className={cn(
+            'absolute inset-x-0 bottom-0 top-6 cursor-pointer',
+            'hover:bg-accent-soft/60 focus-visible:outline-focus focus-visible:outline-2 focus-visible:-outline-offset-2',
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute right-1 bottom-1 text-2xs text-ink-placeholder opacity-0 group-hover:opacity-100"
+          >
+            +
+          </span>
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -66,6 +95,7 @@ export function MonthView({
   today,
   readOnly,
   onOpenDay,
+  onCreateOn,
 }: MonthViewProps) {
   const days = monthGrid(anchor);
   const byDay = eventsByDay(events, homeTimezone);
@@ -124,12 +154,16 @@ export function MonthView({
                     day={day}
                     disabled={readOnly}
                     onOpen={() => onOpenDay(day)}
+                    onCreate={() => onCreateOn(day)}
                     className={outside ? 'bg-sunken' : 'bg-card'}
                   >
-                    <span className="flex items-baseline justify-between gap-1">
-                      <span
+                    <span className="relative z-10 flex items-baseline justify-between gap-1 p-1">
+                      <button
+                        type="button"
+                        onClick={() => onOpenDay(day)}
+                        aria-label={`Open ${day}`}
                         className={cn(
-                          'tabular text-xs',
+                          'tabular rounded-sm px-1 text-xs hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2',
                           day === today
                             ? 'font-semibold text-now-text'
                             : outside
@@ -142,7 +176,7 @@ export function MonthView({
                         )}
                       >
                         {Number(day.slice(8))}
-                      </span>
+                      </button>
                       {glyph && forecast && (
                         <span className="text-2xs text-ink-muted" title={glyph.label}>
                           <span aria-hidden="true">{glyph.icon}</span>
@@ -154,14 +188,17 @@ export function MonthView({
                     </span>
 
                     {dayEvents.length > 0 && (
-                      <span className="mt-auto text-2xs text-ink-muted">
+                      <button
+                        type="button"
+                        onClick={() => onOpenDay(day)}
+                        className="relative z-10 mt-auto px-1 pb-1 text-left text-2xs text-ink-muted hover:text-ink focus-visible:outline-focus focus-visible:outline-2">
                         {/*
                           A count rather than a list. At this size the names
                           would be three characters each, which tells you less
                           than knowing there are four things to look at.
                         */}
                         {dayEvents.length} {dayEvents.length === 1 ? 'thing' : 'things'}
-                      </span>
+                      </button>
                     )}
                   </DayCell>
                 );

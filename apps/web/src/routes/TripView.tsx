@@ -174,6 +174,51 @@ export function TripView() {
     );
   }
 
+  /**
+   * Makes an event from what a gesture said, and nothing else.
+   *
+   * A day picked in the month, or a run of days dragged in the week, fills in
+   * exactly that -- the point of the gesture is that it saves typing the thing
+   * it already knows. The name is left empty and the editor opens on it, so the
+   * next thing typed is the next thing decided.
+   */
+  function createOn(day: DayKey, options: { untilDay?: DayKey } = {}) {
+    if (!store || readOnly) return;
+
+    const id = `e_${randomId()}`;
+    const startsAt = Date.parse(`${day}T12:00:00Z`);
+
+    store.change((current) => {
+      let next = addEvent(current, { id, name: '' }, { userId: 'me' });
+
+      next = updateEvent(
+        next,
+        id,
+        {
+          startsAt,
+          timezone: homeTimezone,
+          // A run of days is how long it lasts, which is the other thing the
+          // gesture said. One day says nothing about length, so it says nothing.
+          ...(options.untilDay && options.untilDay !== day
+            ? {
+                durationMinutes: Math.round(
+                  (Date.parse(`${options.untilDay}T12:00:00Z`) - startsAt) / 60_000,
+                ),
+              }
+            : {}),
+        },
+        { userId: 'me' },
+      );
+
+      return next;
+    });
+
+    setView('day');
+    setAnchor(day);
+    setOpenEventId(id);
+    setHighlighted(id);
+  }
+
   function goToDay(at: number) {
     const key = dayKey(at, homeTimezone);
     setAnchor(key);
@@ -361,6 +406,7 @@ export function TripView() {
               today={today}
               readOnly={readOnly}
               onOpenEvent={focusEvent}
+              onCreateRange={(from, to) => createOn(from, { untilDay: to })}
             />
           )}
 
@@ -376,6 +422,7 @@ export function TripView() {
                 setAnchor(day);
                 setView('day');
               }}
+              onCreateOn={(day) => createOn(day)}
             />
           )}
 
