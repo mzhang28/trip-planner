@@ -31,7 +31,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, type TripSummary } from '../lib/api';
 import { randomId } from '../lib/crypto';
-import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
+import { dayKey, formatDayHeading, moveToDay, setDay, setTimeOfDay } from '../lib/time';
 import { addDays, eventDay, openingDay, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
 import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
@@ -225,11 +225,27 @@ export function TripView() {
    * it already knows. The name is left empty and the editor opens on it, so the
    * next thing typed is the next thing decided.
    */
-  function createOn(day: DayKey, options: { untilDay?: DayKey } = {}) {
+  function createOn(day: DayKey, options: { startMinutes?: number; endMinutes?: number } = {}) {
     if (!store || readOnly) return;
 
     const id = `e_${randomId()}`;
-    const startsAt = Date.parse(`${day}T12:00:00Z`);
+
+    /*
+     * Midday when the gesture said nothing about the hour: it reads as "this
+     * day, time still to work out" rather than claiming to start at midnight.
+     *
+     * The minutes come from the grid, which is drawn in the zone the trip is
+     * shown in -- so they are a wall-clock time there, not an offset from
+     * midnight UTC. Treating them as the latter put a nine o'clock drag at six
+     * in the evening in Tokyo.
+     */
+    const minutes = options.startMinutes ?? 12 * 60;
+    const clock = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(
+      minutes % 60,
+    ).padStart(2, '0')}`;
+
+    const onThatDay = setDay(undefined, homeTimezone, day);
+    const startsAt = onThatDay === null ? null : setTimeOfDay(onThatDay, homeTimezone, clock);
 
     store.change((current) => {
       let next = addEvent(current, { id, name: '' }, { userId: 'me' });
@@ -238,16 +254,12 @@ export function TripView() {
         next,
         id,
         {
-          startsAt,
+          ...(startsAt === null ? {} : { startsAt }),
           timezone: homeTimezone,
-          // A run of days is how long it lasts, which is the other thing the
-          // gesture said. One day says nothing about length, so it says nothing.
-          ...(options.untilDay && options.untilDay !== day
-            ? {
-                durationMinutes: Math.round(
-                  (Date.parse(`${options.untilDay}T12:00:00Z`) - startsAt) / 60_000,
-                ),
-              }
+          // How long only when the gesture said so. A tap on a day says which
+          // day and nothing about length.
+          ...(options.endMinutes !== undefined && options.startMinutes !== undefined
+            ? { durationMinutes: options.endMinutes - options.startMinutes }
             : {}),
         },
         { userId: 'me' },
@@ -380,7 +392,11 @@ export function TripView() {
         </div>
       </header>
 
-      <main className="mx-auto min-h-0 w-full max-w-[100rem] flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+      <main
+        className={`mx-auto min-h-0 w-full max-w-[100rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 ${
+          view === 'week' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'
+        }`}
+      >
         {state && store && <RecoveryBanner state={state} store={store} />}
 
         {!readOnly && (
@@ -411,6 +427,7 @@ export function TripView() {
         )}
 
         <DayNavigator view={view} anchor={anchor} today={today} onChange={moveAnchor} />
+        <div className={view === 'week' ? 'min-h-0 flex-1' : undefined}>
 
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           {view === 'week' && (
@@ -422,7 +439,9 @@ export function TripView() {
               today={today}
               readOnly={readOnly}
               onOpenEvent={focusEvent}
-              onCreateRange={(from, to) => createOn(from, { untilDay: to })}
+              onCreateAt={(day, startMinutes, endMinutes) =>
+                createOn(day, { startMinutes, endMinutes })
+              }
             />
           )}
 
@@ -590,6 +609,7 @@ export function TripView() {
             </div>
           )}
         </DndContext>
+        </div>
 
         {trip?.role === 'owner' && (
           <section className="mt-10 border-t border-line pt-6">

@@ -1,6 +1,10 @@
 import { Button, cn } from '@trip/ui';
 import type { DayKey } from '../lib/calendar';
 import { addDays, startOfWeek } from '../lib/calendar';
+import {
+  setCalendarDisplaySettings,
+  useCalendarDisplaySettings,
+} from './useCalendarDisplaySettings';
 
 export type CalendarView = 'day' | 'week' | 'month';
 
@@ -53,6 +57,7 @@ function describe(view: CalendarView, anchor: DayKey): string {
  */
 export function DayNavigator({ view, anchor, today, onChange }: DayNavigatorProps) {
   const step = view === 'month' ? 28 : view === 'week' ? 7 : 1;
+  const display = useCalendarDisplaySettings();
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -79,6 +84,55 @@ export function DayNavigator({ view, anchor, today, onChange }: DayNavigatorProp
           )}
         />
       </label>
+
+      {view === 'week' && (
+        <details className="relative">
+          <summary className="h-7 cursor-pointer rounded-md border border-line-input bg-card px-2 text-xs leading-7 text-ink hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2">
+            Display
+          </summary>
+          <div className="absolute top-full left-0 z-20 mt-1 flex w-56 flex-col gap-3 rounded-lg border border-line bg-raised p-3 shadow-lg">
+            <p className="text-xs text-ink-secondary">Week timetable hours</p>
+            <label className="flex items-center justify-between gap-2 text-xs text-ink">
+              Starts
+              <select
+                value={display.weekStartHour}
+                onChange={(e) =>
+                  setCalendarDisplaySettings({
+                    ...display,
+                    weekStartHour: Number(e.target.value),
+                  })
+                }
+                className="h-7 rounded-md border border-line-input bg-card px-1 text-xs"
+              >
+                {Array.from({ length: 24 }, (_, hour) => (
+                  <option key={hour} value={hour} disabled={hour >= display.weekEndHour}>
+                    {String(hour).padStart(2, '0')}:00
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-center justify-between gap-2 text-xs text-ink">
+              Ends
+              <select
+                value={display.weekEndHour}
+                onChange={(e) =>
+                  setCalendarDisplaySettings({
+                    ...display,
+                    weekEndHour: Number(e.target.value),
+                  })
+                }
+                className="h-7 rounded-md border border-line-input bg-card px-1 text-xs"
+              >
+                {Array.from({ length: 24 }, (_, index) => index + 1).map((hour) => (
+                  <option key={hour} value={hour} disabled={hour <= display.weekStartHour}>
+                    {hour === 24 ? '00:00 (next day)' : `${String(hour).padStart(2, '0')}:00`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </details>
+      )}
 
       <span data-testid="range-label" className="text-xs text-ink-muted">
         {describe(view, anchor)}
