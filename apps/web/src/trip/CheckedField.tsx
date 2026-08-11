@@ -8,6 +8,8 @@ export interface CheckedFieldProps {
   placeholder?: string;
   inputMode?: 'text' | 'numeric' | 'decimal';
   disabled?: boolean;
+  /** Takes the cursor on mount, for the one field a new thing is waiting on. */
+  autoFocus?: boolean;
   /** Offered as you type, and still typeable if none of them fit. */
   suggestions?: string[];
   /** Returns a message when the text cannot be used, or null when it was taken. */
@@ -29,6 +31,7 @@ export function CheckedField({
   placeholder,
   inputMode,
   disabled,
+  autoFocus,
   suggestions,
   onCommit,
 }: CheckedFieldProps) {
@@ -55,6 +58,7 @@ export function CheckedField({
         disabled={disabled}
         placeholder={placeholder}
         inputMode={inputMode}
+        autoFocus={autoFocus}
         list={suggestions ? `${id}-suggestions` : undefined}
         aria-invalid={error !== null}
         aria-describedby={`${id}-hint`}

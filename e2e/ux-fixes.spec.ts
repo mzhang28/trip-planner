@@ -392,3 +392,94 @@ test.describe('a day decided before an hour', () => {
     await expect(editor.getByTestId('field-duration')).toBeVisible();
   });
 });
+
+test.describe('taking something back', () => {
+  test('a deleted event can be put back from the message that says it went', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Fushimi Inari').click();
+
+    await page.getByRole('button', { name: 'Delete event' }).click();
+    await expect(eventRow(page, 'Fushimi Inari')).toHaveCount(0);
+
+    const undo = page.getByTestId('undo-bar');
+    await expect(undo).toContainText('Deleted Fushimi Inari');
+
+    await undo.getByRole('button', { name: 'Undo' }).click();
+    await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
+    await expect(page.getByTestId('undo-bar')).toHaveCount(0);
+  });
+
+  test('deleting a long selection asks first', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    for (const name of ['One', 'Two', 'Three', 'Four']) {
+      await page.getByRole('textbox', { name: 'New event' }).fill(name);
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await expect(eventRow(page, name)).toBeVisible();
+    }
+
+    const boxes = page.getByTestId('event-select');
+    for (let index = 0; index < 4; index += 1) await boxes.nth(index).check();
+
+    const bar = page.getByTestId('selection-bar');
+    await bar.getByRole('button', { name: 'Delete 4' }).click();
+
+    // Nothing has happened yet: four events is enough to be worth a question.
+    await expect(bar).toContainText('Delete 4 events?');
+    await expect(page.getByTestId('event')).toHaveCount(4);
+
+    await bar.getByRole('button', { name: 'Keep them' }).click();
+    await expect(page.getByTestId('event')).toHaveCount(4);
+
+    await bar.getByRole('button', { name: 'Delete 4' }).click();
+    await bar.getByTestId('confirm-bulk-delete').click();
+    await expect(page.getByTestId('event')).toHaveCount(0);
+
+    await page.getByTestId('undo-bar').getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByTestId('event')).toHaveCount(4);
+  });
+});
+
+test.describe('text a field will not take', () => {
+  test('emptying a name says why instead of quietly restoring it', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Fushimi Inari').click();
+
+    const name = page.getByRole('textbox', { name: 'Name' });
+    await name.fill('');
+    await name.blur();
+
+    await expect(page.getByText('An event needs a name')).toBeVisible();
+    await expect(name).toHaveValue('');
+  });
+
+  test('a link has to be a web address, and a bare host becomes one', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Fushimi Inari').click();
+    await reveal(page, 'links');
+
+    const editor = page.getByTestId('event-editor');
+    await editor.getByRole('textbox', { name: 'Address' }).fill('not a link');
+    await editor.getByRole('button', { name: 'Add link' }).click();
+    await expect(editor.getByText('no site in it')).toBeVisible();
+
+    // A host on its own is what people type, so it is completed rather than
+    // turned into a link to a page of this app that does not exist.
+    await editor.getByRole('textbox', { name: 'Address' }).fill('inari.jp/access');
+    await editor.getByRole('button', { name: 'Add link' }).click();
+    await expect(editor.getByRole('link', { name: 'https://inari.jp/access' })).toBeVisible();
+  });
+});

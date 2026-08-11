@@ -1,6 +1,10 @@
 import type { TripEvent } from '@trip/crdt';
 import { Button, cn } from '@trip/ui';
 import { Trash2, X } from 'lucide-react';
+import { useState } from 'react';
+
+/** Above this many, deleting asks first rather than only offering undo. */
+const ASK_ABOVE = 3;
 
 export interface SelectionBarProps {
   selected: Set<string>;
@@ -29,6 +33,8 @@ export function SelectionBar({
   onDelete,
   onMerge,
 }: SelectionBarProps) {
+  const [asking, setAsking] = useState(false);
+
   if (selected.size === 0) return null;
 
   return (
@@ -63,14 +69,37 @@ export function SelectionBar({
         >
           Merge
         </Button>
-        <Button size="sm" variant="danger" onPress={onDelete}>
-          <Trash2 className="size-3.5" />
-          Delete {selected.size}
-        </Button>
-        <Button size="sm" variant="ghost" onPress={onClear}>
-          <X className="size-3.5" />
-          Clear
-        </Button>
+        {/*
+          A handful can be taken back from the message that follows. A long
+          selection is worth a question first: it is the one case where a
+          mis-aimed press costs an afternoon of planning.
+        */}
+        {asking ? (
+          <>
+            <span className="text-sm text-ink">Delete {selected.size} events?</span>
+            <Button size="sm" variant="danger" data-testid="confirm-bulk-delete" onPress={onDelete}>
+              Delete them
+            </Button>
+            <Button size="sm" variant="ghost" onPress={() => setAsking(false)}>
+              Keep them
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              variant="danger"
+              onPress={() => (selected.size > ASK_ABOVE ? setAsking(true) : onDelete())}
+            >
+              <Trash2 className="size-3.5" />
+              Delete {selected.size}
+            </Button>
+            <Button size="sm" variant="ghost" onPress={onClear}>
+              <X className="size-3.5" />
+              Clear
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

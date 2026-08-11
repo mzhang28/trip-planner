@@ -10,8 +10,8 @@ import {
   addAttachment,
   addEvent,
   addLink,
-  deleteEvent,
   deleteEvents,
+  restoreEvent,
   liveFieldDefs,
   mergeEvents,
   removeAttachment,
@@ -39,6 +39,7 @@ import { useUploadFlush } from '../trip/Attachments';
 import { RecoveryBanner } from '../trip/RecoveryBanner';
 import { SharePanel } from '../trip/SharePanel';
 import { MergePreview, SelectionBar } from '../trip/SelectionBar';
+import { UndoBar } from '../trip/UndoBar';
 import { TransitLeg } from '../trip/TransitLeg';
 import { MonthView } from '../trip/MonthView';
 import { WeekView } from '../trip/WeekView';
@@ -182,6 +183,9 @@ export function TripView() {
    * because setting a date moves the card to another day and remounts it.
    */
   const [revealedFields, setRevealedFields] = useState<Record<string, ReadonlySet<string>>>({});
+
+  /** The last deletion, while it can still be taken back. */
+  const [undoable, setUndoable] = useState<{ ids: string[]; message: string } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mergePrimary, setMergePrimary] = useState<string | null>(null);
   const addBoxRef = useRef<HTMLDivElement>(null);
@@ -402,9 +406,26 @@ export function TripView() {
     });
   }
 
+  /**
+   * Deletes, and keeps the way back open for a few seconds.
+   *
+   * Undo puts the events back through `restoreEvent`, which clears the
+   * tombstone as an ordinary edit -- so it merges like any other and a peer
+   * that never saw the delete is not confused by the reversal.
+   */
+  function removeEvents(ids: string[], message: string) {
+    if (ids.length === 0) return;
+
+    store?.change((current) => deleteEvents(current, ids, { userId: 'me' }));
+    setUndoable({ ids, message });
+  }
+
   function bulkDelete() {
     const ids = [...selected];
-    store?.change((current) => deleteEvents(current, ids, { userId: 'me' }));
+    removeEvents(
+      ids,
+      ids.length === 1 ? 'Deleted 1 event' : `Deleted ${ids.length} events`,
+    );
     setSelected(new Set());
   }
 
@@ -671,8 +692,9 @@ export function TripView() {
                               )
                             }
                             onDelete={() =>
-                              store?.change((current) =>
-                                deleteEvent(current, event.id, { userId: 'me' }),
+                              removeEvents(
+                                [event.id],
+                                `Deleted ${event.name || 'the unnamed event'}`,
                               )
                             }
                             doc={doc}
@@ -727,6 +749,23 @@ export function TripView() {
             onClear={() => setSelected(new Set())}
             onDelete={bulkDelete}
             onMerge={() => setMergePrimary([...selected][0] ?? null)}
+          />
+        )}
+
+        {/* Never both: the selection bar is in the same place at the bottom. */}
+        {undoable && selected.size === 0 && (
+          <UndoBar
+            message={undoable.message}
+            onUndo={() => {
+              store?.change((current) =>
+                undoable.ids.reduce(
+                  (doc, id) => restoreEvent(doc, id, { userId: 'me' }),
+                  current,
+                ),
+              );
+              setUndoable(null);
+            }}
+            onDismiss={() => setUndoable(null)}
           />
         )}
 

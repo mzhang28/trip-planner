@@ -113,6 +113,7 @@ export function EventEditor({
 
   const [linkUrl, setLinkUrl] = useState('');
   const [linkTitle, setLinkTitle] = useState('');
+  const [linkError, setLinkError] = useState<string | null>(null);
 
 
   const applicable = fieldDefs.filter(
@@ -375,7 +376,11 @@ export function EventEditor({
                 className="min-w-40 flex-1"
                 placeholder="https://…"
                 value={linkUrl}
-                onChange={setLinkUrl}
+                errorMessage={linkError}
+                onChange={(next) => {
+                  setLinkUrl(next);
+                  setLinkError(null);
+                }}
               />
               <TextField
                 label="Title"
@@ -388,7 +393,7 @@ export function EventEditor({
                   if (e.key === 'Enter') addLink();
                 }}
               />
-              <Button size="sm" onPress={addLink} isDisabled={linkUrl.trim() === ''}>
+              <Button size="sm" onPress={addLink}>
                 <Plus className="size-3.5" />
                 Add link
               </Button>
@@ -578,13 +583,46 @@ export function EventEditor({
     return list;
   }, [event, applicable, doc, homeTimezone, linkUrl, linkTitle, zone, time]);
 
-  function addLink() {
-    const url = linkUrl.trim();
-    if (!url) return;
+  /**
+   * Reads what was typed as a web address, or says why it cannot.
+   *
+   * Anything at all used to be accepted, so `fushimi-inari.jp` became a link to
+   * a page of this app that does not exist. A bare host is what people type, so
+   * it is completed rather than rejected.
+   */
+  function readAddress(typed: string): { url: string } | { error: string } {
+    const text = typed.trim();
+    if (text === '') return { error: 'Paste or type an address first.' };
 
-    onAddLink(url, linkTitle.trim() || undefined);
+    const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`;
+
+    let parsed: URL;
+    try {
+      parsed = new URL(withScheme);
+    } catch {
+      return { error: 'That is not a web address. It should look like example.com/page.' };
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return { error: 'Only web addresses, starting http:// or https://.' };
+    }
+
+    // A host with no dot is a machine name on a local network, not a site.
+    if (!parsed.hostname.includes('.')) {
+      return { error: 'That address has no site in it, like example.com.' };
+    }
+
+    return { url: parsed.toString() };
+  }
+
+  function addLink() {
+    const read = readAddress(linkUrl);
+    if ('error' in read) return setLinkError(read.error);
+
+    onAddLink(read.url, linkTitle.trim() || undefined);
     setLinkUrl('');
     setLinkTitle('');
+    setLinkError(null);
   }
 
   const shown = sections.filter((section) => section.filled || revealed.has(section.key));
@@ -597,9 +635,9 @@ export function EventEditor({
       data-testid="event-editor"
       className="flex flex-col gap-5 border-t border-line px-3 py-4"
     >
-      <TextField
+      <CheckedField
         label="Name"
-        defaultValue={event.name}
+        value={event.name}
         placeholder="What is it?"
         /*
          * An event made by picking a day on the calendar has no name yet, and
@@ -607,9 +645,19 @@ export function EventEditor({
          * there rather than one click away.
          */
         autoFocus={event.name === ''}
-        onBlur={(e) => {
-          const next = e.currentTarget.value.trim();
-          if (next && next !== event.name) onPatch({ name: next });
+        onCommit={(raw) => {
+          /*
+           * Emptying a name was refused without a word, and the old name came
+           * back when the editor closed. An event that has never been named is
+           * a different thing -- the calendar makes those on purpose -- so
+           * nothing is said about one of those.
+           */
+          if (raw === '' && event.name !== '') {
+            return 'An event needs a name. Delete it below if you no longer want it.';
+          }
+
+          if (raw !== event.name) onPatch({ name: raw });
+          return null;
         }}
       />
 
