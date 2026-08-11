@@ -157,7 +157,51 @@ export interface WeekViewProps {
    * A tap says which day and nothing else, which is a state the event can hold
    * now rather than a reason to invent an hour for it.
    */
-  onCreateAt: (day: DayKey, startMinutes?: number, endMinutes?: number) => void;
+  onCreateAt: (day: DayKey, name: string, startMinutes?: number, endMinutes?: number) => void;
+}
+
+function InlineEventDraft({
+  name,
+  onChange,
+  onCommit,
+  onCancel,
+  className,
+  style,
+}: {
+  name: string;
+  onChange: (name: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div
+      data-testid="week-event-draft"
+      style={style}
+      onPointerDown={(event) => event.stopPropagation()}
+      className={cn(
+        'z-10 flex min-w-0 items-start rounded-sm border border-dashed border-accent bg-accent-soft px-1 py-1',
+        className,
+      )}
+    >
+      <label className="min-w-0 flex-1">
+        <span className="sr-only">Event name</span>
+        <input
+          autoFocus
+          value={name}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && name.trim()) onCommit();
+            if (event.key === 'Escape') onCancel();
+          }}
+          onBlur={() => (name.trim() ? onCommit() : onCancel())}
+          placeholder="Event name"
+          className="h-6 w-full min-w-0 rounded-sm border-0 bg-card/80 px-1 text-xs text-ink outline-none placeholder:text-ink-placeholder focus:ring-2 focus:ring-accent"
+        />
+      </label>
+    </div>
+  );
 }
 
 /**
@@ -371,6 +415,12 @@ export function WeekView({
    * in-progress gesture is nobody else's business until it is finished.
    */
   const [drag, setDrag] = useState<{ day: DayKey; from: number; to: number } | null>(null);
+  const [creating, setCreating] = useState<{
+    day: DayKey;
+    start?: number;
+    end?: number;
+    name: string;
+  } | null>(null);
 
   const selecting = drag
     ? {
@@ -383,8 +433,18 @@ export function WeekView({
     : null;
 
   function finishDrag() {
-    if (selecting) onCreateAt(selecting.day, selecting.start, selecting.end);
+    if (selecting) setCreating({ ...selecting, name: '' });
     setDrag(null);
+  }
+
+  function commitCreation() {
+    if (!creating) return;
+
+    const name = creating.name.trim();
+    if (!name) return;
+
+    onCreateAt(creating.day, name, creating.start, creating.end);
+    setCreating(null);
   }
   const byDay = eventsByDay(events, homeTimezone);
   const displayZone = useDisplayZone();
@@ -494,13 +554,23 @@ export function WeekView({
               them. Drawing one at midnight would put a "Thursday, some time"
               plan at the top of the grid as though that were the plan.
             */}
-            {untimed.size > 0 && (
+            {(untimed.size > 0 || (creating && creating.start === undefined)) && (
               <div className="grid gap-px border-x border-line bg-line" style={{ gridTemplateColumns }}>
                 <div className="sticky left-0 z-20 bg-page py-0.5 pr-1 text-right text-2xs text-ink-muted">
                   Any
                 </div>
                 {days.map((day) => (
                   <div key={day} className="flex min-w-0 flex-col gap-0.5 bg-card p-0.5">
+                    {creating?.day === day && creating.start === undefined && (
+                      <InlineEventDraft
+                        name={creating.name}
+                        onChange={(name) =>
+                          setCreating((current) => (current ? { ...current, name } : current))
+                        }
+                        onCommit={commitCreation}
+                        onCancel={() => setCreating(null)}
+                      />
+                    )}
                     {(untimed.get(day) ?? []).map((event) => (
                       <button
                         key={event.id}
@@ -597,14 +667,17 @@ export function WeekView({
                           }
                         : null
                     }
-                    onStart={(minutes) => setDrag({ day, from: minutes, to: minutes })}
+                    onStart={(minutes) => {
+                      setCreating(null);
+                      setDrag({ day, from: minutes, to: minutes });
+                    }}
                     onMove={(minutes) =>
                       setDrag((current) =>
                         current && current.day === day ? { ...current, to: minutes } : current,
                       )
                     }
                     onFinish={finishDrag}
-                    onAdd={() => onCreateAt(day)}
+                    onAdd={() => setCreating({ day, name: '' })}
                     windowStart={windowStart}
                     windowEnd={windowEnd}
                     fitToView={displaySettings.weekFitToView}
@@ -665,6 +738,27 @@ export function WeekView({
                         </button>
                       ),
                     )}
+                    {creating?.day === day &&
+                      creating.start !== undefined &&
+                      creating.end !== undefined && (
+                        <InlineEventDraft
+                          name={creating.name}
+                          onChange={(name) =>
+                            setCreating((current) => (current ? { ...current, name } : current))
+                          }
+                          onCommit={commitCreation}
+                          onCancel={() => setCreating(null)}
+                          className="absolute inset-x-0.5"
+                          style={{
+                            top: displaySettings.weekFitToView
+                              ? `${((creating.start - windowStart) / (windowEnd - windowStart)) * 100}%`
+                              : (creating.start - windowStart) * MINUTE_HEIGHT,
+                            height: displaySettings.weekFitToView
+                              ? `max(30px, calc(${((creating.end - creating.start) / (windowEnd - windowStart)) * 100}% - 2px))`
+                              : Math.max(30, (creating.end - creating.start) * MINUTE_HEIGHT - 2),
+                          }}
+                        />
+                      )}
                   </DayColumn>
                 );
               })}

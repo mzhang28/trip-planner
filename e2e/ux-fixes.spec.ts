@@ -570,6 +570,16 @@ test.describe('reaching things with a finger', () => {
     const today = new Date().toISOString().slice(0, 10);
     await page.getByTestId(`week-add-${today}`).click();
 
+    const draft = page.getByTestId('week-event-draft');
+    const name = draft.getByRole('textbox', { name: 'Event name' });
+    await expect(name).toBeFocused();
+    await name.fill('Dinner');
+    await name.press('Enter');
+
+    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    await expect(page.getByTestId('event-editor')).toHaveCount(0);
+    await page.getByTestId('week-untimed-event').filter({ hasText: 'Dinner' }).click();
+
     await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
     await expect(page.getByTestId('event-editor')).toBeVisible();
     await expect(page.getByTestId('event-date')).toHaveValue(today);

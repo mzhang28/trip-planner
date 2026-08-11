@@ -495,6 +495,21 @@ test.describe('making an event from the calendar', () => {
     await page.mouse.move(box.x + box.width / 2, at(12), { steps: 10 });
     await page.mouse.up();
 
+    const draft = page.getByTestId('week-event-draft');
+    await expect(draft).toBeVisible();
+    const name = draft.getByRole('textbox', { name: 'Event name' });
+    await expect(name).toBeFocused();
+    await name.fill('Nishiki Market');
+    await name.press('Enter');
+
+    // Creation stays in the week and does not open the full editor. Clicking
+    // the finished event is the explicit next step that opens its details.
+    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    await expect(page.getByTestId('event-editor')).toHaveCount(0);
+    const created = page.getByTestId('week-event').filter({ hasText: 'Nishiki Market' });
+    await expect(created).toBeVisible();
+    await created.click();
+
     await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
     const editor = page.getByTestId('event-editor');
     await expect(editor).toBeVisible();

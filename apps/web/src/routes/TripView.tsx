@@ -353,12 +353,19 @@ export function TripView() {
   /**
    * Makes an event from what a gesture said, and nothing else.
    *
-   * A day picked in the month, or a run of days dragged in the week, fills in
-   * exactly that -- the point of the gesture is that it saves typing the thing
-   * it already knows. The name is left empty and the editor opens on it, so the
-   * next thing typed is the next thing decided.
+   * A calendar gesture fills in exactly what it knows. Month and day creation
+   * leave the name empty and open the editor. Week creation collects the name
+   * first, then calls this without opening it.
    */
-  function createOn(day: DayKey, options: { startMinutes?: number; endMinutes?: number } = {}) {
+  function createOn(
+    day: DayKey,
+    options: {
+      startMinutes?: number;
+      endMinutes?: number;
+      name?: string;
+      openAfterCreate?: boolean;
+    } = {},
+  ) {
     if (!store || readOnly) return;
 
     const id = `e_${randomId()}`;
@@ -384,7 +391,7 @@ export function TripView() {
           );
 
     store.change((current) => {
-      let next = addEvent(current, { id, name: '' }, { userId: 'me' });
+      let next = addEvent(current, { id, name: options.name ?? '' }, { userId: 'me' });
 
       next = updateEvent(
         next,
@@ -405,10 +412,12 @@ export function TripView() {
       return next;
     });
 
-    setView('day');
-    moveAnchor(day);
-    setOpenEventId(id);
-    setHighlighted(id);
+    if (options.openAfterCreate !== false) {
+      setView('day');
+      moveAnchor(day);
+      setOpenEventId(id);
+      setHighlighted(id);
+    }
   }
 
   function goToDay(at: number) {
@@ -643,8 +652,8 @@ export function TripView() {
               readOnly={readOnly}
               onOpenEvent={focusEvent}
               onChangeAnchor={moveAnchor}
-              onCreateAt={(day, startMinutes, endMinutes) =>
-                createOn(day, { startMinutes, endMinutes })
+              onCreateAt={(day, name, startMinutes, endMinutes) =>
+                createOn(day, { startMinutes, endMinutes, name, openAfterCreate: false })
               }
             />
           )}
