@@ -329,8 +329,8 @@ export function TripView() {
   }
 
   return (
-    <div className="min-h-dvh bg-page text-ink">
-      <header className="sticky top-0 z-10 border-b border-line bg-page/95 backdrop-blur">
+    <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
+      <header className="z-10 shrink-0 border-b border-line bg-page/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-[100rem] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline">
             All trips
@@ -380,7 +380,7 @@ export function TripView() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[100rem] px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto min-h-0 w-full max-w-[100rem] flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
         {state && store && <RecoveryBanner state={state} store={store} />}
 
         {!readOnly && (
