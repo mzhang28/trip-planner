@@ -11,7 +11,16 @@ import { BOOKING_STATUSES } from '@trip/crdt';
 import { Button, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { formatTime, setDay, setTimeOfDay, toDateInput, zoneFor } from '../lib/time';
+import {
+  formatTime,
+  isTimeZone,
+  knownTimeZones,
+  setDay,
+  setTimeOfDay,
+  toDateInput,
+  zoneFor,
+} from '../lib/time';
+import { CheckedField } from './CheckedField';
 import { TimeField } from './TimeField';
 import { Attachments } from './Attachments';
 import { DescriptionEditor } from './DescriptionEditor';
@@ -187,18 +196,27 @@ export function EventEditor({
         label: 'How long',
         filled: event.durationMinutes !== undefined,
         render: () => (
-          <TextField
+          <CheckedField
             label="How long"
             inputMode="numeric"
-            defaultValue={event.durationMinutes === undefined ? '' : String(event.durationMinutes)}
             placeholder="90"
-            description="In minutes."
-            onBlur={(e) => {
-              const raw = e.currentTarget.value.trim();
-              const parsed = Number(raw);
-              onPatch({
-                durationMinutes: raw === '' || Number.isNaN(parsed) ? undefined : parsed,
-              });
+            hint="In minutes."
+            value={event.durationMinutes === undefined ? '' : String(event.durationMinutes)}
+            onCommit={(raw) => {
+              if (raw === '') {
+                onPatch({ durationMinutes: undefined });
+                return null;
+              }
+
+              // A negative or fractional length used to be stored as typed, and
+              // then drew an event of negative height on the week grid.
+              const minutes = Number(raw);
+              if (!Number.isInteger(minutes) || minutes <= 0) {
+                return 'A whole number of minutes, more than zero.';
+              }
+
+              onPatch({ durationMinutes: minutes });
+              return null;
             }}
           />
         ),
@@ -426,12 +444,29 @@ export function EventEditor({
         label: 'Time zone',
         filled: event.timezone !== undefined,
         render: () => (
-          <TextField
+          <CheckedField
             label="Time zone"
-            defaultValue={event.timezone ?? ''}
             placeholder={homeTimezone}
-            description="Where this happens. Leave blank to use the trip's."
-            onBlur={(e) => onPatch({ timezone: e.currentTarget.value.trim() || undefined })}
+            hint="Where this happens. Leave blank to use the trip's."
+            value={event.timezone ?? ''}
+            suggestions={knownTimeZones()}
+            onCommit={(raw) => {
+              if (raw === '') {
+                onPatch({ timezone: undefined });
+                return null;
+              }
+
+              /*
+               * Checked here rather than where it is printed. An unknown zone
+               * used to be stored happily and then throw from Intl every time
+               * the event was drawn, which reads as the app breaking rather
+               * than as one field being wrong.
+               */
+              if (!isTimeZone(raw)) return 'Not a time zone. Try one from the list, like Asia/Tokyo.';
+
+              onPatch({ timezone: raw });
+              return null;
+            }}
           />
         ),
       },

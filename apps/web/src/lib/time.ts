@@ -12,6 +12,36 @@ export function zoneFor(eventTimezone: string | undefined, homeTimezone: string)
   return eventTimezone ?? homeTimezone;
 }
 
+/** Whether the browser can format a time in this zone. */
+export function isTimeZone(candidate: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-GB', { timeZone: candidate });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let cachedZones: string[] | null = null;
+
+/**
+ * Every zone the browser knows, for a field to offer while somebody types.
+ *
+ * There are around 400 of them and the list never changes during a visit, so it
+ * is worked out once. Browsers without `supportedValuesOf` get nothing offered
+ * and can still type a zone, which is checked either way.
+ */
+export function knownTimeZones(): string[] {
+  if (cachedZones) return cachedZones;
+
+  const supported = (
+    Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
+  ).supportedValuesOf;
+
+  cachedZones = supported ? supported('timeZone') : [];
+  return cachedZones;
+}
+
 export function formatTime(at: Instant, timeZone: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     hour: '2-digit',

@@ -1,5 +1,5 @@
 import type { Place } from '@trip/crdt';
-import { TextField, cn } from '@trip/ui';
+import { cn } from '@trip/ui';
 import { useEffect, useId, useRef, useState } from 'react';
 
 interface PlaceResult {
@@ -8,6 +8,13 @@ interface PlaceResult {
   lat: number;
   lng: number;
 }
+
+/** Where the lookup has got to, which is what the field says while you wait. */
+type Lookup =
+  | { state: 'idle' }
+  | { state: 'searching' }
+  | { state: 'found'; places: PlaceResult[] }
+  | { state: 'unreachable' };
 
 export interface PlacePickerProps {
   value: Place | undefined;
@@ -21,24 +28,32 @@ export interface PlacePickerProps {
  * restaurant that has not been added to the map are both real places on a trip,
  * so whatever is typed is kept even when nothing comes back — the search only
  * offers to fill in the coordinates.
+ *
+ * A combobox rather than a list of things to click: results arrive after a
+ * pause, and a field that can only be answered with a pointer cannot be
+ * answered at all by someone typing an address on a phone keyboard.
  */
 export function PlacePicker({ value, onChange }: PlacePickerProps) {
   const [query, setQuery] = useState(value?.label ?? '');
-  const [results, setResults] = useState<PlaceResult[]>([]);
+  const [lookup, setLookup] = useState<Lookup>({ state: 'idle' });
+  const [active, setActive] = useState(0);
   const [open, setOpen] = useState(false);
-  const listId = useId();
+  const id = useId();
   const latest = useRef(0);
+
+  const places = lookup.state === 'found' ? lookup.places : [];
 
   useEffect(() => {
     const text = query.trim();
     if (text.length < 3 || text === value?.label) {
-      setResults([]);
+      setLookup({ state: 'idle' });
       return;
     }
 
     // Wait for a pause in typing. Nominatim allows one request a second, and
     // sending one per keystroke would spend that budget on prefixes nobody
     // meant to search for.
+    setLookup({ state: 'searching' });
     const timer = setTimeout(() => {
       const ticket = ++latest.current;
 
@@ -46,72 +61,149 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
         .then((res) => res.json() as Promise<{ places: PlaceResult[] }>)
         .then((body) => {
           // A slower earlier request must not overwrite a faster later one.
-          if (ticket === latest.current) setResults(body.places);
+          if (ticket === latest.current) setLookup({ state: 'found', places: body.places });
         })
-        .catch(() => setResults([]));
+        .catch(() => {
+          /*
+           * Said plainly rather than shown as an empty list. Offline is the
+           * normal state on a trip, and "no matches" would be a lie that stops
+           * somebody trying again later.
+           */
+          if (ticket === latest.current) setLookup({ state: 'unreachable' });
+        });
     }, 400);
 
     return () => clearTimeout(timer);
   }, [query, value?.label]);
 
-  function choose(result: PlaceResult) {
+  useEffect(() => setActive(0), [lookup]);
+
+  function choose(result: PlaceResult | undefined) {
+    if (!result) return;
+
     onChange({ label: result.label, address: result.address, lat: result.lat, lng: result.lng });
     setQuery(result.label);
-    setResults([]);
+    setLookup({ state: 'idle' });
     setOpen(false);
   }
 
-  const showing = open && results.length > 0;
+  /** Keeps the words, drops the pin: the coordinates belonged to the old name. */
+  function commitTypedText() {
+    const text = query.trim();
+    if (text === (value?.label ?? '')) return;
+
+    onChange(text ? { label: text } : undefined);
+  }
+
+  const pinned = value?.lat !== undefined;
+  const edited = query.trim() !== (value?.label ?? '');
+  const showing = open && lookup.state !== 'idle';
+
+  const message =
+    lookup.state === 'searching'
+      ? 'Looking…'
+      : lookup.state === 'unreachable'
+        ? 'Could not reach the map. What you typed is kept either way.'
+        : places.length === 0
+          ? 'No map match. What you typed is kept, without a pin.'
+          : null;
 
   return (
     <div className="relative">
-      <TextField
-        label="Place"
-        placeholder="Fushimi Inari Taisha"
-        description={
-          value?.lat === undefined
-            ? 'Found on a map, it gets a pin. Typed by hand, it still counts.'
-            : `Pinned at ${value.lat.toFixed(4)}, ${value.lng!.toFixed(4)}`
-        }
-        value={query}
-        onChange={(next) => {
-          setQuery(next);
-          setOpen(true);
-        }}
-        onBlur={() => {
-          setTimeout(() => setOpen(false), 150);
+      <div className="flex flex-col gap-1">
+        <label htmlFor={id} className="text-xs font-medium text-ink-secondary">
+          Place
+        </label>
 
-          const text = query.trim();
-          if (text === (value?.label ?? '')) return;
+        <input
+          id={id}
+          type="text"
+          role="combobox"
+          value={query}
+          placeholder="Fushimi Inari Taisha"
+          aria-expanded={showing}
+          aria-controls={showing ? `${id}-list` : undefined}
+          aria-activedescendant={
+            showing && places.length > 0 ? `${id}-option-${active}` : undefined
+          }
+          aria-autocomplete="list"
+          aria-describedby={`${id}-hint`}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setOpen(true);
+              setActive((current) => Math.min(current + 1, places.length - 1));
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setActive((current) => Math.max(current - 1, 0));
+            } else if (e.key === 'Enter' && showing && places.length > 0) {
+              e.preventDefault();
+              choose(places[active]);
+            } else if (e.key === 'Escape') {
+              setOpen(false);
+            }
+          }}
+          onBlur={() => {
+            setTimeout(() => setOpen(false), 150);
+            commitTypedText();
+          }}
+          className={cn(
+            'h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-ink',
+            'placeholder:text-ink-placeholder',
+            'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+          )}
+        />
 
-          // Keeping the words but dropping the pin: the coordinates belonged to
-          // the old name and would put the marker somewhere else entirely.
-          onChange(text ? { label: text } : undefined);
-        }}
-      />
+        <span id={`${id}-hint`} className="text-2xs text-ink-muted">
+          {/*
+            Said before it happens rather than discovered afterwards. Retyping
+            the name of a pinned place used to remove its marker silently, and
+            the map simply lost the event.
+          */}
+          {pinned && edited
+            ? 'Leaving this changes the place, so the pin comes off. Pick a result to move it instead.'
+            : pinned
+              ? `Pinned at ${value.lat!.toFixed(4)}, ${value.lng!.toFixed(4)}`
+              : 'Found on a map, it gets a pin. Typed by hand, it still counts.'}
+        </span>
+      </div>
 
       {showing && (
         <ul
-          id={listId}
+          id={`${id}-list`}
           role="listbox"
           aria-label="Matching places"
           className="absolute top-full right-0 left-0 z-20 mt-1 max-h-64 overflow-auto rounded-lg border border-line bg-raised py-1 shadow-lg"
         >
-          {results.map((result) => (
-            <li key={`${result.lat},${result.lng}`}>
-              <button
-                type="button"
+          {message && (
+            <li role="presentation" className="px-3 py-2 text-sm text-ink-secondary">
+              {message}
+            </li>
+          )}
+
+          {places.map((result, position) => (
+            <li key={`${result.lat},${result.lng}`} role="presentation">
+              <div
+                id={`${id}-option-${position}`}
+                role="option"
+                aria-selected={position === active}
                 onMouseDown={() => choose(result)}
+                onMouseEnter={() => setActive(position)}
                 className={cn(
-                  'block w-full px-3 py-1.5 text-left',
-                  'hover:bg-accent-soft focus-visible:bg-accent-soft focus-visible:outline-none',
+                  'cursor-pointer px-3 py-1.5',
+                  position === active && 'bg-accent-soft',
                 )}
               >
                 <span className="block truncate text-sm text-ink">{result.label}</span>
                 {result.address && (
                   <span className="block truncate text-2xs text-ink-muted">{result.address}</span>
                 )}
-              </button>
+              </div>
             </li>
           ))}
         </ul>

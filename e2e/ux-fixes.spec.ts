@@ -225,3 +225,98 @@ test.describe('sharing', () => {
     void tripId;
   });
 });
+
+test.describe('what a field does with input it cannot use', () => {
+  test('a duration must be a number of minutes, and says so when it is not', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Tea ceremony');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Tea ceremony').click();
+    await reveal(page, 'duration');
+
+    const duration = page.getByRole('textbox', { name: 'How long' });
+    await duration.fill('-30');
+    await duration.blur();
+
+    // The text stays put with the reason beside it, rather than being dropped
+    // on the floor and leaving the old value looking accepted.
+    await expect(duration).toHaveValue('-30');
+    await expect(page.getByText('more than zero')).toBeVisible();
+
+    await duration.fill('90');
+    await duration.blur();
+    await expect(page.getByText('more than zero')).toHaveCount(0);
+
+    // Reloaded, so this reads what was stored rather than what is still on
+    // screen: the refused text must not have been kept, and the good one must.
+    await page.reload();
+    await eventRow(page, 'Tea ceremony').click();
+    await expect(page.getByRole('textbox', { name: 'How long' })).toHaveValue('90');
+  });
+
+  test('a time zone has to be one the browser knows', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Tea ceremony');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Tea ceremony').click();
+    await reveal(page, 'timezone');
+
+    const zone = page.getByRole('combobox', { name: 'Time zone' });
+    await zone.fill('Japan/Kyoto');
+    await zone.blur();
+    await expect(page.getByText('Not a time zone')).toBeVisible();
+
+    await zone.fill('Asia/Osaka');
+    await zone.blur();
+    await expect(page.getByText('Not a time zone')).toBeVisible();
+
+    await zone.fill('Asia/Tokyo');
+    await zone.blur();
+    await expect(page.getByText('Not a time zone')).toHaveCount(0);
+  });
+});
+
+test.describe('searching', () => {
+  test('a search that finds nothing says so', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+    const search = page.getByRole('combobox', { name: 'Search this trip' });
+    await search.fill('Fushimi');
+    await expect(page.getByRole('option').first()).toContainText('Fushimi Inari');
+
+    await search.fill('zzzzz');
+    await expect(page.getByRole('listbox', { name: 'Search results' })).toContainText(
+      'Nothing matches',
+    );
+    await expect(page.getByRole('option')).toHaveCount(0);
+  });
+
+  test('results are reachable from the keyboard alone', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+    const search = page.getByRole('combobox', { name: 'Search this trip' });
+    await search.fill('Fushimi');
+
+    // Whatever the field says is selected has to be the row that is
+    // highlighted, or a screen reader reads out one thing while Enter takes
+    // you to another.
+    const first = page.getByRole('option').first();
+    const selected = await first.getAttribute('id');
+    expect(await search.getAttribute('aria-activedescendant')).toBe(selected);
+
+    await search.press('Enter');
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+  });
+});

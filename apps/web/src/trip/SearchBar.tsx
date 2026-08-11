@@ -11,6 +11,12 @@ const GROUP_LABEL: Record<SearchResult['kind'], string> = {
   command: 'Actions',
 };
 
+/** What to press to reach the field, written the way this platform writes it. */
+function shortcutHint(): string {
+  const mac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+  return mac ? '⌘K' : 'Ctrl K';
+}
+
 export interface SearchBarProps {
   doc: TripDoc | undefined;
   homeTimezone: string;
@@ -73,7 +79,13 @@ export function SearchBar({
     inputRef.current?.blur();
   }
 
-  const showing = open && results.length > 0;
+  /*
+   * Open once there is something to answer, whether or not there is an answer.
+   * A search that found nothing used to close the list, which reads the same as
+   * a search that has not run yet -- so a typo looked like a broken field.
+   */
+  const asked = query.trim() !== '';
+  const showing = open && asked;
 
   // Rendered as a flat list with headings between, because a screen reader
   // counts options and inserting group wrappers changes what it announces.
@@ -98,7 +110,9 @@ export function SearchBar({
           aria-label="Search this trip"
           aria-expanded={showing}
           aria-controls={showing ? listId : undefined}
-          aria-activedescendant={showing ? `${listId}-${active}` : undefined}
+          aria-activedescendant={
+            showing && results.length > 0 ? `${listId}-${active}` : undefined
+          }
           aria-autocomplete="list"
           placeholder="Search or jump to a day"
           value={query}
@@ -126,11 +140,21 @@ export function SearchBar({
             }
           }}
           className={cn(
-            'h-9 w-full rounded-md border border-line-input bg-card pr-3 pl-8 text-sm text-ink',
+            'h-9 w-full rounded-md border border-line-input bg-card pr-14 pl-8 text-sm text-ink',
             'placeholder:text-ink-placeholder',
             'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
           )}
         />
+
+        {/* The shortcut, where the shortcut is. Nothing else said it existed. */}
+        {!asked && (
+          <kbd
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 right-2 hidden -translate-y-1/2 rounded-sm border border-line px-1.5 py-0.5 text-2xs text-ink-muted sm:block"
+          >
+            {shortcutHint()}
+          </kbd>
+        )}
       </div>
 
       {showing && (
@@ -140,8 +164,14 @@ export function SearchBar({
           aria-label="Search results"
           className="absolute top-full right-0 left-0 z-20 mt-1 max-h-80 overflow-auto rounded-lg border border-line bg-raised py-1 shadow-lg"
         >
+          {results.length === 0 && (
+            <li role="presentation" className="px-3 py-2 text-sm text-ink-secondary">
+              Nothing matches “{query.trim()}”. Try part of a name, a city, or a date like 14 Aug.
+            </li>
+          )}
+
           {rows.map(({ heading, result }, position) => (
-            <li key={result.id}>
+            <li key={result.id} role="presentation">
               {heading && (
                 <div
                   aria-hidden="true"
