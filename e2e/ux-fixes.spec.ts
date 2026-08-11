@@ -483,3 +483,62 @@ test.describe('text a field will not take', () => {
     await expect(editor.getByRole('link', { name: 'https://inari.jp/access' })).toBeVisible();
   });
 });
+
+test.describe('trips you cannot open', () => {
+  test('an address that names no trip says so instead of opening an editor', async ({ page }) => {
+    await page.goto('/t/t_nosuchtripatall');
+
+    await expect(page.getByTestId('no-access')).toContainText('not here');
+
+    // Nothing to type into, because nothing typed would ever be saved.
+    await expect(page.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
+  });
+
+  test('a trip you have been removed from says that, not that it is missing', async ({
+    page,
+    browser,
+  }) => {
+    await page.goto('/');
+    const tripId = await newTrip(page);
+
+    const token = await page.evaluate(async (id) => {
+      const res = await fetch(`/api/trips/${id}/share`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ role: 'editor' }),
+      });
+      return ((await res.json()) as { token: string }).token;
+    }, tripId);
+
+    const other = await browser.newContext();
+    const guest = await other.newPage();
+    await guest.goto(`/join/${token}`);
+    await expect(guest.getByRole('textbox', { name: 'New event' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Share trip' }).click();
+    const panel = page.getByTestId('share-panel');
+    await panel.getByRole('button', { name: 'Remove' }).click();
+
+    await guest.reload();
+    await expect(guest.getByTestId('no-access')).toContainText('Your access was removed');
+
+    await other.close();
+  });
+
+  test('a list that could not be fetched is not an empty list', async ({ page, context }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await context.setOffline(true);
+    await page.goto('/');
+
+    // "No trips yet" here would send somebody off to make the trip they
+    // already have.
+    await expect(page.getByTestId('trips-unreachable')).toBeVisible();
+    await expect(page.getByText('No trips yet')).toHaveCount(0);
+
+    await context.setOffline(false);
+    await page.getByTestId('trips-unreachable').getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByText('Japan, April')).toBeVisible();
+  });
+});

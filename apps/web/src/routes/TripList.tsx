@@ -1,20 +1,32 @@
 import { Button, Card, TextField, ThemeToggle } from '@trip/ui';
 import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, deviceTimezone, type TripSummary } from '../lib/api';
 
 export function TripList() {
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
+
+  /*
+   * A list that could not be fetched used to become an empty list, which reads
+   * as "you have no trips" -- and somebody who believes that starts again from
+   * nothing while their trips sit on the server.
+   */
+  const [unreachable, setUnreachable] = useState(false);
   const [name, setName] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setUnreachable(false);
     void api
       .listTrips()
-      .then((res) => setTrips(res.trips))
-      .catch(() => setTrips([]));
+      .then((res) => {
+        setTrips(res.trips);
+      })
+      .catch(() => setUnreachable(true));
   }, []);
+
+  useEffect(load, [load]);
 
   async function create() {
     const trimmed = name.trim();
@@ -52,10 +64,23 @@ export function TripList() {
           </Button>
         </div>
 
-        {trips?.length === 0 && (
-          <p className="py-10 text-center text-ink-secondary">
-            No trips yet. Name one above — you can work out the dates later.
-          </p>
+        {unreachable ? (
+          <div
+            data-testid="trips-unreachable"
+            className="flex flex-col items-center gap-3 py-10 text-center"
+          >
+            <p className="text-ink-secondary">
+              Your trips could not be loaded. The server did not answer, so this is not the whole
+              list.
+            </p>
+            <Button onPress={load}>Try again</Button>
+          </div>
+        ) : (
+          trips?.length === 0 && (
+            <p className="py-10 text-center text-ink-secondary">
+              No trips yet. Name one above — you can work out the dates later.
+            </p>
+          )
         )}
 
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

@@ -45,19 +45,26 @@ function when(at: number): string {
 export function AuditPanel({ tripId, onUndone }: { tripId: string; onUndone: () => void }) {
   const [filter, setFilter] = useState<Filter>('mcp');
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const query = filter === 'mcp' ? '?source=mcp' : '';
 
+    setUnreachable(false);
     try {
       const res = await fetch(`/api/audit/${tripId}${query}`);
+      if (!res.ok) throw new Error(String(res.status));
+
       const body = (await res.json()) as { entries: AuditEntry[] };
       setEntries(body.entries);
     } catch {
-      // Offline. The log lives on the server, so there is nothing local to
-      // fall back to and an empty panel says so.
-      setEntries([]);
+      /*
+       * The log lives on the server, and there is nothing local to fall back
+       * to. An empty panel would say nothing has happened, which is a claim
+       * this cannot make while offline.
+       */
+      setUnreachable(true);
     }
   }, [tripId, filter]);
 
@@ -88,12 +95,24 @@ export function AuditPanel({ tripId, onUndone }: { tripId: string; onUndone: () 
         />
       </div>
 
-      {entries?.length === 0 && (
-        <p className="text-sm text-ink-secondary">
-          {filter === 'mcp'
-            ? 'No agent has changed anything on this trip.'
-            : 'Nothing has been recorded yet. Edits made here are not listed.'}
-        </p>
+      {unreachable ? (
+        <div className="flex flex-wrap items-center gap-3" data-testid="audit-unreachable">
+          <p className="min-w-0 flex-1 text-sm text-ink-secondary">
+            This list is kept on the server, which could not be reached. It is not that nothing has
+            happened.
+          </p>
+          <Button size="sm" onPress={() => void load()}>
+            Try again
+          </Button>
+        </div>
+      ) : (
+        entries?.length === 0 && (
+          <p className="text-sm text-ink-secondary">
+            {filter === 'mcp'
+              ? 'No agent has changed anything on this trip.'
+              : 'Nothing has been recorded yet. Edits made here are not listed.'}
+          </p>
+        )
       )}
 
       <ul className="flex flex-col gap-2">

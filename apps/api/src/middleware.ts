@@ -1,4 +1,4 @@
-import { tripMembers } from '@trip/schema';
+import { tripMembers, trips } from '@trip/schema';
 import { and, eq } from 'drizzle-orm';
 import { createMiddleware } from 'hono/factory';
 import { getCookie, setCookie } from 'hono/cookie';
@@ -66,7 +66,18 @@ export const requireMembership = createMiddleware<AppEnv>(async (c, next) => {
     .where(and(eq(tripMembers.tripId, tripId), eq(tripMembers.userId, userId)))
     .get();
 
-  if (!row) return c.json({ error: 'not_a_member' }, 403);
+  if (!row) {
+    /*
+     * A trip that is not there is worth saying, and it is not a leak: a trip id
+     * is sixteen random bytes, so anyone asking about one either had it or is
+     * not going to find it by asking. Answering "not yours" for an address that
+     * names nothing sent people looking for access they never needed.
+     */
+    const exists = db.select({ id: trips.id }).from(trips).where(eq(trips.id, tripId)).get();
+    return exists
+      ? c.json({ error: 'not_a_member' }, 403)
+      : c.json({ error: 'no_such_trip' }, 404);
+  }
 
   c.set('membership', { tripId, userId, role: row.role });
   await next();

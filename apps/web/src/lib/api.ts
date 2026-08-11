@@ -6,6 +6,24 @@ export interface TripSummary {
   lastOpenedAt?: number;
 }
 
+/**
+ * A request the server answered, and refused.
+ *
+ * Carries the status so a caller can tell a trip that is not there from one it
+ * may not read -- and both of those from a request that never arrived, which
+ * throws a plain error instead. "It is gone" and "the train is in a tunnel"
+ * call for different words on screen, and guessing between them loses work.
+ */
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+  ) {
+    super(`${code} (${status})`);
+    this.name = 'ApiError';
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -14,7 +32,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.error ?? `${path} returned ${response.status}`);
+    throw new ApiError(response.status, body.error ?? `${path} returned ${response.status}`);
   }
 
   return response.json() as Promise<T>;

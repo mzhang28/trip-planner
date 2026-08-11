@@ -25,10 +25,17 @@ interface Member {
   firstOpenedAt: number;
 }
 
+/** Reads after "a link that", or after a person's name. */
 const ROLE_WORD: Record<string, string> = {
   viewer: 'can read',
   editor: 'can edit',
   owner: 'owns this trip',
+};
+
+/** Reads after "lets anyone who has it". */
+const ROLE_ACTION: Record<string, string> = {
+  viewer: 'read this trip',
+  editor: 'read and change this trip',
 };
 
 function on(at: number): string {
@@ -50,8 +57,11 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
   const [links, setLinks] = useState<AccessLink[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [you, setYou] = useState<string | null>(null);
+  const [unreachable, setUnreachable] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setUnreachable(false);
     try {
       const res = await fetch(`/api/trips/${tripId}/access`);
       if (!res.ok) return;
@@ -66,7 +76,11 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
       setMembers(body.members);
       setYou(body.you);
     } catch {
-      // Offline. Sharing needs the server, and the panel says so below.
+      /*
+       * Sharing needs the server. An empty panel would say there are no links
+       * and nobody on the trip, which is a different and alarming thing.
+       */
+      setUnreachable(true);
     }
   }, [tripId]);
 
@@ -75,11 +89,18 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
   }, [load]);
 
   async function makeLink() {
-    const { token } = await api.createShareLink(tripId, role);
+    try {
+      const { token } = await api.createShareLink(tripId, role);
 
-    setMade({ url: `${location.origin}/join/${token}`, role });
-    setCopied(false);
-    await load();
+      setMade({ url: `${location.origin}/join/${token}`, role });
+      setCopied(false);
+      setFailed(null);
+      await load();
+    } catch {
+      // A link has to be minted by the server, so this one is not made. Saying
+      // nothing left a pressed button and no link, which reads as a broken app.
+      setFailed('That did not reach the server, so no link was made. Try again when you are back on.');
+    }
   }
 
   async function copy() {
@@ -139,6 +160,26 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
           </Button>
         </div>
 
+        {failed && (
+          <p data-testid="share-failed" className="mb-4 text-sm text-danger">
+            {failed}
+          </p>
+        )}
+
+        {unreachable && (
+          <div
+            data-testid="share-unreachable"
+            className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-sunken p-3"
+          >
+            <p className="min-w-0 flex-1 text-sm text-ink-secondary">
+              Links and members could not be loaded, so what is below is not the whole picture.
+            </p>
+            <Button size="sm" onPress={() => void load()}>
+              Try again
+            </Button>
+          </div>
+        )}
+
         {made && (
           <div className="mb-5 rounded-md border border-line bg-sunken p-3">
             <p className="mb-2 text-xs text-ink-secondary">
@@ -147,7 +188,7 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
                 no action attached. The old text said it was shown once and left
                 the reader to work out whether that mattered.
               */}
-              This link lets anyone who has it {ROLE_WORD[made.role]}. Copy it now — it cannot be
+              This link lets anyone who has it {ROLE_ACTION[made.role]}. Copy it now — it cannot be
               shown again, though you can make another or revoke this one at any time.
             </p>
 
@@ -170,7 +211,9 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
           <h3 className="mb-2 text-sm text-ink">Links you have made</h3>
 
           {live.length === 0 ? (
-            <p className="text-sm text-ink-secondary">None. Nobody can join without one.</p>
+            <p className="text-sm text-ink-secondary">
+              {unreachable ? 'Not known while the server is out of reach.' : 'None. Nobody can join without one.'}
+            </p>
           ) : (
             <ul className="flex flex-col gap-1">
               {live.map((link) => (

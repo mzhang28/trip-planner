@@ -29,7 +29,7 @@ import { Button, IconButton, SegmentedControl, TextField, ThemeToggle } from '@t
 import { GripVertical, Plus, Settings, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { api, type TripSummary } from '../lib/api';
+import { ApiError, api, type TripSummary } from '../lib/api';
 import { randomId } from '../lib/crypto';
 import { dayKey, formatDayHeading, moveToDay, setDay, setTimeOfDay } from '../lib/time';
 import { addDays, eventDay, openingDay, type DayKey } from '../lib/calendar';
@@ -173,6 +173,14 @@ export function TripView() {
   const events = useEvents(state);
 
   const [trip, setTrip] = useState<TripSummary | null>(null);
+
+  /*
+   * What the server said about this trip, which is not the same question as
+   * whether the trip is on this device. A replica exists offline either way.
+   */
+  const [access, setAccess] = useState<'asking' | 'open' | 'missing' | 'refused' | 'unreachable'>(
+    'asking',
+  );
   const [draft, setDraft] = useState('');
   const [sharing, setSharing] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
@@ -190,17 +198,41 @@ export function TripView() {
   const [mergePrimary, setMergePrimary] = useState<string | null>(null);
   const addBoxRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  /**
+   * Asks the server whether this trip is open to this person.
+   *
+   * Three different answers, and they used to look the same: a trip called
+   * "Trip" with every control working and a status saying the work was saved.
+   * Two of them mean nothing typed here will ever arrive.
+   */
+  const retryAccess = useCallback(() => {
     if (!tripId) return;
+
+    setAccess('asking');
     void api
       .getTrip(tripId)
-      .then(setTrip)
-      .catch(() => setTrip(null));
+      .then((summary) => {
+        setTrip(summary);
+        setAccess('open');
+      })
+      .catch((error: unknown) => {
+        setTrip(null);
+        if (error instanceof ApiError) setAccess(error.status === 403 ? 'refused' : 'missing');
+        else setAccess('unreachable');
+      });
   }, [tripId]);
+
+  useEffect(retryAccess, [retryAccess]);
 
   const doc = state?.doc as TripDoc | undefined;
   const homeTimezone = trip?.homeTimezone ?? doc?.meta?.homeTimezone ?? 'UTC';
-  const readOnly = trip?.role === 'viewer';
+
+  /*
+   * Nothing may be changed until the server has said this trip can be. Offline
+   * is the exception the whole app is built for: a copy that was reached before
+   * is still editable, and the sync badge says where the work is sitting.
+   */
+  const readOnly = trip?.role === 'viewer' || access === 'asking';
 
   const fieldDefs = useMemo(() => liveFieldDefs(doc), [doc]);
   const zonePreference = useZonePreference();
@@ -460,6 +492,34 @@ export function TripView() {
     }
   }
 
+  /*
+   * A trip that is not there, or not yours, gets a page of its own rather than
+   * an empty itinerary with working controls. Anything typed into that would
+   * have been refused by the server for as long as the tab stayed open.
+   */
+  if (access === 'missing' || access === 'refused') {
+    return (
+      <div className="grid h-dvh place-items-center overflow-hidden bg-page px-6 text-center text-ink">
+        <div data-testid="no-access" className="max-w-md">
+          <h1 className="mb-2 text-xl">
+            {access === 'missing' ? 'This trip is not here' : 'You cannot open this trip'}
+          </h1>
+          <p className="mb-4 text-ink-secondary">
+            {access === 'missing'
+              ? 'The address may be wrong, or the trip may have been deleted. Nothing you type here would be saved.'
+              : 'Your access was removed, or the link you used was revoked. Ask whoever owns the trip for a new link.'}
+          </p>
+          <Link
+            to="/"
+            className="text-sm text-accent-text underline underline-offset-2 hover:no-underline"
+          >
+            All trips
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
       <header className="z-10 shrink-0 border-b border-line bg-page/95 backdrop-blur">
@@ -516,6 +576,27 @@ export function TripView() {
         }`}
       >
         {state && store && <RecoveryBanner state={state} store={store} />}
+
+        {/*
+          Your copy, unchecked. Editing stays open because that is what this app
+          is for, but the trip could not be confirmed to still exist or still be
+          yours -- which is worth knowing before an afternoon of planning.
+        */}
+        {access === 'unreachable' && (
+          <div
+            role="status"
+            data-testid="offline-copy"
+            className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-sunken px-4 py-3"
+          >
+            <p className="min-w-0 flex-1 text-sm text-ink">
+              Showing your copy of this trip. The server could not be reached, so changes stay on
+              this device until it can be.
+            </p>
+            <Button size="sm" onPress={() => retryAccess()}>
+              Try again
+            </Button>
+          </div>
+        )}
 
         {!readOnly && (
           <div ref={addBoxRef} className="mb-6 flex items-end gap-2">
