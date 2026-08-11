@@ -7,6 +7,7 @@ import { config } from './config';
 import type { AppEnv, Services } from './context';
 import { renameUser } from './identity';
 import { requireMembership, withIdentity, withServices } from './middleware';
+import { airportRoutes } from './routes/airports';
 import { auditRoutes } from './routes/audit';
 import { blobRoutes } from './routes/blobs';
 import { mcpRoutes } from './routes/mcp';
@@ -95,7 +96,8 @@ export function createApp(services: Services) {
    * Uploading is guarded by trip membership when the client says which trip it
    * is for. Reading is not: a blob is named by its own hash, so knowing the
    * name is already knowing the contents.
-   */
+  */
+  app.route('/api/airports', airportRoutes());
   app.route('/api/blobs', blobRoutes());
   app.route('/api/places', placeRoutes());
   app.route('/api/weather', weatherRoutes());

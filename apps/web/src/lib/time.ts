@@ -42,6 +42,16 @@ export function knownTimeZones(): string[] {
   return cachedZones;
 }
 
+/** The short name people expect to see beside a clock, such as JST or GMT+9. */
+export function timeZoneAbbreviation(at: Instant, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'short',
+  }).formatToParts(at);
+
+  return parts.find((part) => part.type === 'timeZoneName')?.value ?? timeZone;
+}
+
 export function formatTime(at: Instant, timeZone: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     hour: '2-digit',

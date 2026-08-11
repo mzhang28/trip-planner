@@ -51,7 +51,14 @@ export function DayMap({ events, selectedId, onSelect }: DayMapProps) {
   const pinned = events.filter(
     (event) => event.location?.lat !== undefined && event.location.lng !== undefined,
   );
+  const hasPins = pinned.length > 0;
 
+  /*
+   * Runs when the container appears, not only when this component mounts. A day
+   * that starts with nothing pinned has no container to build a map in, so an
+   * effect that only ran once left the panel empty for the rest of the visit:
+   * the first place added to a day got no map at all.
+   */
   useEffect(() => {
     if (!container.current || map.current) return;
 
@@ -72,7 +79,7 @@ export function DayMap({ events, selectedId, onSelect }: DayMapProps) {
       map.current = null;
       markers.current.clear();
     };
-  }, []);
+  }, [hasPins]);
 
   useEffect(() => {
     const instance = map.current;
@@ -99,18 +106,38 @@ export function DayMap({ events, selectedId, onSelect }: DayMapProps) {
       );
       instance.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
     }
-    // `pinned` is derived from events each render, so depending on it directly
-    // would redraw every time. The ids and the selection are what change.
-  }, [pinned.map((e) => `${e.id}:${e.booking.status}`).join(), selectedId]);
+    /*
+     * `pinned` is a new array every render, so depending on it directly would
+     * redraw the map continuously. This key holds everything a marker is drawn
+     * from: which events, in what order, where, and how they look. It used to
+     * hold only ids and booking states, so moving a pinned place left the old
+     * marker where it was, and reordering a day left the numbers as they were.
+     */
+  }, [
+    pinned
+      .map(
+        (event, index) =>
+          `${event.id}:${index}:${event.booking.status}:${event.location!.lat}:${event.location!.lng}`,
+      )
+      .join(),
+    selectedId,
+  ]);
 
+  /*
+   * Out of the way until there is something to look at. An empty map panel took
+   * half the width of a desktop and a screen of a phone to repeat one sentence
+   * for as long as nothing had a place -- which is most of the time a trip is
+   * being planned.
+   */
   if (pinned.length === 0) {
     return (
-      <div className="grid h-full min-h-64 place-items-center rounded-lg border border-line bg-card p-6 text-center">
-        <p className="max-w-xs text-sm text-ink-secondary">
-          Nothing on the map yet. Give an event a place and it gets a pin, numbered in the order the
-          day happens.
-        </p>
-      </div>
+      <p
+        data-testid="empty-map"
+        className="rounded-lg border border-dashed border-line px-3 py-2 text-2xs text-ink-muted"
+      >
+        Give an event a place and the map appears here, with a numbered pin in the order the day
+        happens.
+      </p>
     );
   }
 

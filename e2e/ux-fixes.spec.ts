@@ -715,3 +715,72 @@ test.describe('a flight', () => {
     await expect(editor.getByText('Not a time zone')).toBeVisible();
   });
 });
+
+test.describe('the map and the forecast', () => {
+  test('moving a pinned place moves its pin', async ({ page }) => {
+    /*
+     * The geocoder is stubbed. What is being tested is what the map does with
+     * coordinates, and a test that also depends on a public service answering
+     * fails for reasons that have nothing to do with this app.
+     */
+    await page.route('**/api/places/search*', async (route) => {
+      const query = new URL(route.request().url()).searchParams.get('q') ?? '';
+      const match = query.toLowerCase().includes('osaka')
+        ? { label: 'Osaka Castle', lat: 34.6873, lng: 135.5259 }
+        : { label: 'Kyoto Station', lat: 34.9858, lng: 135.7588 };
+
+      await route.fulfill({ json: { places: [match] } });
+    });
+
+    await page.goto('/');
+    await newTrip(page);
+
+    /*
+     * A day chosen on purpose. Reading whichever day the view opened on races
+     * the opening guess, which moves once the trip stops being empty.
+     */
+    const anchored = '2026-09-03';
+    await page.getByTestId('go-to-date').fill(anchored);
+
+    async function pin(name: string, query: string) {
+      await page.getByRole('textbox', { name: 'New event' }).fill(name);
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await eventRow(page, name).click();
+
+      // On the day the map is showing, which is the day the view is anchored
+      // on -- and that is the trip's day, not necessarily today.
+      await reveal(page, 'when');
+      await page.getByTestId('event-date').fill(anchored);
+
+      await reveal(page, 'place');
+      await page.getByRole('combobox', { name: 'Place' }).fill(query);
+      await expect(page.getByRole('option').first()).toBeVisible({ timeout: 15_000 });
+      await page.getByRole('option').first().click();
+      await expect(page.getByText('Pinned at')).toBeVisible();
+
+      await page.getByTestId('close-editor').click();
+    }
+
+    await pin('Fushimi Inari', 'Kyoto Station');
+    await pin('Nishiki Market', 'Kyoto Station');
+
+    // Two pins on the same spot sit on top of each other.
+    const pins = page.locator('.leaflet-marker-icon');
+    await expect(pins).toHaveCount(2);
+    const before = await pins.nth(0).boundingBox();
+    expect((await pins.nth(1).boundingBox())!.x).toBeCloseTo(before!.x, 0);
+
+    // The map used to redraw only when an id or a booking state changed, so a
+    // place moved to another city left its marker where it was.
+    await eventRow(page, 'Nishiki Market').click();
+    await page.getByRole('combobox', { name: 'Place' }).fill('Osaka Castle');
+    await expect(page.getByRole('option').first()).toBeVisible({ timeout: 15_000 });
+    await page.getByRole('option').first().click();
+
+    await expect(async () => {
+      const first = await pins.nth(0).boundingBox();
+      const second = await pins.nth(1).boundingBox();
+      expect(Math.abs(first!.x - second!.x)).toBeGreaterThan(40);
+    }).toPass({ timeout: 10_000 });
+  });
+});

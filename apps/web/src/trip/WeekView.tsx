@@ -306,6 +306,12 @@ function DayColumn({
         <button
           type="button"
           data-testid={`week-add-${day}`}
+          /*
+           * The press belongs to the button, not to the column behind it.
+           * Letting it through started a drag at the button's own position --
+           * the bottom of the column -- so tapping Add made an event at 23:15.
+           */
+          onPointerDown={(event) => event.stopPropagation()}
           aria-label={`Add something on ${day}`}
           onClick={onAdd}
           className="absolute inset-x-0.5 bottom-0.5 z-10 hidden rounded-sm border border-dashed border-line py-0.5 text-2xs text-ink-muted [@media(pointer:coarse)]:block"
@@ -537,11 +543,21 @@ export function WeekView({
                       {Number(day.slice(8))}
                     </div>
                     {glyph && forecast && (
-                      <div className="truncate text-2xs text-ink-muted" title={glyph.label}>
+                      <div
+                        className="truncate text-2xs text-ink-muted"
+                        title={
+                          forecast.place ? `${glyph.label} in ${forecast.place}` : glyph.label
+                        }
+                      >
                         <span aria-hidden="true">{glyph.icon}</span>{' '}
                         <span className="tabular hidden sm:inline">
                           {Math.round(forecast.max)}°/{Math.round(forecast.min)}°
                         </span>
+                        {/* Which city these numbers are for. A trip moves, and
+                            a temperature with no place on it is a guess. */}
+                        {forecast.place && (
+                          <span className="sr-only"> in {forecast.place}</span>
+                        )}
                       </div>
                     )}
                   </div>

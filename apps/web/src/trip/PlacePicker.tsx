@@ -41,6 +41,34 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
   const id = useId();
   const latest = useRef(0);
 
+  /*
+   * Set when a result is taken from the list.
+   *
+   * Choosing one blurs the field, and the blur below writes down whatever text
+   * is in it as a place with no coordinates -- which threw away the pin that
+   * had just been chosen, one line after it was set.
+   */
+  const chosen = useRef(false);
+
+  /*
+   * The pending close from the last blur.
+   *
+   * Closing is delayed so a click on a result lands before the list goes. Type
+   * again inside that moment -- which is what changing your mind looks like --
+   * and the old timer used to shut the new list a heartbeat after it opened.
+   */
+  const closing = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function stayOpen() {
+    if (closing.current) clearTimeout(closing.current);
+    closing.current = null;
+    setOpen(true);
+  }
+
+  useEffect(() => () => {
+    if (closing.current) clearTimeout(closing.current);
+  }, []);
+
   const places = lookup.state === 'found' ? lookup.places : [];
 
   useEffect(() => {
@@ -81,6 +109,7 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
   function choose(result: PlaceResult | undefined) {
     if (!result) return;
 
+    chosen.current = true;
     onChange({ label: result.label, address: result.address, lat: result.lat, lng: result.lng });
     setQuery(result.label);
     setLookup({ state: 'idle' });
@@ -89,6 +118,11 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
 
   /** Keeps the words, drops the pin: the coordinates belonged to the old name. */
   function commitTypedText() {
+    if (chosen.current) {
+      chosen.current = false;
+      return;
+    }
+
     const text = query.trim();
     if (text === (value?.label ?? '')) return;
 
@@ -130,13 +164,13 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
           aria-describedby={`${id}-hint`}
           onChange={(e) => {
             setQuery(e.target.value);
-            setOpen(true);
+            stayOpen();
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={stayOpen}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setOpen(true);
+              stayOpen();
               setActive((current) => Math.min(current + 1, places.length - 1));
             } else if (e.key === 'ArrowUp') {
               e.preventDefault();
@@ -149,7 +183,7 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
             }
           }}
           onBlur={() => {
-            setTimeout(() => setOpen(false), 150);
+            closing.current = setTimeout(() => setOpen(false), 150);
             commitTypedText();
           }}
           className={cn(

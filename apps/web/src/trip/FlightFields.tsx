@@ -1,15 +1,9 @@
 import type { FlightDetails, TripEvent } from '@trip/crdt';
 import { useState } from 'react';
 import { TextField, cn } from '@trip/ui';
-import {
-  formatTime,
-  isTimeZone,
-  knownTimeZones,
-  setDay,
-  setTimeOfDay,
-  toDateInput,
-} from '../lib/time';
-import { CheckedField } from './CheckedField';
+import { Plane, PlaneLanding, PlaneTakeoff } from 'lucide-react';
+import { formatTime, setDay, setTimeOfDay, toDateInput } from '../lib/time';
+import { AirportPicker } from './AirportPicker';
 import { TimeField } from './TimeField';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -76,6 +70,52 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
 
   const patchFlight = (next: Partial<FlightDetails>) =>
     onPatch({ flight: { ...flight, ...next } });
+
+  /** Changes the departure zone without changing what the ticket's clock says. */
+  function setDepartureZone(timezone: string, nextFlight: Partial<FlightDetails> = {}) {
+    if (event.startsAt === undefined) {
+      onPatch({
+        timezone,
+        flight: { ...flight, ...nextFlight, departsTz: timezone },
+      });
+      return;
+    }
+
+    const moved = event.timeUndecided
+      ? setDay(undefined, timezone, toDateInput(event.startsAt, departsTz))
+      : moveWallClock(event.startsAt, departsTz, timezone);
+    if (moved === null) return;
+
+    // If arrival is already known, keep its local ticket time too. The
+    // duration changes because changing an airport changes the real timeline.
+    const nextDuration =
+      arrivesAt !== undefined && arrivesAt > moved
+        ? Math.round((arrivesAt - moved) / 60_000)
+        : event.durationMinutes;
+
+    onPatch({
+      startsAt: moved,
+      durationMinutes: nextDuration,
+      timezone,
+      flight: { ...flight, ...nextFlight, departsTz: timezone },
+    });
+  }
+
+  /** Changes the arrival zone and preserves the local day and time. */
+  function setArrivalZone(timezone: string, nextFlight: Partial<FlightDetails> = {}) {
+    let durationMinutes = event.durationMinutes;
+    if (arrivesAt !== undefined && event.startsAt !== undefined) {
+      const moved = moveWallClock(arrivesAt, arrivesTz, timezone);
+      if (moved !== null && moved > event.startsAt) {
+        durationMinutes = Math.round((moved - event.startsAt) / 60_000);
+      }
+    }
+
+    onPatch({
+      durationMinutes,
+      flight: { ...flight, ...nextFlight, arrivesTz: timezone },
+    });
+  }
 
   /** Moves the departure onto a day, keeping its hour if it has one. */
   function setDepartureDay(day: string) {
@@ -172,10 +212,105 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
   }
 
   return (
-    <section className="flex flex-col gap-4">
-      <span className="text-xs font-medium text-ink-secondary">Flight</span>
+    <section className="overflow-hidden rounded-xl border border-line bg-sunken/50">
+      <div className="flex items-center justify-between gap-3 border-b border-line bg-card px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="grid size-7 place-items-center rounded-full bg-accent-soft text-accent-text">
+            <Plane aria-hidden="true" className="size-3.5" />
+          </span>
+          <div>
+            <h3 className="text-sm font-medium text-ink">Flight details</h3>
+            <p className="text-2xs text-ink-muted">Local time at each airport</p>
+          </div>
+        </div>
+      </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid items-start gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)]">
+        <div className="min-w-0 rounded-lg border border-line bg-card p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-1.5 text-2xs font-medium tracking-wide text-ink-muted uppercase">
+            <PlaneTakeoff aria-hidden="true" className="size-3.5" />
+            Departure
+          </div>
+          <AirportPicker
+            label="Leaving from"
+            code={flight.from}
+            timezone={departsTz}
+            onChange={({ code, timezone }) => {
+              if (timezone) setDepartureZone(timezone, { from: code });
+              else patchFlight({ from: code });
+            }}
+          />
+
+          <div className="mt-3 grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-2">
+            <DayField
+              label="Departure date"
+              testId="departs-date"
+              value={event.startsAt === undefined ? '' : toDateInput(event.startsAt, departsTz)}
+              onChange={setDepartureDay}
+            />
+            <TimeField
+              label="Departs"
+              value={
+                event.startsAt === undefined || event.timeUndecided
+                  ? ''
+                  : formatTime(event.startsAt, departsTz)
+              }
+              timezone={departsTz}
+              timezoneAt={event.startsAt}
+              timezoneLabel="Departure time zone"
+              onTimezoneChange={setDepartureZone}
+              onCommit={setDeparture}
+            />
+          </div>
+        </div>
+
+        <div aria-hidden="true" className="flex items-center self-center sm:flex-col">
+          <span className="h-px flex-1 border-t border-dashed border-line-strong sm:h-8 sm:w-px sm:flex-none sm:border-t-0 sm:border-l" />
+          <span className="grid size-8 shrink-0 place-items-center rounded-full border border-line bg-raised text-ink-muted shadow-sm">
+            <Plane className="size-4 rotate-45 sm:rotate-90" />
+          </span>
+          <span className="h-px flex-1 border-t border-dashed border-line-strong sm:h-8 sm:w-px sm:flex-none sm:border-t-0 sm:border-l" />
+        </div>
+
+        <div className="min-w-0 rounded-lg border border-line bg-card p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-1.5 text-2xs font-medium tracking-wide text-ink-muted uppercase">
+            <PlaneLanding aria-hidden="true" className="size-3.5" />
+            Arrival
+          </div>
+          <AirportPicker
+            label="Arriving at"
+            code={flight.to}
+            timezone={arrivesTz}
+            onChange={({ code, timezone }) => {
+              if (timezone) setArrivalZone(timezone, { to: code });
+              else patchFlight({ to: code });
+            }}
+          />
+
+          <div className="mt-3 grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-2">
+            <DayField
+              label="Arrival date"
+              testId="arrives-date"
+              value={arrivesAt === undefined ? '' : toDateInput(arrivesAt, arrivesTz)}
+              error={arrivalProblem}
+              onChange={setArrivalDay}
+            />
+            <TimeField
+              label="Arrives"
+              value={arrivesAt === undefined ? '' : formatTime(arrivesAt, arrivesTz)}
+              disabled={event.startsAt === undefined}
+              hint={event.startsAt === undefined ? 'Set departure first.' : undefined}
+              timezone={arrivesTz}
+              timezoneAt={arrivesAt ?? event.startsAt}
+              timezoneLabel="Arrival time zone"
+              onTimezoneChange={setArrivalZone}
+              onCommit={setArrival}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-2 border-t border-line bg-card px-3 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_repeat(3,minmax(4rem,0.65fr))]">
         <TextField
           label="Airline"
           defaultValue={flight.airline ?? ''}
@@ -190,92 +325,6 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
             patchFlight({ number: e.currentTarget.value.trim().toUpperCase() || undefined })
           }
         />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-3 rounded-md border border-line p-3">
-          <span className="text-2xs font-medium tracking-wide text-ink-muted uppercase">Out</span>
-          <TextField
-            label="Leaving from"
-            defaultValue={flight.from ?? ''}
-            placeholder="NRT"
-            onBlur={(e) => patchFlight({ from: e.currentTarget.value.trim().toUpperCase() || undefined })}
-          />
-          <DayField
-            label="Departure date"
-            testId="departs-date"
-            value={event.startsAt === undefined ? '' : toDateInput(event.startsAt, departsTz)}
-            onChange={setDepartureDay}
-          />
-          <TimeField
-            label={`Departs (${departsTz})`}
-            value={
-              event.startsAt === undefined || event.timeUndecided
-                ? ''
-                : formatTime(event.startsAt, departsTz)
-            }
-            onCommit={setDeparture}
-          />
-          <CheckedField
-            label="Departure time zone"
-            value={flight.departsTz ?? ''}
-            placeholder={homeTimezone}
-            suggestions={knownTimeZones()}
-            onCommit={(raw) => {
-              if (raw !== '' && !isTimeZone(raw)) {
-                // An unknown zone here used to be stored and then throw from
-                // Intl every time the flight was drawn.
-                return 'Not a time zone. Try one from the list, like Asia/Tokyo.';
-              }
-
-              const timezone = raw || undefined;
-              patchFlight({ departsTz: timezone });
-              onPatch({ timezone });
-              return null;
-            }}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3 rounded-md border border-line p-3">
-          <span className="text-2xs font-medium tracking-wide text-ink-muted uppercase">In</span>
-          <TextField
-            label="Arriving at"
-            defaultValue={flight.to ?? ''}
-            placeholder="ITM"
-            onBlur={(e) => patchFlight({ to: e.currentTarget.value.trim().toUpperCase() || undefined })}
-          />
-          <DayField
-            label="Arrival date"
-            testId="arrives-date"
-            value={arrivesAt === undefined ? '' : toDateInput(arrivesAt, arrivesTz)}
-            error={arrivalProblem}
-            onChange={setArrivalDay}
-          />
-          <TimeField
-            label={`Arrives (${arrivesTz})`}
-            value={arrivesAt === undefined ? '' : formatTime(arrivesAt, arrivesTz)}
-            disabled={event.startsAt === undefined}
-            hint={event.startsAt === undefined ? 'Set the departure time first.' : undefined}
-            onCommit={setArrival}
-          />
-          <CheckedField
-            label="Arrival time zone"
-            value={flight.arrivesTz ?? ''}
-            placeholder={departsTz}
-            suggestions={knownTimeZones()}
-            onCommit={(raw) => {
-              if (raw !== '' && !isTimeZone(raw)) {
-                return 'Not a time zone. Try one from the list, like Asia/Tokyo.';
-              }
-
-              patchFlight({ arrivesTz: raw || undefined });
-              return null;
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
         <TextField
           label="Seat"
           defaultValue={flight.seat ?? ''}
@@ -297,6 +346,12 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
       </div>
     </section>
   );
+}
+
+/** Moves a local date and clock reading into another zone. */
+function moveWallClock(at: number, fromZone: string, toZone: string): number | null {
+  const onDay = setDay(undefined, toZone, toDateInput(at, fromZone));
+  return onDay === null ? null : setTimeOfDay(onDay, toZone, formatTime(at, fromZone));
 }
 
 /**

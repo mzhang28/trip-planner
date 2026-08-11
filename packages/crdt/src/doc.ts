@@ -80,6 +80,27 @@ export type EditableEventFields = Omit<
   'id' | 'links' | 'attachments' | 'customFields' | 'updatedAt' | 'updatedBy' | 'deletedAt'
 >;
 
+/**
+ * A value Automerge will take.
+ *
+ * Automerge rejects `undefined` outright, and a patch is often built by
+ * spreading what is already there -- `{ ...flight, number: undefined }` to
+ * clear one field, or a place with no street address. One such key threw, and
+ * the whole change was lost: the pin chosen from the map never arrived, and
+ * nothing on screen said why. A key with no value is the same as an absent
+ * key here, so it is dropped.
+ */
+function withoutBlanks(value: unknown): unknown {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+
+  const kept: Record<string, unknown> = {};
+  for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+    if (inner !== undefined) kept[key] = withoutBlanks(inner);
+  }
+
+  return kept;
+}
+
 export function updateEvent(
   doc: Doc,
   id: EventId,
@@ -104,7 +125,7 @@ export function updateEvent(
       if (value === undefined) {
         delete target[key];
       } else {
-        target[key] = value;
+        target[key] = withoutBlanks(value);
       }
     }
 

@@ -13,8 +13,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   formatTime,
-  isTimeZone,
-  knownTimeZones,
   setDay,
   setTimeOfDay,
   toDateInput,
@@ -185,9 +183,26 @@ export function EventEditor({
             </label>
 
             <TimeField
-              label={`Time (${zone})`}
+              label="Time"
               value={time}
               disabled={event.startsAt === undefined}
+              timezone={zone}
+              timezoneAt={event.startsAt}
+              onTimezoneChange={(timezone) => {
+                if (event.startsAt === undefined) {
+                  onPatch({ timezone });
+                  return;
+                }
+
+                const day = toDateInput(event.startsAt, zone);
+                const onDay = setDay(undefined, timezone, day);
+                if (onDay === null) return;
+
+                const next = event.timeUndecided
+                  ? onDay
+                  : setTimeOfDay(onDay, timezone, formatTime(event.startsAt, zone));
+                if (next !== null) onPatch({ startsAt: next, timezone });
+              }}
               hint={
                 event.startsAt === undefined
                   ? 'Pick a date first.'
@@ -467,37 +482,6 @@ export function EventEditor({
               />
             </div>
           </section>
-        ),
-      },
-      {
-        key: 'timezone',
-        label: 'Time zone',
-        filled: event.timezone !== undefined,
-        render: () => (
-          <CheckedField
-            label="Time zone"
-            placeholder={homeTimezone}
-            hint="Where this happens. Leave blank to use the trip's."
-            value={event.timezone ?? ''}
-            suggestions={knownTimeZones()}
-            onCommit={(raw) => {
-              if (raw === '') {
-                onPatch({ timezone: undefined });
-                return null;
-              }
-
-              /*
-               * Checked here rather than where it is printed. An unknown zone
-               * used to be stored happily and then throw from Intl every time
-               * the event was drawn, which reads as the app breaking rather
-               * than as one field being wrong.
-               */
-              if (!isTimeZone(raw)) return 'Not a time zone. Try one from the list, like Asia/Tokyo.';
-
-              onPatch({ timezone: raw });
-              return null;
-            }}
-          />
         ),
       },
     ];

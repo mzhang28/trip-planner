@@ -335,3 +335,25 @@ describe('deleting several at once', () => {
     expect((doc as TripDoc).events.a!.deletedAt).toBe(1);
   });
 });
+
+describe('a patch carrying an object', () => {
+  it('takes a place whose street address is unknown', () => {
+    let doc = createTrip('Japan', 'Asia/Tokyo');
+    doc = addEvent(doc, { id: 'e1' as EventId, name: 'Fushimi Inari' }, { userId: 'u1' });
+
+    /*
+     * Spreading what is already there is how every patch here is built, so a
+     * key with nothing in it is normal. Automerge rejects undefined outright,
+     * and one such key used to throw away the whole change -- a place chosen
+     * from the map arrived with no address and so never arrived at all.
+     */
+    doc = updateEvent(
+      doc,
+      'e1' as EventId,
+      { location: { label: 'Kyoto Station', address: undefined, lat: 34.98, lng: 135.75 } },
+      { userId: 'u1' },
+    );
+
+    expect(doc.events.e1.location).toEqual({ label: 'Kyoto Station', lat: 34.98, lng: 135.75 });
+  });
+});

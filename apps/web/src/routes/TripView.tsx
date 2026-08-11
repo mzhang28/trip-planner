@@ -239,7 +239,7 @@ export function TripView() {
 
   // Drains whatever was attached with no network, once there is one.
   useUploadFlush();
-  const weather = useWeather(events);
+  const weather = useWeather(events, homeTimezone);
 
   const [view, setView] = useState<CalendarView>('day');
   const [anchor, setAnchor] = useState<DayKey>(() => new Date().toISOString().slice(0, 10));
@@ -830,7 +830,17 @@ export function TripView() {
                 on anything narrower. A map squeezed into a phone column shows
                 less than the list it is competing with for the space.
               */}
-              <aside className="mt-6 h-80 lg:sticky lg:top-0 lg:mt-0 lg:h-[calc(100dvh-11rem)] lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]">
+              {/*
+                Takes its space only when there is a pin to put in it. Before
+                that the panel is one line, and the itinerary has the width.
+              */}
+              <aside
+                className={
+                  mappable.some((event) => event.location?.lat !== undefined)
+                    ? 'mt-6 h-80 lg:sticky lg:top-0 lg:mt-0 lg:h-[calc(100dvh-11rem)] lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
+                    : 'mt-6 lg:sticky lg:top-0 lg:mt-0 lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
+                }
+              >
                 <DayMap
                   events={mappable}
                   selectedId={highlighted}

@@ -238,7 +238,16 @@ test.describe('flights and the map', () => {
     // Each end names itself, so neither the test nor a screen reader has to
     // work out which of two fields called "Airport" is which.
     await editor.getByRole('textbox', { name: 'Leaving from' }).fill('nrt');
-    await editor.getByRole('combobox', { name: 'Departure time zone' }).fill('Asia/Tokyo');
+    await expect(
+      editor.getByRole('button', { name: 'Departure time zone: Asia/Tokyo' }),
+    ).toBeVisible();
+
+    // The zone rests inside the time control as a short name. Its popover can
+    // still find the full IANA zone from a familiar abbreviation.
+    await editor.getByRole('button', { name: 'Departure time zone: Asia/Tokyo' }).click();
+    await page.getByRole('searchbox', { name: 'Search departure time zone' }).fill('JST');
+    await expect(page.getByRole('option', { name: /Asia\/Tokyo/ })).toBeVisible();
+    await page.keyboard.press('Escape');
 
     // The date first: a time on its own used to put the flight on today,
     // whatever day the ticket says.
@@ -247,7 +256,9 @@ test.describe('flights and the map', () => {
     await editor.getByRole('textbox', { name: /Departs/ }).blur();
 
     await editor.getByRole('textbox', { name: 'Arriving at' }).fill('lhr');
-    await editor.getByRole('combobox', { name: 'Arrival time zone' }).fill('Europe/London');
+    await expect(
+      editor.getByRole('button', { name: 'Arrival time zone: Europe/London' }),
+    ).toBeVisible();
     await editor.getByRole('textbox', { name: /Arrives/ }).fill('21:30');
     await editor.getByRole('textbox', { name: /Arrives/ }).blur();
 
@@ -265,12 +276,14 @@ test.describe('flights and the map', () => {
     await expect(summary).toContainText(/clocks back 8h/);
   });
 
-  test('the day map says what to do when nothing has a place yet', async ({ page }) => {
+  test('the map stays out of the way until something has a place', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
-    await expect(page.getByText(/Nothing on the map yet/)).toBeVisible();
+    // One line rather than an empty panel taking half the width to say it.
+    await expect(page.getByTestId('empty-map')).toBeVisible();
+    await expect(page.getByTestId('day-map')).toHaveCount(0);
   });
 });
 

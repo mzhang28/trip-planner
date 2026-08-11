@@ -182,11 +182,17 @@ export function MonthView({
                         {Number(day.slice(8))}
                       </button>
                       {glyph && forecast && (
-                        <span className="text-2xs text-ink-muted" title={glyph.label}>
+                        <span
+                          className="text-2xs text-ink-muted"
+                          title={
+                            forecast.place ? `${glyph.label} in ${forecast.place}` : glyph.label
+                          }
+                        >
                           <span aria-hidden="true">{glyph.icon}</span>
                           <span className="tabular ml-0.5 hidden sm:inline">
                             {Math.round(forecast.max)}°
                           </span>
+                          {forecast.place && <span className="sr-only"> in {forecast.place}</span>}
                         </span>
                       )}
                     </span>
