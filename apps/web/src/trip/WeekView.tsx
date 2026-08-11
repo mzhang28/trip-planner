@@ -1,6 +1,7 @@
 import type { TripEvent } from '@trip/crdt';
 import { StatusSpine, cn } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DayKey } from '../lib/calendar';
 import { addDays, citySegments, eventsByDay, lodgingSpans, spanWithin } from '../lib/calendar';
@@ -22,6 +23,10 @@ interface PositionedEvent {
   height: number | string;
   column: number;
   columns: number;
+  /** Starts earlier than the week draws, so it sits at the top of the column. */
+  outsideBefore: boolean;
+  /** Runs past the last hour the week draws, so it stops at the bottom. */
+  outsideAfter: boolean;
 }
 
 function minutesSinceMidnight(at: number, timeZone: string): number {
@@ -60,15 +65,31 @@ function positionEvents(
       );
       const duration = Math.max(1, event.durationMinutes ?? DEFAULT_EVENT_MINUTES);
 
+      /*
+       * Clamped to the visible hours, and never to nothing.
+       *
+       * The week only draws part of the day, so an 05:30 flight has no slot of
+       * its own. Clamping start and end independently inverts them for an
+       * event outside the window, and an inverted pair is not drawable, so the
+       * flight went missing from the week altogether. Every event keeps at
+       * least a sliver, pinned to whichever edge it fell past, and the card
+       * still prints its true time. The flags below say which edge it is.
+       */
+      const actualEnd = actualStart + duration;
+      const sliver = Math.min(15, windowEnd - windowStart);
+      const start = Math.min(Math.max(actualStart, windowStart), windowEnd - sliver);
+      const end = Math.max(Math.min(actualEnd, windowEnd), start + sliver);
+
       return {
         event,
-        start: Math.max(windowStart, actualStart),
-        end: Math.min(windowEnd, actualStart + duration),
+        start,
+        end,
+        outsideBefore: actualStart < windowStart,
+        outsideAfter: actualEnd > windowEnd,
         column: 0,
         columns: 1,
       };
     })
-    .filter((item) => item.end > item.start)
     .sort((a, b) => a.start - b.start || a.end - b.end);
 
   const positioned: typeof timed = [];
@@ -112,6 +133,8 @@ function positionEvents(
         : Math.max(30, duration * MINUTE_HEIGHT - 2),
       column: item.column,
       columns: item.columns,
+      outsideBefore: item.outsideBefore,
+      outsideAfter: item.outsideAfter,
     };
   });
 }
@@ -515,7 +538,7 @@ export function WeekView({
                     fitToView={displaySettings.weekFitToView}
                   >
                     {positioned.map(
-                      ({ event, top, height, column, columns }) => (
+                      ({ event, top, height, column, columns, outsideBefore, outsideAfter }) => (
                         <button
                           key={event.id}
                           type="button"
@@ -527,15 +550,34 @@ export function WeekView({
                             left: `calc(${(column / columns) * 100}% + 2px)`,
                             width: `calc(${100 / columns}% - 4px)`,
                           }}
-                          className="absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
+                          className={cn(
+                            'absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2',
+                            // A cut edge, so a pinned event does not read as one that
+                            // really starts or ends at the hour it is resting on.
+                            outsideBefore && 'border-t-ink-muted [border-top-style:dashed]',
+                            outsideAfter && 'border-b-ink-muted [border-bottom-style:dashed]',
+                          )}
                         >
                           <StatusSpine status={event.booking.status} />
                           <span className="min-w-0 flex-1">
                             {event.startsAt !== undefined && (
-                              <span className="tabular block text-2xs text-ink-muted">
+                              <span className="tabular flex items-center gap-0.5 text-2xs text-ink-muted">
+                                {outsideBefore && (
+                                  <ChevronUp aria-hidden="true" className="size-3" />
+                                )}
                                 {formatTime(
                                   event.startsAt,
                                   displayZone(event.timezone, homeTimezone),
+                                )}
+                                {outsideAfter && !outsideBefore && (
+                                  <ChevronDown aria-hidden="true" className="size-3" />
+                                )}
+                                {(outsideBefore || outsideAfter) && (
+                                  <span className="sr-only">
+                                    {outsideBefore
+                                      ? ', earlier than the hours shown'
+                                      : ', later than the hours shown'}
+                                  </span>
                                 )}
                               </span>
                             )}

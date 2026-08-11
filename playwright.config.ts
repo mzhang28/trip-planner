@@ -17,6 +17,14 @@ const WEB_URL = `http://localhost:${WEB_PORT}`;
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+
+  /*
+   * One API process serves the whole suite, and better-sqlite3 is synchronous,
+   * so every request it handles blocks the next. Past four workers the tests
+   * spend their time queueing behind each other and start timing out on work
+   * that is not slow, only waiting.
+   */
+  workers: process.env.CI ? 2 : 4,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],

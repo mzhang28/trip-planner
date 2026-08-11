@@ -32,7 +32,7 @@ test('work made while away is kept when the trip has to be reloaded', async ({ p
   await context.setOffline(false);
   // The server now refuses anything older than this moment, which is what a
   // device that has been away past the tombstone horizon looks like.
-  await page.request.post('/api/test/force-resync');
+  await page.request.post(`/api/test/force-resync/${trip.id}`);
 
   await page.reload();
 

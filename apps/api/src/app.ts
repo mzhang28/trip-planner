@@ -1,5 +1,6 @@
 import { TOMBSTONE_TTL_MS } from '@trip/crdt';
 import { trips } from '@trip/schema';
+import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { config } from './config';
@@ -61,18 +62,29 @@ export function createApp(services: Services) {
   });
 
   /*
-   * Puts the server in the state it reaches after a sweep: tombstones removed,
-   * and a watermark that makes it refuse any document older than now.
+   * Puts one trip in the state it reaches after a sweep: tombstones removed,
+   * and a watermark that makes the server refuse any document older than now.
    *
    * The watermark is set whether or not there was anything to remove, which the
    * nightly job does not do — it has no reason to make peers resync for a sweep
    * that changed nothing. Only mounted outside production, because it exists so
    * the tests can reach a state that otherwise takes thirty days to arrive.
+   *
+   * Named trip by trip. One database serves the whole test suite in parallel,
+   * and marking every trip swept sent every other test's browser back for a
+   * fresh copy mid-edit.
    */
   if (!config.isProduction) {
-    app.post('/api/test/force-resync', (c) => {
-      const swept = sweepAllTrips(services.db, services.docs, Date.now() + TOMBSTONE_TTL_MS + 1);
-      services.db.update(trips).set({ tombstonesSweptAt: Date.now() }).run();
+    app.post('/api/test/force-resync/:tripId', (c) => {
+      const tripId = c.req.param('tripId');
+      const swept = sweepAllTrips(services.db, services.docs, Date.now() + TOMBSTONE_TTL_MS + 1, [
+        tripId,
+      ]);
+      services.db
+        .update(trips)
+        .set({ tombstonesSweptAt: Date.now() })
+        .where(eq(trips.id, tripId))
+        .run();
 
       return c.json({ swept });
     });

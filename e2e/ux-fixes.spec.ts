@@ -172,3 +172,56 @@ test.describe('what a viewer can do', () => {
     await other.close();
   });
 });
+
+test.describe('sharing', () => {
+  test('a read-only link can be made, copied, and revoked', async ({ page, context, browser }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    await page.goto('/');
+    const tripId = await newTrip(page);
+
+    await page.getByRole('button', { name: 'Share trip' }).click();
+    const panel = page.getByTestId('share-panel');
+    await expect(panel).toBeVisible();
+
+    // Read-only was never offered though the server always supported it.
+    await panel.getByRole('radiogroup', { name: 'What the link allows' })
+      .getByText('Can read', { exact: true })
+      .click();
+    await panel.getByRole('button', { name: 'Make a link' }).click();
+
+    const url = await panel.getByTestId('share-url').textContent();
+    expect(url).toContain('/join/');
+
+    await panel.getByRole('button', { name: 'Copy' }).click();
+    await expect(panel.getByRole('button', { name: 'Copied' })).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
+
+    // The link is listed afterwards, so its existence is not something to
+    // remember.
+    await expect(panel.getByText(/A link that can read/)).toBeVisible();
+
+    // Somebody uses it, then it is revoked.
+    const other = await browser.newContext();
+    const guest = await other.newPage();
+    await guest.goto(url!);
+    await expect(guest.getByTestId('event')).toHaveCount(0);
+    await expect(guest.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
+
+    await panel.getByRole('button', { name: 'Revoke' }).click();
+    await expect(panel.getByText(/A link that can read/)).toHaveCount(0);
+
+    // Nobody new can join with it now.
+    const third = await browser.newContext();
+    const stranger = await third.newPage();
+    await stranger.goto(url!);
+    await expect(stranger.getByText(/no longer works/)).toBeVisible();
+
+    // The person who already used it is still on the trip, and listed.
+    await expect(panel.getByRole('button', { name: 'Remove' })).toHaveCount(1);
+
+    await other.close();
+    await third.close();
+    void tripId;
+  });
+});

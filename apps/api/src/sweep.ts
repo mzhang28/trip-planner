@@ -19,10 +19,19 @@ export interface SweepReport {
  * synced since before this may still be holding a swept event as live, so the
  * sync endpoint refuses it and makes it take a fresh copy instead.
  */
-export function sweepAllTrips(db: Db, docs: DocStore, now = Date.now()): SweepReport[] {
+export function sweepAllTrips(
+  db: Db,
+  docs: DocStore,
+  now = Date.now(),
+  /** Limits the sweep to these trips. Omitted, it covers all of them. */
+  only?: string[],
+): SweepReport[] {
   const reports: SweepReport[] = [];
+  const chosen = only && new Set(only);
 
   for (const trip of db.select({ id: trips.id }).from(trips).all()) {
+    if (chosen && !chosen.has(trip.id)) continue;
+
     const doc = docs.load(trip.id);
     if (!doc) continue;
 

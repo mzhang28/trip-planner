@@ -37,6 +37,7 @@ import { DayMap } from '../trip/DayMap';
 import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
 import { useUploadFlush } from '../trip/Attachments';
 import { RecoveryBanner } from '../trip/RecoveryBanner';
+import { SharePanel } from '../trip/SharePanel';
 import { MergePreview, SelectionBar } from '../trip/SelectionBar';
 import { TransitLeg } from '../trip/TransitLeg';
 import { MonthView } from '../trip/MonthView';
@@ -169,7 +170,7 @@ export function TripView() {
 
   const [trip, setTrip] = useState<TripSummary | null>(null);
   const [draft, setDraft] = useState('');
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -400,10 +401,8 @@ export function TripView() {
     setMergePrimary(null);
   }
 
-  async function share() {
-    if (!tripId) return;
-    const { token } = await api.createShareLink(tripId, 'editor');
-    setShareUrl(`${location.origin}/join/${token}`);
+  function share() {
+    setSharing(true);
   }
 
   function runCommand(command: CommandId) {
@@ -412,7 +411,7 @@ export function TripView() {
     } else if (command === 'today') {
       goToDay(Date.now());
     } else if (command === 'share') {
-      void share();
+      share();
     }
   }
 
@@ -501,8 +500,8 @@ export function TripView() {
         )}
 
         <DayNavigator view={view} anchor={anchor} today={today} onChange={moveAnchor} />
-        <div className={view === 'week' ? 'min-h-0 flex-1' : undefined}>
 
+        <div className={view === 'week' ? 'min-h-0 flex-1' : undefined}>
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           {view === 'week' && (
             <WeekView
@@ -671,7 +670,7 @@ export function TripView() {
                 on anything narrower. A map squeezed into a phone column shows
                 less than the list it is competing with for the space.
               */}
-              <aside className="mt-6 h-80 lg:sticky lg:top-24 lg:mt-0 lg:h-[calc(100dvh-9rem)] lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]">
+              <aside className="mt-6 h-80 lg:sticky lg:top-0 lg:mt-0 lg:h-[calc(100dvh-11rem)] lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]">
                 <DayMap
                   events={mappable}
                   selectedId={highlighted}
@@ -686,21 +685,8 @@ export function TripView() {
         </DndContext>
         </div>
 
-        {trip?.role === 'owner' && (
-          <section className="mt-10 border-t border-line pt-6">
-            <Button onPress={() => void share()}>Share trip</Button>
-            {shareUrl && (
-              <div className="mt-3">
-                <p className="mb-1 text-xs text-ink-muted">
-                  Anyone with this link can edit the trip. It is shown once.
-                </p>
-                <code className="block rounded-md bg-sunken px-2 py-1.5 text-xs break-all">
-                  {shareUrl}
-                </code>
-              </div>
-            )}
-          </section>
-        )}
+        {sharing && tripId && <SharePanel tripId={tripId} onClose={() => setSharing(false)} />}
+
         {selected.size > 0 && (
           <SelectionBar
             selected={selected}

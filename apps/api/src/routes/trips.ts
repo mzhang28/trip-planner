@@ -1,4 +1,4 @@
-import { shareLinks, tripMembers, trips, type TripRole } from '@trip/schema';
+import { shareLinks, tripMembers, trips, users, type TripRole } from '@trip/schema';
 import { and, desc, eq, isNull, or, gt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -127,6 +127,89 @@ export function tripRoutes() {
       .run();
 
     return c.json({ token: raw, role: parsed.data.role }, 201);
+  });
+
+  /**
+   * The links that exist, and who is on the trip.
+   *
+   * Sharing was a one-shot token with nothing to see afterwards: no way to tell
+   * whether a link was still live, who had used one, or how to take it back.
+   * The token itself is not here and cannot be -- only its hash was ever
+   * stored, which is the point.
+   */
+  app.get('/:tripId/access', requireMembership, (c) => {
+    const { db } = c.var.services;
+    const membership = c.var.membership!;
+
+    if (membership.role !== 'owner') return c.json({ error: 'owner_only' }, 403);
+
+    const links = db
+      .select({
+        id: shareLinks.id,
+        role: shareLinks.role,
+        createdAt: shareLinks.createdAt,
+        expiresAt: shareLinks.expiresAt,
+        revokedAt: shareLinks.revokedAt,
+      })
+      .from(shareLinks)
+      .where(eq(shareLinks.tripId, membership.tripId))
+      .orderBy(desc(shareLinks.createdAt))
+      .all();
+
+    const members = db
+      .select({
+        userId: tripMembers.userId,
+        role: tripMembers.role,
+        name: users.displayName,
+        firstOpenedAt: tripMembers.firstOpenedAt,
+      })
+      .from(tripMembers)
+      .innerJoin(users, eq(users.id, tripMembers.userId))
+      .where(eq(tripMembers.tripId, membership.tripId))
+      .all();
+
+    return c.json({ links, members, you: membership.userId });
+  });
+
+  /**
+   * Stops a link working.
+   *
+   * People who already used it keep their access, because they are members now
+   * and revoking a link is about who can still join rather than about evicting
+   * anyone. Removing a member is a separate thing, and says so.
+   */
+  app.post('/:tripId/access/links/:linkId/revoke', requireMembership, (c) => {
+    const { db } = c.var.services;
+    const membership = c.var.membership!;
+
+    if (membership.role !== 'owner') return c.json({ error: 'owner_only' }, 403);
+
+    db.update(shareLinks)
+      .set({ revokedAt: Date.now() })
+      .where(
+        and(eq(shareLinks.id, c.req.param('linkId')), eq(shareLinks.tripId, membership.tripId)),
+      )
+      .run();
+
+    return c.json({ ok: true });
+  });
+
+  app.delete('/:tripId/access/members/:userId', requireMembership, (c) => {
+    const { db } = c.var.services;
+    const membership = c.var.membership!;
+    const target = c.req.param('userId');
+
+    if (membership.role !== 'owner') return c.json({ error: 'owner_only' }, 403);
+
+    // An owner removing themselves would leave a trip nobody can share or
+    // manage, and there is no way back into it.
+    if (target === membership.userId) return c.json({ error: 'cannot_remove_yourself' }, 400);
+
+    db.delete(tripMembers)
+      .where(and(eq(tripMembers.tripId, membership.tripId), eq(tripMembers.userId, target)))
+      .run();
+
+    return c.json({ ok: true });
   });
 
   return app;

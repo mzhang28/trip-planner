@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
+/*
+ * The hours the week timetable shows out of the box. A column covers exactly
+ * this range, so a time in a column is a fraction of its height.
+ */
+const WEEK_START_HOUR = 9;
+const WEEK_HOURS = 24 - WEEK_START_HOUR;
+
 async function newTrip(page: Page, name: string) {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
 
@@ -22,7 +29,10 @@ function eventRow(page: Page, name: string) {
 }
 
 /** Adds an event and fills in the city and time that put it on a calendar. */
-async function addEvent(page: Page, name: string, city: string, time: string) {
+/** A fixed Wednesday, so a test never depends on which day it is run. */
+const ON = '2026-08-12';
+
+async function addEvent(page: Page, name: string, city: string, time: string, day = ON) {
   await page.getByRole('textbox', { name: 'New event' }).fill(name);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(eventRow(page, name)).toBeVisible();
@@ -42,9 +52,24 @@ async function addEvent(page: Page, name: string, city: string, time: string) {
 
   // A date first, then a time. The time field is disabled until there is a day
   // for it to be a time on.
-  await editor.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
-  await editor.getByRole('textbox', { name: /Time \(/ }).fill(time);
-  await editor.getByRole('textbox', { name: /Time \(/ }).blur();
+  await editor.getByTestId('event-date').fill(day);
+
+  /*
+   * Re-acquired, because setting the date moves the card into another day's
+   * section and React replaces the node. Holding the old handle would fill a
+   * box that is no longer on the page.
+   */
+  const afterDate = page.getByTestId('event-editor');
+  await expect(afterDate.getByTestId('event-date')).toHaveValue(day);
+  await expect(afterDate.getByRole('textbox', { name: /Time \(/ })).toBeEnabled();
+  await afterDate.getByRole('textbox', { name: /Time \(/ }).fill(time);
+  await afterDate.getByRole('textbox', { name: /Time \(/ }).blur();
+
+  // Both halves of the instant, checked where they were typed. A day that did
+  // not take leaves the event on today, and every later assertion then fails
+  // somewhere else with nothing pointing back here.
+  await expect(afterDate.getByTestId('event-date')).toHaveValue(day);
+  await expect(eventRow(page, name)).toContainText(time);
 
   // Close whichever card is open. The event has moved to another day by now,
   // so it is not necessarily the one that was clicked to open it.
@@ -89,14 +114,17 @@ test.describe('week and month views', () => {
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '05:30');
     await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
 
+    await page.getByTestId('go-to-date').fill(ON);
     await switchTo(page, 'Week');
 
-    // Both events fall on today, so today's column holds them both.
+    // Both events are on the same day, so one column holds them both.
     const week = page.getByTestId('week-event');
     await expect(week.filter({ hasText: 'Fushimi Inari' })).toBeVisible();
     await expect(week.filter({ hasText: 'Nishiki Market' })).toBeVisible();
 
     // Earlier in the day comes first, which is what makes a column a timeline.
+    // Fushimi is at 05:30, before the hours the week shows by default: it is
+    // pinned to the top of the column rather than dropped from it.
     await expect(week.first()).toContainText('Fushimi Inari');
   });
 
@@ -105,6 +133,7 @@ test.describe('week and month views', () => {
     await newTrip(page, 'Japan, April');
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
+    await page.getByTestId('go-to-date').fill(ON);
     await switchTo(page, 'Month');
 
     /*
@@ -127,6 +156,7 @@ test.describe('week and month views', () => {
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
     await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
 
+    await page.getByTestId('go-to-date').fill(ON);
     await switchTo(page, 'Month');
     await expect(page.getByText('2 things')).toBeVisible();
 
@@ -142,14 +172,22 @@ test.describe('week and month views', () => {
     await newTrip(page, 'Japan, April');
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
+    await page.getByTestId('go-to-date').fill(ON);
     await switchTo(page, 'Week');
-    await expect(page.getByTestId('week-event')).toHaveCount(1);
 
+    const event = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
+    await expect(event).toBeInViewport();
+
+    /*
+     * Out of sight rather than off the page. The week keeps a runway of days
+     * rendered on either side so a sideways swipe has somewhere to go, so what
+     * moving on changes is which days are on screen.
+     */
     await page.getByRole('button', { name: 'Later' }).click();
-    await expect(page.getByTestId('week-event')).toHaveCount(0);
+    await expect(event).not.toBeInViewport();
 
-    await page.getByRole('button', { name: 'Today' }).click();
-    await expect(page.getByTestId('week-event')).toHaveCount(1);
+    await page.getByTestId('go-to-date').fill(ON);
+    await expect(event).toBeInViewport();
   });
 
   test('picking an event in the week opens it in the day view', async ({ page }) => {
@@ -157,6 +195,7 @@ test.describe('week and month views', () => {
     await newTrip(page, 'Japan, April');
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
+    await page.getByTestId('go-to-date').fill(ON);
     await switchTo(page, 'Week');
     await page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' }).click();
 
@@ -411,28 +450,38 @@ test.describe('making an event from the calendar', () => {
     await expect(page.getByTestId('event')).toHaveCount(1);
   });
 
-  test('dragging across days in the week makes an event spanning them', async ({ page }) => {
+  test('dragging down a day in the week makes an event over that time', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await switchTo(page, 'Week');
 
-    const columns = page.locator('[data-testid^="day-2"]');
-    await expect(columns.first()).toBeVisible();
+    const column = page.locator('[data-testid^="day-2"]').first();
+    await expect(column).toBeVisible();
+    await column.scrollIntoViewIfNeeded();
 
-    const box = await columns.first().boundingBox();
+    const box = await column.boundingBox();
     if (!box) throw new Error('no week column to drag on');
 
-    // Press on one empty column and release two along.
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height - 20);
+    /*
+     * The column covers the hours the week is set to show, top to bottom, so a
+     * time is a fraction of its height rather than a fixed number of pixels.
+     * This drags from 10:00 to 12:00. The grid has a time axis, which is what
+     * makes dragging say when as well as which day -- the whole reason to drag
+     * rather than tap.
+     */
+    const at = (hour: number) => box.y + ((hour - WEEK_START_HOUR) / WEEK_HOURS) * box.height;
+
+    await page.mouse.move(box.x + box.width / 2, at(10));
     await page.mouse.down();
-    await page.mouse.move(box.x + box.width * 2.5, box.y + box.height - 20, { steps: 8 });
+    await page.mouse.move(box.x + box.width / 2, at(12), { steps: 10 });
     await page.mouse.up();
 
     await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
     const editor = page.getByTestId('event-editor');
     await expect(editor).toBeVisible();
 
-    // The drag said which days, so it said how long. Two days on from the first.
+    await expect(editor.getByRole('textbox', { name: /Time \(/ })).toHaveValue('10:00');
     await expect(editor.getByTestId('field-duration')).toBeVisible();
+    await expect(editor.getByRole('textbox', { name: 'How long' }).first()).toHaveValue('120');
   });
 });
