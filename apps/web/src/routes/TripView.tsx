@@ -30,6 +30,7 @@ import { GripVertical, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, type TripSummary } from '../lib/api';
+import { randomId } from '../lib/crypto';
 import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
 import { addDays, eventDay, startOfWeek, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
@@ -147,7 +148,7 @@ export function TripView() {
     if (!name || !store) return;
 
     store.change((current) =>
-      addEvent(current, { id: `e_${crypto.randomUUID()}`, name }, { userId: 'me' }),
+      addEvent(current, { id: `e_${randomId()}`, name }, { userId: 'me' }),
     );
     setDraft('');
   }, [draft, store]);
@@ -440,7 +441,7 @@ export function TripView() {
                                 addLink(
                                   current,
                                   event.id,
-                                  `l_${crypto.randomUUID()}`,
+                                  `l_${randomId()}`,
                                   { url, title },
                                   { userId: 'me' },
                                 ),

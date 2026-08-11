@@ -99,13 +99,20 @@ export default defineConfig({
 });
 
 function apiProxy() {
+  // Both ports come from the environment so a test run can sit beside a dev
+  // server on its own pair rather than fighting it for the port.
+  const target = `http://localhost:${process.env.API_PORT ?? 8787}`;
+  const forward = { target, changeOrigin: true, ws: true };
+
   return {
-    '/api': {
-      // Both ports come from the environment so a test run can sit beside a dev
-      // server on its own pair rather than fighting it for the port.
-      target: `http://localhost:${process.env.API_PORT ?? 8787}`,
-      changeOrigin: true,
-      ws: true,
-    },
+    '/api': forward,
+    /*
+     * The agent-facing paths are forwarded too. They are not under /api because
+     * a client is handed the server's URL and looks for them where the specs
+     * say they live -- so they have to be reachable at the root.
+     */
+    '/oauth': forward,
+    '/mcp': forward,
+    '/.well-known': forward,
   };
 }

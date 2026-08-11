@@ -2,6 +2,7 @@ import type { EventAttachment, TripEvent } from '@trip/crdt';
 import { cn } from '@trip/ui';
 import { Loader2, Paperclip, Trash2 } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { randomId } from '../lib/crypto';
 import { flushUploads, hashFile, isPending, queueUpload } from './uploads';
 
 /** Matches the server's own ceiling, so a refusal is explained before the upload. */
@@ -74,7 +75,7 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
           queuedAt: Date.now(),
         });
 
-        onAdd(`a_${crypto.randomUUID()}`, {
+        onAdd(`a_${randomId()}`, {
           blobHash: hash,
           filename: file.name,
           mime: file.type || 'application/octet-stream',

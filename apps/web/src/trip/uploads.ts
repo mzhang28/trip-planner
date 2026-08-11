@@ -1,4 +1,5 @@
 import { createStore, del, get, keys, set } from 'idb-keyval';
+import { sha256Hex } from '../lib/crypto';
 
 /*
  * Its own database, not another store inside the documents one.
@@ -21,13 +22,7 @@ export interface QueuedUpload {
 /** SHA-256 of the bytes, which is the name the file is stored under. */
 export async function hashFile(file: File): Promise<{ hash: string; bytes: ArrayBuffer }> {
   const bytes = await file.arrayBuffer();
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-
-  const hash = [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-
-  return { hash, bytes };
+  return { hash: await sha256Hex(bytes), bytes };
 }
 
 /**

@@ -13,6 +13,8 @@ import { Button, Card, TextField, ThemeToggle } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { randomId } from '../lib/crypto';
+import { AuditPanel } from '../trip/AuditPanel';
 import { useTripState, useTripStore } from '../trip/useTrip';
 
 const TYPES: Array<{ value: FieldType; label: string; hint: string }> = [
@@ -54,7 +56,7 @@ export function TripFields() {
 
     store.change((current) =>
       addFieldDef(current, {
-        id: `f_${crypto.randomUUID()}`,
+        id: `f_${randomId()}`,
         label: trimmed,
         type,
         order: defs.length,
@@ -73,12 +75,13 @@ export function TripFields() {
           >
             Back to trip
           </Link>
-          <h1 className="flex-1 text-lg">Fields</h1>
+          <h1 className="flex-1 text-lg">Trip settings</h1>
           <ThemeToggle />
         </div>
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+        <h2 className="mb-1 text-sm text-ink">Fields</h2>
         <p className="mb-6 max-w-prose text-sm text-ink-secondary">
           Anything you add here appears on every event in this trip, and is searchable by its name
           as well as its value.
@@ -140,7 +143,7 @@ export function TripFields() {
                 }
                 onAddOption={(optionLabel) =>
                   store?.change((c) =>
-                    addFieldOption(c, def.id, `o_${crypto.randomUUID()}`, { label: optionLabel }),
+                    addFieldOption(c, def.id, `o_${randomId()}`, { label: optionLabel }),
                   )
                 }
                 onRemoveOption={(optionId) =>
@@ -151,6 +154,16 @@ export function TripFields() {
             ))}
           </div>
         )}
+        <div className="mt-12 border-t border-line pt-8">
+          {tripId && (
+            <AuditPanel
+              tripId={tripId}
+              // Undo writes to the document on the server, so the local replica
+              // has to ask for it rather than wait for something to poke it.
+              onUndone={() => void store?.sync()}
+            />
+          )}
+        </div>
       </main>
     </div>
   );
