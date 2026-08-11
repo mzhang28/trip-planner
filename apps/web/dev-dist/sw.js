@@ -85,13 +85,13 @@ define(['./workbox-7b16fee0'], (function (workbox) { 'use strict';
     "revision": "3ca0b8505b4bec776b69afdba2768812"
   }, {
     "url": "/index.html",
-    "revision": "0.pi8clp91k3s"
+    "revision": "0.97tc02tl6m4"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("/index.html"), {
     allowlist: [/^\/$/]
   }));
-  workbox.registerRoute(/^https:\/\/[abc]\.tile\.openstreetmap\.org\/.*/, new workbox.CacheFirst({
+  workbox.registerRoute(/^https:\/\/(?:[abc]\.)?tile\.openstreetmap\.org\/.*/, new workbox.CacheFirst({
     "cacheName": "osm-tiles",
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 3000,

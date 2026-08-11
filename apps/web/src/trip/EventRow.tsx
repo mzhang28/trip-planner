@@ -1,4 +1,10 @@
-import type { CustomValue, FieldDef, FieldDefId, TripEvent } from '@trip/crdt';
+import type {
+  CustomValue,
+  EventAttachment,
+  FieldDef,
+  FieldDefId,
+  TripEvent,
+} from '@trip/crdt';
 import { Card, StatusChip, StatusSpine, cn } from '@trip/ui';
 import type { ReactNode } from 'react';
 import { Button } from 'react-aria-components';
@@ -16,6 +22,8 @@ export interface EventRowProps {
   onAddLink: (url: string, title: string | undefined) => void;
   onRemoveLink: (linkId: string) => void;
   onSetCustomField: (fieldId: FieldDefId, value: CustomValue | undefined) => void;
+  onAddAttachment: (id: string, attachment: EventAttachment) => void;
+  onRemoveAttachment: (id: string) => void;
   onDelete: () => void;
   /**
    * Held by the list rather than by the card.
@@ -50,6 +58,8 @@ export function EventRow({
   onAddLink,
   onRemoveLink,
   onSetCustomField,
+  onAddAttachment,
+  onRemoveAttachment,
   onDelete,
   isOpen,
   onToggle,
@@ -135,6 +145,8 @@ export function EventRow({
           onAddLink={onAddLink}
           onRemoveLink={onRemoveLink}
           onSetCustomField={onSetCustomField}
+          onAddAttachment={onAddAttachment}
+          onRemoveAttachment={onRemoveAttachment}
           onDelete={onDelete}
         />
       )}

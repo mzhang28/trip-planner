@@ -7,16 +7,19 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core';
 import {
+  addAttachment,
   addEvent,
   addLink,
   deleteEvent,
   deleteEvents,
   liveFieldDefs,
   mergeEvents,
+  removeAttachment,
   removeLink,
   setCustomField,
   updateEvent,
   type CustomValue,
+  type EventAttachment,
   type EditableEventFields,
   type FieldDefId,
   type TripDoc,
@@ -30,6 +33,7 @@ import { api, type TripSummary } from '../lib/api';
 import { dayKey, formatDayHeading, moveToDay } from '../lib/time';
 import { addDays, eventDay, startOfWeek, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
+import { useUploadFlush } from '../trip/Attachments';
 import { MergePreview, SelectionBar } from '../trip/SelectionBar';
 import { MonthView } from '../trip/MonthView';
 import { WeekView } from '../trip/WeekView';
@@ -108,6 +112,9 @@ export function TripView() {
   const days = useMemo(() => groupByDay(events, homeTimezone), [events, homeTimezone]);
   const fieldDefs = useMemo(() => liveFieldDefs(doc), [doc]);
   const zonePreference = useZonePreference();
+
+  // Drains whatever was attached with no network, once there is one.
+  useUploadFlush();
   const weather = useWeather(events);
 
   const [view, setView] = useState<CalendarView>('day');
@@ -449,6 +456,18 @@ export function TripView() {
                                 setCustomField(current, event.id, fieldId, value, {
                                   userId: 'me',
                                 }),
+                              )
+                            }
+                            onAddAttachment={(id, attachment: EventAttachment) =>
+                              store?.change((current) =>
+                                addAttachment(current, event.id, id, attachment, {
+                                  userId: 'me',
+                                }),
+                              )
+                            }
+                            onRemoveAttachment={(id) =>
+                              store?.change((current) =>
+                                removeAttachment(current, event.id, id, { userId: 'me' }),
                               )
                             }
                             onDelete={() =>

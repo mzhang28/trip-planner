@@ -1,7 +1,9 @@
 import * as A from '@automerge/automerge';
 import { higherStatus } from './status';
 import type {
+  AttachmentId,
   CustomValue,
+  EventAttachment,
   EventId,
   EventKind,
   FieldDef,
@@ -165,6 +167,59 @@ export function removeLink(doc: Doc, eventId: EventId, linkId: LinkId, author: A
     delete event.links[linkId];
     stamp(event, author);
   });
+}
+
+export function addAttachment(
+  doc: Doc,
+  eventId: EventId,
+  attachmentId: AttachmentId,
+  attachment: EventAttachment,
+  author: Author,
+): Doc {
+  return A.change(doc, (d) => {
+    const event = d.events[eventId];
+    if (!event) return;
+
+    event.attachments[attachmentId] = attachment;
+    stamp(event, author);
+  });
+}
+
+/**
+ * Drops the reference, leaving the bytes alone.
+ *
+ * The same file may be on another event, and the name is the content, so the
+ * blob is shared. Removing the bytes is the sweep's job once nothing points at
+ * them any more.
+ */
+export function removeAttachment(
+  doc: Doc,
+  eventId: EventId,
+  attachmentId: AttachmentId,
+  author: Author,
+): Doc {
+  return A.change(doc, (d) => {
+    const event = d.events[eventId];
+    if (!event) return;
+
+    delete event.attachments[attachmentId];
+    stamp(event, author);
+  });
+}
+
+/** Every blob hash the trip still points at, for deciding what may be deleted. */
+export function referencedBlobs(doc: TripDoc | undefined): Set<string> {
+  const hashes = new Set<string>();
+
+  // Includes tombstoned events on purpose: a deleted event can be undone, and
+  // its files have to still be there when it is.
+  for (const event of Object.values(doc?.events ?? {})) {
+    for (const attachment of Object.values(event.attachments)) {
+      hashes.add(attachment.blobHash);
+    }
+  }
+
+  return hashes;
 }
 
 export function setCustomField(

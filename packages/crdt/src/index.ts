@@ -7,6 +7,7 @@ export {
 } from './status';
 
 export {
+  addAttachment,
   addEvent,
   addFieldDef,
   addFieldOption,
@@ -20,6 +21,8 @@ export {
   mergeEvents,
   removeLink,
   restoreEvent,
+  referencedBlobs,
+  removeAttachment,
   removeFieldOption,
   setCustomField,
   updateEvent,

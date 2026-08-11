@@ -1,9 +1,17 @@
-import type { BookingStatus, CustomValue, FieldDef, FieldDefId, TripEvent } from '@trip/crdt';
+import type {
+  BookingStatus,
+  CustomValue,
+  EventAttachment,
+  FieldDef,
+  FieldDefId,
+  TripEvent,
+} from '@trip/crdt';
 import { BOOKING_STATUSES } from '@trip/crdt';
 import { Button, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { formatTime, setTimeOfDay, zoneFor } from '../lib/time';
+import { Attachments } from './Attachments';
 import { FlightFields } from './FlightFields';
 import { PlacePicker } from './PlacePicker';
 
@@ -32,6 +40,8 @@ export interface EventEditorProps {
   onAddLink: (url: string, title: string | undefined) => void;
   onRemoveLink: (linkId: string) => void;
   onSetCustomField: (fieldId: FieldDefId, value: CustomValue | undefined) => void;
+  onAddAttachment: (id: string, attachment: EventAttachment) => void;
+  onRemoveAttachment: (id: string) => void;
   onDelete: () => void;
 }
 
@@ -50,6 +60,8 @@ export function EventEditor({
   onAddLink,
   onRemoveLink,
   onSetCustomField,
+  onAddAttachment,
+  onRemoveAttachment,
   onDelete,
 }: EventEditorProps) {
   const zone = zoneFor(event.timezone, homeTimezone);
@@ -297,6 +309,8 @@ export function EventEditor({
           </Button>
         </div>
       </section>
+
+      <Attachments event={event} onAdd={onAddAttachment} onRemove={onRemoveAttachment} />
 
       {applicable.length > 0 && (
         <section className="flex flex-col gap-4">

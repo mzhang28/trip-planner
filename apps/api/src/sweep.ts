@@ -1,7 +1,8 @@
-import { sweepTombstones } from '@trip/crdt';
+import { referencedBlobs, sweepTombstones, type TripDoc } from '@trip/crdt';
 import { trips } from '@trip/schema';
 import { eq } from 'drizzle-orm';
 import type { Db } from './db';
+import type { BlobStore } from './blobs/BlobStore';
 import type { DocStore } from './docStore';
 
 export interface SweepReport {
@@ -41,6 +42,41 @@ export function sweepAllTrips(db: Db, docs: DocStore, now = Date.now()): SweepRe
   }
 
   return reports;
+}
+
+/**
+ * Deletes blobs no trip points at any more.
+ *
+ * Tombstoned events count as pointing at theirs: a delete can be undone, and
+ * the files have to still be there when it is. Only once the tombstone itself
+ * is swept do its attachments become unreachable.
+ *
+ * The bytes are named by their own hash, so a file on two events is one blob
+ * and is kept while either still refers to it.
+ */
+export async function collectBlobs(
+  db: Db,
+  docs: DocStore,
+  blobs: BlobStore,
+  known: string[],
+): Promise<number> {
+  const referenced = new Set<string>();
+
+  for (const trip of db.select({ id: trips.id }).from(trips).all()) {
+    const doc = docs.load(trip.id);
+    if (!doc) continue;
+
+    for (const hash of referencedBlobs(doc as TripDoc)) referenced.add(hash);
+  }
+
+  let removed = 0;
+  for (const hash of known) {
+    if (referenced.has(hash)) continue;
+    await blobs.delete(hash);
+    removed += 1;
+  }
+
+  return removed;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;

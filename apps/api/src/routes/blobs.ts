@@ -12,11 +12,18 @@ export function blobRoutes() {
   const app = new Hono<AppEnv>();
 
   /**
-   * Whether these bytes are already here.
+   * Whether these bytes are already here, without sending them back.
    *
-   * Content addressing makes this worth asking: the same booking confirmation
-   * attached by two people uploads once, and a retried upload costs nothing.
+   * Content addressing makes this worth asking: the same confirmation attached
+   * by two people uploads once, and a retried upload costs nothing.
    */
+  app.on('HEAD', '/:hash', async (c) => {
+    const hash = c.req.param('hash');
+    if (!HASH.test(hash)) return c.body(null, 400);
+
+    return c.body(null, (await c.var.services.blobs.has(hash)) ? 200 : 404);
+  });
+
   app.get('/:hash', async (c) => {
     const hash = c.req.param('hash');
     if (!HASH.test(hash)) return c.json({ error: 'bad_hash' }, 400);
