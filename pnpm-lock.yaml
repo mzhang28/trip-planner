@@ -26,12 +26,18 @@ importers:
 
   apps/api:
     dependencies:
+      '@automerge/automerge':
+        specifier: ^3.4.0
+        version: 3.4.0
       '@hono/node-server':
         specifier: ^1.19.9
         version: 1.19.17(hono@4.13.1)
       '@trip/crdt':
         specifier: workspace:*
         version: link:../../packages/crdt
+      '@trip/schema':
+        specifier: workspace:^
+        version: link:../../packages/schema
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -112,6 +118,19 @@ importers:
       '@automerge/automerge':
         specifier: ^3.4.0
         version: 3.4.0
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/schema:
+    dependencies:
+      '@trip/crdt':
+        specifier: workspace:*
+        version: link:../crdt
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(better-sqlite3@13.0.3)
     devDependencies:
       typescript:
         specifier: ^5.9.3
