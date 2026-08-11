@@ -150,7 +150,7 @@ test.describe('week and month views', () => {
     expect(count).toBeLessThanOrEqual(6);
   });
 
-  test('a month counts what is on each day and opens the day when clicked', async ({ page }) => {
+  test('a month names what is on each day and opens the day when clicked', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
@@ -158,9 +158,12 @@ test.describe('week and month views', () => {
 
     await page.getByTestId('go-to-date').fill(ON);
     await switchTo(page, 'Month');
-    await expect(page.getByText('2 things')).toBeVisible();
+    // Names, not a count: every day of a month said "2 things" and read alike.
+    const cell = page.getByTestId('day-2026-08-12');
+    await expect(cell).toContainText('Fushimi Inari');
+    await expect(cell).toContainText('Nishiki Market');
 
-    await page.getByText('2 things').click();
+    await cell.getByText('Fushimi Inari').click();
 
     // Clicking a day drops back into the day view, on that day.
     await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();

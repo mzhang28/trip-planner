@@ -102,9 +102,15 @@ export function EventRow({
           <label
             className={cn(
               'flex cursor-pointer items-center pl-2',
-              // Hidden until something is ticked or the card is hovered, so a
-              // list of events is a list of events rather than a form.
-              !selectionActive && !isSelected && 'opacity-0 focus-within:opacity-100 hover:opacity-100',
+              /*
+               * Hidden until something is ticked or the card is hovered, so a
+               * list of events is a list of events rather than a form -- but
+               * only where hovering is a thing. A finger has no hover, so on a
+               * phone the boxes were invisible and selection unreachable.
+               */
+              !selectionActive &&
+                !isSelected &&
+                '[@media(hover:hover)]:opacity-0 focus-within:opacity-100 hover:opacity-100',
             )}
           >
             <span className="sr-only">Select {event.name}</span>
@@ -181,6 +187,7 @@ export function EventRow({
           onDelete={onDelete}
           doc={doc}
           onOpenEvent={onOpenEvent}
+          onClose={onToggle}
           revealed={revealed}
           onReveal={onReveal}
         />

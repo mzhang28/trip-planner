@@ -1,5 +1,5 @@
 import type { TripEvent } from '@trip/crdt';
-import { cn } from '@trip/ui';
+import { StatusSpine, cn } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
 import type { DayKey } from '../lib/calendar';
 import { citySegments, eventsByDay, monthGrid, monthOf } from '../lib/calendar';
@@ -67,9 +67,13 @@ function DayCell({
             'hover:bg-accent-soft/60 focus-visible:outline-focus focus-visible:outline-2 focus-visible:-outline-offset-2',
           )}
         >
+          {/*
+            Shown outright where there is no hover to reveal it. A touch user
+            was creating events by tapping a cell that looked inert.
+          */}
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute right-1 bottom-1 text-2xs text-ink-placeholder opacity-0 group-hover:opacity-100"
+            className="pointer-events-none absolute right-1 bottom-1 text-2xs text-ink-placeholder group-hover:opacity-100 [@media(hover:hover)]:opacity-0"
           >
             +
           </span>
@@ -191,13 +195,36 @@ export function MonthView({
                       <button
                         type="button"
                         onClick={() => onOpenDay(day)}
-                        className="relative z-10 mt-auto px-1 pb-1 text-left text-2xs text-ink-muted hover:text-ink focus-visible:outline-focus focus-visible:outline-2">
+                        className="relative z-10 mt-auto flex w-full flex-col items-stretch gap-px px-1 pb-1 text-left focus-visible:outline-focus focus-visible:outline-2"
+                      >
                         {/*
-                          A count rather than a list. At this size the names
-                          would be three characters each, which tells you less
-                          than knowing there are four things to look at.
+                          Two names and a count, not a count alone. "2 things"
+                          made every day of a month look the same, so the month
+                          could not answer the question it exists for -- what is
+                          happening, roughly, and when.
                         */}
-                        {dayEvents.length} {dayEvents.length === 1 ? 'thing' : 'things'}
+                        {dayEvents.slice(0, 2).map((event) => (
+                          <span
+                            key={event.id}
+                            className="flex min-w-0 items-center gap-1 text-2xs text-ink"
+                          >
+                            <StatusSpine status={event.booking.status} className="h-2.5 w-0.5" />
+                            <span
+                              className={cn(
+                                'truncate',
+                                event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                              )}
+                            >
+                              {event.name || 'Unnamed'}
+                            </span>
+                          </span>
+                        ))}
+
+                        {dayEvents.length > 2 && (
+                          <span className="text-2xs text-ink-muted">
+                            +{dayEvents.length - 2} more
+                          </span>
+                        )}
                       </button>
                     )}
                   </DayCell>

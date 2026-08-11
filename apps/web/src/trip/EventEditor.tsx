@@ -60,6 +60,8 @@ export interface EventEditorProps {
   onDelete: () => void;
   doc: TripDoc | undefined;
   onOpenEvent: (eventId: string) => void;
+  /** Closes the card. The header that also closes it scrolls out of reach. */
+  onClose: () => void;
   /**
    * Fields asked for during this sitting, kept by the list.
    *
@@ -104,6 +106,7 @@ export function EventEditor({
   onDelete,
   doc,
   onOpenEvent,
+  onClose,
   revealed,
   onReveal,
 }: EventEditorProps) {
@@ -672,10 +675,35 @@ export function EventEditor({
         onAdd={onReveal}
       />
 
-      <div className="flex justify-end">
-        <Button variant="ghost" size="sm" onPress={onDelete} className={cn('text-danger')}>
+      {/*
+        Sticky, because an event with most of its fields open is several screens
+        tall on a phone and the card header -- the only way out -- is at the top
+        of them. The name comes along so it is clear what is being edited.
+      */}
+      <div className="sticky bottom-0 -mx-3 -mb-4 flex items-center gap-3 border-t border-line bg-card px-3 py-2">
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate text-xs',
+            event.name ? 'text-ink-secondary' : 'text-ink-placeholder italic',
+          )}
+        >
+          {event.name || 'Unnamed'}
+        </span>
+
+        {/* Said in full to a screen reader, short on a phone where it sits
+            beside the name it applies to. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Delete event"
+          onPress={onDelete}
+          className={cn('text-danger')}
+        >
           <Trash2 className="size-3.5" />
-          Delete event
+          Delete
+        </Button>
+        <Button size="sm" data-testid="close-editor" onPress={onClose}>
+          Done
         </Button>
       </div>
     </div>

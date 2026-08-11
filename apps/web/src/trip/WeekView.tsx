@@ -151,9 +151,13 @@ export interface WeekViewProps {
   readOnly: boolean;
   onOpenEvent: (eventId: string) => void;
   onChangeAnchor: (day: DayKey) => void;
-  /** Makes an event over the days that were dragged across. */
-  /** Makes an event at the time that was dragged out. */
-  onCreateAt: (day: DayKey, startMinutes: number, endMinutes: number) => void;
+  /**
+   * Makes an event on that day, over that time when a drag said one.
+   *
+   * A tap says which day and nothing else, which is a state the event can hold
+   * now rather than a reason to invent an hour for it.
+   */
+  onCreateAt: (day: DayKey, startMinutes?: number, endMinutes?: number) => void;
 }
 
 /**
@@ -172,6 +176,7 @@ function DayColumn({
   onStart,
   onMove,
   onFinish,
+  onAdd,
   band,
   windowStart,
   windowEnd,
@@ -184,6 +189,8 @@ function DayColumn({
   onStart: (minutes: number) => void;
   onMove: (minutes: number) => void;
   onFinish: () => void;
+  /** Adds to this day with no hour, for a pointer that cannot drag one out. */
+  onAdd: () => void;
   band: { top: number | string; height: number | string } | null;
   windowStart: number;
   windowEnd: number;
@@ -246,6 +253,23 @@ function DayColumn({
           : `100% ${HOUR_HEIGHT}px`,
       }}
     >
+      {/*
+        Dragging out a time is a mouse gesture: with a finger the same movement
+        scrolls the week, so it is left alone there. This is what a finger gets
+        instead, and it says which day without pretending to know the hour.
+      */}
+      {!disabled && (
+        <button
+          type="button"
+          data-testid={`week-add-${day}`}
+          aria-label={`Add something on ${day}`}
+          onClick={onAdd}
+          className="absolute inset-x-0.5 bottom-0.5 z-10 hidden rounded-sm border border-dashed border-line py-0.5 text-2xs text-ink-muted [@media(pointer:coarse)]:block"
+        >
+          Add
+        </button>
+      )}
+
       {/* What the drag has picked so far, so the gesture shows its result. */}
       {band && (
         <div
@@ -580,6 +604,7 @@ export function WeekView({
                       )
                     }
                     onFinish={finishDrag}
+                    onAdd={() => onCreateAt(day)}
                     windowStart={windowStart}
                     windowEnd={windowEnd}
                     fitToView={displaySettings.weekFitToView}
