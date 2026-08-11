@@ -13,10 +13,11 @@
     "typecheck": "pnpm --recursive typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "pnpm free-test-ports && playwright test",
     "storybook": "pnpm --filter @trip/ui storybook",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "free-test-ports": "node -e \"const{execSync}=require('node:child_process');for(const p of[5273,8887]){try{execSync('fuser -k '+p+'/tcp',{stdio:'ignore'})}catch{}}\""
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

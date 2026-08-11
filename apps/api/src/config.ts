@@ -16,6 +16,14 @@ const schema = z.object({
   BLOB_STORE: z.enum(['fs', 's3']).default('fs'),
   BLOB_DIR: z.string().default('data/blobs'),
 
+  /* Only read when BLOB_STORE is s3. */
+  S3_BUCKET: z.string().optional(),
+  S3_REGION: z.string().default('auto'),
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_PREFIX: z.string().default('blobs'),
+
   /**
    * The origin this server is reached at. It is the OAuth issuer and the
    * resource identifier that access tokens are bound to, so it has to be the

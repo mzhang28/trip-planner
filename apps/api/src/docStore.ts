@@ -72,7 +72,15 @@ export class DocStore {
      * can no longer be changed.
      */
     this.#cache.set(tripId, next);
-    if (added.length === 0) return;
+
+    if (added.length === 0) {
+      // A caller with no change blobs to record has still changed the document
+      // -- the sweep is the case -- so the snapshot and the projection have to
+      // follow, or the change exists only in memory until the next restart.
+      this.#persistSnapshot(tripId, next);
+      this.#project(tripId, next);
+      return;
+    }
 
     const now = Date.now();
     const rows = added.map((change) => ({

@@ -1,0 +1,65 @@
+import { sweepTombstones } from '@trip/crdt';
+import { trips } from '@trip/schema';
+import { eq } from 'drizzle-orm';
+import type { Db } from './db';
+import type { DocStore } from './docStore';
+
+export interface SweepReport {
+  tripId: string;
+  removedEvents: number;
+  removedFieldDefs: number;
+}
+
+/**
+ * Removes tombstones past thirty days, across every trip.
+ *
+ * Setting `deletedAt` is what tells peers about a delete; this is what reclaims
+ * the space. Recording when it ran is the important part: a peer that has not
+ * synced since before this may still be holding a swept event as live, so the
+ * sync endpoint refuses it and makes it take a fresh copy instead.
+ */
+export function sweepAllTrips(db: Db, docs: DocStore, now = Date.now()): SweepReport[] {
+  const reports: SweepReport[] = [];
+
+  for (const trip of db.select({ id: trips.id }).from(trips).all()) {
+    const doc = docs.load(trip.id);
+    if (!doc) continue;
+
+    const result = sweepTombstones(doc, now);
+    if (result.removedEvents.length === 0 && result.removedFieldDefs.length === 0) continue;
+
+    // A sweep is a change like any other, so it reaches everyone through the
+    // usual sync rather than needing a channel of its own.
+    docs.commit(trip.id, result.doc, [], 'system');
+    db.update(trips).set({ tombstonesSweptAt: now }).where(eq(trips.id, trip.id)).run();
+
+    reports.push({
+      tripId: trip.id,
+      removedEvents: result.removedEvents.length,
+      removedFieldDefs: result.removedFieldDefs.length,
+    });
+  }
+
+  return reports;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Runs the sweep once at startup and then daily. */
+export function scheduleSweep(db: Db, docs: DocStore): () => void {
+  const run = () => {
+    try {
+      sweepAllTrips(db, docs);
+    } catch (error) {
+      // A failed sweep must not take the server down with it. Tombstones
+      // outliving thirty days costs space; an unreachable server costs the app.
+      console.error('tombstone sweep failed', error);
+    }
+  };
+
+  run();
+  const timer = setInterval(run, DAY_MS);
+  timer.unref?.();
+
+  return () => clearInterval(timer);
+}

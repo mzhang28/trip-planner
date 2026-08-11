@@ -4,6 +4,7 @@ import { addEvent, type Doc } from '@trip/crdt';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import { createDb, runMigrations, type Db } from './db';
+import { FsBlobStore } from './blobs/FsBlobStore';
 import { DocStore } from './docStore';
 
 type App = ReturnType<typeof createApp>;
@@ -91,7 +92,7 @@ describe('sync over HTTP', () => {
   beforeEach(() => {
     ({ db } = createDb(':memory:'));
     runMigrations(db, resolve(import.meta.dirname, '../drizzle'));
-    app = createApp({ db, docs: new DocStore(db) });
+    app = createApp({ db, docs: new DocStore(db), blobs: new FsBlobStore('/tmp/trip-test-blobs') });
   });
 
   async function newTrip(client: Client) {

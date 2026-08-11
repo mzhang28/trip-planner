@@ -1,4 +1,5 @@
 import type { TripRole } from '@trip/schema';
+import type { BlobStore } from './blobs/BlobStore';
 import type { Db } from './db';
 import type { DocStore } from './docStore';
 import type { Identity } from './identity';
@@ -6,6 +7,7 @@ import type { Identity } from './identity';
 export interface Services {
   db: Db;
   docs: DocStore;
+  blobs: BlobStore;
 }
 
 export interface Membership {

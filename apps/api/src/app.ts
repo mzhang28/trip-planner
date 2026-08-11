@@ -4,6 +4,7 @@ import { config } from './config';
 import type { AppEnv, Services } from './context';
 import { renameUser } from './identity';
 import { requireMembership, withIdentity, withServices } from './middleware';
+import { blobRoutes } from './routes/blobs';
 import { placeRoutes, weatherRoutes } from './routes/places';
 import { shareRoutes, tripRoutes } from './routes/trips';
 import { syncRoutes } from './routes/sync';
@@ -39,6 +40,7 @@ export function createApp(services: Services) {
     return c.json({ ...c.var.identity, displayName });
   });
 
+  app.route('/api/blobs', blobRoutes());
   app.route('/api/places', placeRoutes());
   app.route('/api/weather', weatherRoutes());
   app.route('/api/trips', tripRoutes());
