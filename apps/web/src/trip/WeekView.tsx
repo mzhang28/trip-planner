@@ -1,9 +1,9 @@
 import type { TripEvent } from '@trip/crdt';
 import { StatusSpine, cn } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DayKey } from '../lib/calendar';
-import { citySegments, eventsByDay, lodgingSpans, spanWithin, weekOf } from '../lib/calendar';
+import { addDays, citySegments, eventsByDay, lodgingSpans, spanWithin } from '../lib/calendar';
 import { formatTime } from '../lib/time';
 import { useCalendarDisplaySettings } from './useCalendarDisplaySettings';
 import { useDisplayZone } from './useDisplayZone';
@@ -13,6 +13,8 @@ import { weatherGlyph, type DailyWeather } from './useWeather';
 const HOUR_HEIGHT = 56;
 const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
 const DEFAULT_EVENT_MINUTES = 30;
+const BUFFER_DAYS_BEFORE = 1;
+const RENDERED_DAY_COUNT = 15;
 
 interface PositionedEvent {
   event: TripEvent;
@@ -122,6 +124,7 @@ export interface WeekViewProps {
   today: DayKey;
   readOnly: boolean;
   onOpenEvent: (eventId: string) => void;
+  onChangeAnchor: (day: DayKey) => void;
   /** Makes an event over the days that were dragged across. */
   /** Makes an event at the time that was dragged out. */
   onCreateAt: (day: DayKey, startMinutes: number, endMinutes: number) => void;
@@ -247,13 +250,67 @@ export function WeekView({
   today,
   readOnly,
   onOpenEvent,
+  onChangeAnchor,
   onCreateAt,
 }: WeekViewProps) {
-  const days = weekOf(anchor);
+  const days = useMemo(
+    () =>
+      Array.from({ length: RENDERED_DAY_COUNT }, (_, index) =>
+        addDays(anchor, index - BUFFER_DAYS_BEFORE),
+      ),
+    [anchor],
+  );
   const displaySettings = useCalendarDisplaySettings();
   const windowStart = displaySettings.weekStartHour * 60;
   const windowEnd = displaySettings.weekEndHour * 60;
   const timetableHeight = (windowEnd - windowStart) * MINUTE_HEIGHT;
+  const horizontalScroller = useRef<HTMLDivElement>(null);
+  const anchorCell = useRef<HTMLDivElement>(null);
+  const centeredScrollLeft = useRef(0);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gridTemplateColumns = `2.5rem repeat(${days.length}, minmax(5.5rem, calc((100cqw - 2.5rem - 7px) / 7)))`;
+
+  /*
+   * Keep one week visible, but render a week of runway on either side. Once a
+   * horizontal gesture settles, that newly visible first day becomes the
+   * anchor and the runway is rebuilt around it. The pixels stay in the same
+   * place while the user gets an effectively unbounded strip of dates.
+   */
+  useLayoutEffect(() => {
+    const scroller = horizontalScroller.current;
+    const cell = anchorCell.current;
+    if (!scroller || !cell) return;
+
+    const gutterWidth = 40;
+    const nextScrollLeft =
+      scroller.scrollLeft +
+      cell.getBoundingClientRect().left -
+      scroller.getBoundingClientRect().left -
+      gutterWidth -
+      1;
+    centeredScrollLeft.current = nextScrollLeft;
+    scroller.scrollLeft = nextScrollLeft;
+  }, [anchor]);
+
+  useEffect(
+    () => () => {
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    },
+    [],
+  );
+
+  function settleHorizontalScroll() {
+    const scroller = horizontalScroller.current;
+    const cell = anchorCell.current;
+    if (!scroller || !cell) return;
+
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      const dayStep = cell.getBoundingClientRect().width + 1;
+      const dayOffset = Math.round((scroller.scrollLeft - centeredScrollLeft.current) / dayStep);
+      if (dayOffset !== 0) onChangeAnchor(addDays(anchor, dayOffset));
+    }, 140);
+  }
 
   /*
    * Which days are being dragged across.
@@ -288,225 +345,259 @@ export function WeekView({
     <div
       className="flex h-full min-h-0 flex-col overflow-hidden"
       role="group"
-      aria-label="This week"
+      aria-label="Week view"
       // A drag that ends outside the grid is abandoned rather than left armed.
       onPointerLeave={() => setDrag(null)}
     >
-      {/* City and date rows do not move when the timetable scrolls. */}
-      <div className="shrink-0">
-        {cities.length > 0 && (
-          <div className="grid grid-cols-[2.5rem_repeat(7,minmax(0,1fr))] gap-px pb-1">
-            <div />
-            {days.map((day) => {
-              const segment = cities.find((run) => day >= run.from && day <= run.to);
-              const isStart = segment?.from === day;
-
-              return (
-                <div
-                  key={day}
-                  className={cn(
-                    'truncate px-1 py-0.5 text-2xs font-medium',
-                    segment ? 'bg-accent-soft text-accent-text' : 'text-transparent',
-                    segment && day === segment.from && 'rounded-l-full',
-                    segment && day === segment.to && 'rounded-r-full',
-                  )}
-                >
-                  {isStart ? segment.label : ' '}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div className="grid grid-cols-[2.5rem_repeat(7,minmax(0,1fr))] gap-px rounded-t-lg border border-line bg-line">
-          <div className="bg-page" />
-          {days.map((day) => {
-            const forecast = weather.get(day);
-            const glyph = forecast ? weatherGlyph(forecast.code) : null;
-
-            return (
-              <div key={day} className="min-w-0 bg-card px-1 py-1.5 text-center">
-                <div
-                  className={cn(
-                    'text-2xs',
-                    day === today ? 'font-semibold text-now-text' : 'text-ink-muted',
-                  )}
-                >
-                  {new Intl.DateTimeFormat('en-GB', {
-                    weekday: 'short',
-                    timeZone: 'UTC',
-                  }).format(Date.parse(`${day}T12:00:00Z`))}
-                </div>
-                <div
-                  className={cn(
-                    'tabular text-sm',
-                    day === today ? 'font-semibold text-now-text' : 'text-ink',
-                  )}
-                >
-                  {Number(day.slice(8))}
-                </div>
-                {glyph && forecast && (
-                  <div className="truncate text-2xs text-ink-muted" title={glyph.label}>
-                    <span aria-hidden="true">{glyph.icon}</span>{' '}
-                    <span className="tabular hidden sm:inline">
-                      {Math.round(forecast.max)}°/{Math.round(forecast.min)}°
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* This is the week's only scroll region. All seven days stay aligned. */}
       <div
-        data-testid="week-timetable-scroll"
-        tabIndex={0}
-        className={cn(
-          'min-h-0 flex-1 overscroll-contain rounded-b-lg border-x border-b border-line',
-          displaySettings.weekFitToView ? 'overflow-hidden' : 'overflow-y-auto',
-        )}
+        ref={horizontalScroller}
+        data-testid="week-horizontal-scroll"
+        onScroll={settleHorizontalScroll}
+        className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        style={{ containerType: 'inline-size' }}
       >
-        <div
-          className="grid grid-cols-[2.5rem_repeat(7,minmax(0,1fr))] gap-px bg-line"
-          style={{ height: displaySettings.weekFitToView ? '100%' : timetableHeight }}
-        >
-          <div aria-hidden="true" className="relative bg-page text-right text-2xs text-ink-muted">
-            {Array.from(
-              { length: displaySettings.weekEndHour - displaySettings.weekStartHour + 1 },
-              (_, index) => displaySettings.weekStartHour + index,
-            ).map((hour) => (
-              <span
-                key={hour}
-                style={{
-                  top: displaySettings.weekFitToView
-                    ? `${((hour - displaySettings.weekStartHour) / (displaySettings.weekEndHour - displaySettings.weekStartHour)) * 100}%`
-                    : (hour - displaySettings.weekStartHour) * HOUR_HEIGHT,
-                }}
-                className={cn(
-                  'absolute right-1 tabular',
-                  hour === displaySettings.weekEndHour
-                    ? '-translate-y-full'
-                    : '-translate-y-1/2',
-                )}
-              >
-                {hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`}
-              </span>
-            ))}
-          </div>
+        <div className="flex h-full w-max min-w-full flex-col">
+          {/* City and date rows do not move when the timetable scrolls vertically. */}
+          <div className="shrink-0">
+            {cities.length > 0 && (
+              <div className="grid gap-px pb-1" style={{ gridTemplateColumns }}>
+                <div className="sticky left-0 z-20 bg-page" />
+                {days.map((day) => {
+                  const segment = cities.find((run) => day >= run.from && day <= run.to);
+                  const isStart = segment?.from === day;
 
-          {days.map((day) => {
-            const positioned = positionEvents(
-              byDay.get(day) ?? [],
-              displayZone,
-              homeTimezone,
-              windowStart,
-              windowEnd,
-              displaySettings.weekFitToView,
-            );
-
-            return (
-              <DayColumn
-                key={day}
-                day={day}
-                disabled={readOnly}
-                selected={false}
-                band={
-                  selecting && selecting.day === day
-                    ? {
-                        top: displaySettings.weekFitToView
-                          ? `${((selecting.start - windowStart) / (windowEnd - windowStart)) * 100}%`
-                          : (selecting.start - windowStart) * MINUTE_HEIGHT,
-                        height: displaySettings.weekFitToView
-                          ? `${((selecting.end - selecting.start) / (windowEnd - windowStart)) * 100}%`
-                          : (selecting.end - selecting.start) * MINUTE_HEIGHT,
-                      }
-                    : null
-                }
-                onStart={(minutes) => setDrag({ day, from: minutes, to: minutes })}
-                onMove={(minutes) =>
-                  setDrag((current) =>
-                    current && current.day === day ? { ...current, to: minutes } : current,
-                  )
-                }
-                onFinish={finishDrag}
-                windowStart={windowStart}
-                windowEnd={windowEnd}
-                fitToView={displaySettings.weekFitToView}
-              >
-                {positioned.map(({ event, top, height, column, columns }) => (
-                  <button
-                    key={event.id}
-                    type="button"
-                    data-testid="week-event"
-                    onClick={() => onOpenEvent(event.id)}
-                    style={{
-                      top,
-                      height,
-                      left: `calc(${(column / columns) * 100}% + 2px)`,
-                      width: `calc(${100 / columns}% - 4px)`,
-                    }}
-                    className="absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
-                  >
-                    <StatusSpine status={event.booking.status} />
-                    <span className="min-w-0 flex-1">
-                      {event.startsAt !== undefined && (
-                        <span className="tabular block text-2xs text-ink-muted">
-                          {formatTime(event.startsAt, displayZone(event.timezone, homeTimezone))}
-                        </span>
-                      )}
-                      <span
-                        className={cn(
-                          'block truncate text-xs',
-                          event.name ? 'text-ink' : 'text-ink-placeholder italic',
-                        )}
-                      >
-                        {event.name || 'Unnamed'}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </DayColumn>
-            );
-          })}
-        </div>
-      </div>
-
-      <section className="mt-2 shrink-0" aria-label="Where you are sleeping">
-          {beds.length === 0 ? (
-            <p className="px-1 py-2 text-2xs text-ink-muted">
-              No hotels this week. Add an event and set its kind to lodging to see it here.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {beds.map((span) => {
-                const placed = spanWithin(span, days)!;
-
-                return (
-                  <div key={span.event.id} className="grid grid-cols-7 gap-px">
-                    <button
-                      type="button"
-                      onClick={() => onOpenEvent(span.event.id)}
-                      style={{ gridColumn: `${placed.start + 1} / span ${placed.length}` }}
+                  return (
+                    <div
+                      key={day}
                       className={cn(
-                        'flex items-center gap-1.5 truncate rounded-full border border-line-default bg-sunken px-2 py-1',
-                        'text-left text-2xs text-ink hover:bg-card focus-visible:outline-focus focus-visible:outline-2',
+                        'truncate px-1 py-0.5 text-2xs font-medium',
+                        segment ? 'bg-accent-soft text-accent-text' : 'text-transparent',
+                        segment && day === segment.from && 'rounded-l-full',
+                        segment && day === segment.to && 'rounded-r-full',
                       )}
                     >
-                      <StatusSpine
-                        status={span.event.booking.status}
-                        orientation="horizontal"
-                        className="w-4 shrink-0"
-                      />
-                      <span className="truncate">{span.event.name}</span>
-                    </button>
+                      {isStart ? segment.label : ' '}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div
+              className="grid gap-px rounded-t-lg border border-line bg-line"
+              style={{ gridTemplateColumns }}
+            >
+              <div className="sticky left-0 z-20 bg-page" />
+              {days.map((day) => {
+                const forecast = weather.get(day);
+                const glyph = forecast ? weatherGlyph(forecast.code) : null;
+
+                return (
+                  <div
+                    key={day}
+                    ref={day === anchor ? anchorCell : undefined}
+                    data-week-day={day}
+                    className="min-w-0 bg-card px-1 py-1.5 text-center"
+                  >
+                    <div
+                      className={cn(
+                        'text-2xs',
+                        day === today ? 'font-semibold text-now-text' : 'text-ink-muted',
+                      )}
+                    >
+                      {new Intl.DateTimeFormat('en-GB', {
+                        weekday: 'short',
+                        timeZone: 'UTC',
+                      }).format(Date.parse(`${day}T12:00:00Z`))}
+                    </div>
+                    <div
+                      className={cn(
+                        'tabular text-sm',
+                        day === today ? 'font-semibold text-now-text' : 'text-ink',
+                      )}
+                    >
+                      {Number(day.slice(8))}
+                    </div>
+                    {glyph && forecast && (
+                      <div className="truncate text-2xs text-ink-muted" title={glyph.label}>
+                        <span aria-hidden="true">{glyph.icon}</span>{' '}
+                        <span className="tabular hidden sm:inline">
+                          {Math.round(forecast.max)}°/{Math.round(forecast.min)}°
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-          )}
-      </section>
+          </div>
+
+          {/* Time scroll is independent; every rendered day stays aligned. */}
+          <div
+            data-testid="week-timetable-scroll"
+            tabIndex={0}
+            className={cn(
+              'min-h-0 flex-1 overscroll-y-contain rounded-b-lg border-x border-b border-line',
+              displaySettings.weekFitToView ? 'overflow-hidden' : 'overflow-y-auto',
+            )}
+          >
+            <div
+              className="grid gap-px bg-line"
+              style={{
+                gridTemplateColumns,
+                height: displaySettings.weekFitToView ? '100%' : timetableHeight,
+              }}
+            >
+              <div
+                aria-hidden="true"
+                className="sticky left-0 z-20 bg-page text-right text-2xs text-ink-muted"
+              >
+                {Array.from(
+                  { length: displaySettings.weekEndHour - displaySettings.weekStartHour + 1 },
+                  (_, index) => displaySettings.weekStartHour + index,
+                ).map((hour) => (
+                  <span
+                    key={hour}
+                    style={{
+                      top: displaySettings.weekFitToView
+                        ? `${((hour - displaySettings.weekStartHour) / (displaySettings.weekEndHour - displaySettings.weekStartHour)) * 100}%`
+                        : (hour - displaySettings.weekStartHour) * HOUR_HEIGHT,
+                    }}
+                    className={cn(
+                      'absolute right-1 tabular',
+                      hour === displaySettings.weekEndHour
+                        ? '-translate-y-full'
+                        : '-translate-y-1/2',
+                    )}
+                  >
+                    {hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`}
+                  </span>
+                ))}
+              </div>
+
+              {days.map((day) => {
+                const positioned = positionEvents(
+                  byDay.get(day) ?? [],
+                  displayZone,
+                  homeTimezone,
+                  windowStart,
+                  windowEnd,
+                  displaySettings.weekFitToView,
+                );
+
+                return (
+                  <DayColumn
+                    key={day}
+                    day={day}
+                    disabled={readOnly}
+                    selected={false}
+                    band={
+                      selecting && selecting.day === day
+                        ? {
+                            top: displaySettings.weekFitToView
+                              ? `${((selecting.start - windowStart) / (windowEnd - windowStart)) * 100}%`
+                              : (selecting.start - windowStart) * MINUTE_HEIGHT,
+                            height: displaySettings.weekFitToView
+                              ? `${((selecting.end - selecting.start) / (windowEnd - windowStart)) * 100}%`
+                              : (selecting.end - selecting.start) * MINUTE_HEIGHT,
+                          }
+                        : null
+                    }
+                    onStart={(minutes) => setDrag({ day, from: minutes, to: minutes })}
+                    onMove={(minutes) =>
+                      setDrag((current) =>
+                        current && current.day === day ? { ...current, to: minutes } : current,
+                      )
+                    }
+                    onFinish={finishDrag}
+                    windowStart={windowStart}
+                    windowEnd={windowEnd}
+                    fitToView={displaySettings.weekFitToView}
+                  >
+                    {positioned.map(
+                      ({ event, top, height, column, columns }) => (
+                        <button
+                          key={event.id}
+                          type="button"
+                          data-testid="week-event"
+                          onClick={() => onOpenEvent(event.id)}
+                          style={{
+                            top,
+                            height,
+                            left: `calc(${(column / columns) * 100}% + 2px)`,
+                            width: `calc(${100 / columns}% - 4px)`,
+                          }}
+                          className="absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
+                        >
+                          <StatusSpine status={event.booking.status} />
+                          <span className="min-w-0 flex-1">
+                            {event.startsAt !== undefined && (
+                              <span className="tabular block text-2xs text-ink-muted">
+                                {formatTime(
+                                  event.startsAt,
+                                  displayZone(event.timezone, homeTimezone),
+                                )}
+                              </span>
+                            )}
+                            <span
+                              className={cn(
+                                'block truncate text-xs',
+                                event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                              )}
+                            >
+                              {event.name || 'Unnamed'}
+                            </span>
+                          </span>
+                        </button>
+                      ),
+                    )}
+                  </DayColumn>
+                );
+              })}
+            </div>
+          </div>
+
+          <section className="mt-2 shrink-0" aria-label="Where you are sleeping">
+            {beds.length === 0 ? (
+              <p className="px-1 py-2 text-2xs text-ink-muted">
+                No hotels this week. Add an event and set its kind to lodging to see it here.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {beds.map((span) => {
+                  const placed = spanWithin(span, days)!;
+
+                  return (
+                    <div
+                      key={span.event.id}
+                      className="grid gap-px"
+                      style={{ gridTemplateColumns }}
+                    >
+                      <div className="sticky left-0 z-20 bg-page" />
+                      <button
+                        type="button"
+                        onClick={() => onOpenEvent(span.event.id)}
+                        style={{ gridColumn: `${placed.start + 2} / span ${placed.length}` }}
+                        className={cn(
+                          'flex items-center gap-1.5 truncate rounded-full border border-line-default bg-sunken px-2 py-1',
+                          'text-left text-2xs text-ink hover:bg-card focus-visible:outline-focus focus-visible:outline-2',
+                        )}
+                      >
+                        <StatusSpine
+                          status={span.event.booking.status}
+                          orientation="horizontal"
+                          className="w-4 shrink-0"
+                        />
+                        <span className="truncate">{span.event.name}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

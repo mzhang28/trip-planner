@@ -1,6 +1,6 @@
 import { Button, cn } from '@trip/ui';
 import type { DayKey } from '../lib/calendar';
-import { addDays, startOfWeek } from '../lib/calendar';
+import { addDays } from '../lib/calendar';
 import {
   setCalendarDisplaySettings,
   useCalendarDisplaySettings,
@@ -27,13 +27,14 @@ function describe(view: CalendarView, anchor: DayKey): string {
   }
 
   if (view === 'week') {
-    const start = startOfWeek(anchor);
-    return `Week of ${new Intl.DateTimeFormat('en-GB', {
+    const format = new Intl.DateTimeFormat('en-GB', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
       timeZone: 'UTC',
-    }).format(Date.parse(`${start}T12:00:00Z`))}`;
+    });
+    const end = addDays(anchor, 6);
+    return `${format.format(at)} – ${format.format(Date.parse(`${end}T12:00:00Z`))}`;
   }
 
   // The year is in there because a trip is often planned months out, and

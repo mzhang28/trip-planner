@@ -513,6 +513,7 @@ export function TripView() {
               today={today}
               readOnly={readOnly}
               onOpenEvent={focusEvent}
+              onChangeAnchor={moveAnchor}
               onCreateAt={(day, startMinutes, endMinutes) =>
                 createOn(day, { startMinutes, endMinutes })
               }
