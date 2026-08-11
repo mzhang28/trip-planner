@@ -1,27 +1,73 @@
 import type { FlightDetails, TripEvent } from '@trip/crdt';
 import { TextField } from '@trip/ui';
 import { formatTime, setTimeOfDay } from '../lib/time';
+import { TimeField } from './TimeField';
 
 export interface FlightFieldsProps {
   event: TripEvent;
   homeTimezone: string;
-  onPatch: (patch: { flight: FlightDetails }) => void;
+  onPatch: (patch: Partial<TripEvent>) => void;
 }
 
 /**
- * A flight, with each end kept in its own zone.
+ * A flight, with each end shown in its own zone.
  *
- * This is the one case where showing a single time zone actively misleads: a
- * flight that leaves at 17:00 and lands at 09:00 has not gone backwards, and
- * showing both ends in the reader's zone would hide the thing they need to
- * plan around.
+ * The departure is the event's start and the arrival is start plus duration.
+ * Keeping one timeline is essential: calendar placement, transit checks, and
+ * the boarding-pass summary must not be able to disagree about one flight.
  */
 export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps) {
   const flight = event.flight ?? {};
   const departsTz = flight.departsTz ?? event.timezone ?? homeTimezone;
   const arrivesTz = flight.arrivesTz ?? departsTz;
+  const arrivesAt =
+    event.startsAt === undefined || event.durationMinutes === undefined
+      ? undefined
+      : event.startsAt + event.durationMinutes * 60_000;
 
-  const patch = (next: Partial<FlightDetails>) => onPatch({ flight: { ...flight, ...next } });
+  const patchFlight = (next: Partial<FlightDetails>) =>
+    onPatch({ flight: { ...flight, ...next } });
+
+  function setDeparture(raw: string): string | null {
+    if (raw === '') {
+      onPatch({ startsAt: undefined });
+      return null;
+    }
+
+    const at = setTimeOfDay(event.startsAt ?? Date.now(), departsTz, raw);
+    if (at === null) return 'Use a 24-hour time, like 17:05';
+
+    onPatch({
+      startsAt: at,
+      // A flight's event time is its departure, so the event's zone belongs
+      // to the departure airport too.
+      timezone: departsTz,
+      flight: { ...flight, departsTz },
+    });
+    return null;
+  }
+
+  function setArrival(raw: string): string | null {
+    if (event.startsAt === undefined) return 'Set the departure time first.';
+    if (raw === '') {
+      onPatch({ durationMinutes: undefined });
+      return null;
+    }
+
+    let at = setTimeOfDay(event.startsAt, arrivesTz, raw);
+    if (at === null) return 'Use a 24-hour time, like 09:20';
+
+    // A time earlier than departure is normally tomorrow at the arrival
+    // airport. This gives overnight flights the useful default while retaining
+    // a single start + duration for the calendar.
+    if (at <= event.startsAt) at += 24 * 60 * 60 * 1000;
+
+    onPatch({
+      durationMinutes: Math.round((at - event.startsAt) / 60_000),
+      flight: { ...flight, arrivesTz },
+    });
+    return null;
+  }
 
   return (
     <section className="flex flex-col gap-4">
@@ -32,13 +78,15 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
           label="Airline"
           defaultValue={flight.airline ?? ''}
           placeholder="ANA"
-          onBlur={(e) => patch({ airline: e.currentTarget.value.trim() || undefined })}
+          onBlur={(e) => patchFlight({ airline: e.currentTarget.value.trim() || undefined })}
         />
         <TextField
           label="Flight number"
           defaultValue={flight.number ?? ''}
           placeholder="NH017"
-          onBlur={(e) => patch({ number: e.currentTarget.value.trim().toUpperCase() || undefined })}
+          onBlur={(e) =>
+            patchFlight({ number: e.currentTarget.value.trim().toUpperCase() || undefined })
+          }
         />
       </div>
 
@@ -49,24 +97,22 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
             label="Leaving from"
             defaultValue={flight.from ?? ''}
             placeholder="NRT"
-            onBlur={(e) => patch({ from: e.currentTarget.value.trim().toUpperCase() || undefined })}
+            onBlur={(e) => patchFlight({ from: e.currentTarget.value.trim().toUpperCase() || undefined })}
           />
-          <TextField
+          <TimeField
             label={`Departs (${departsTz})`}
-            defaultValue={flight.departsAt ? formatTime(flight.departsAt, departsTz) : ''}
-            placeholder="17:05"
-            onBlur={(e) => {
-              const raw = e.currentTarget.value.trim();
-              if (!raw) return patch({ departsAt: undefined });
-              const at = setTimeOfDay(flight.departsAt ?? event.startsAt ?? Date.now(), departsTz, raw);
-              if (at !== null) patch({ departsAt: at, departsTz });
-            }}
+            value={event.startsAt === undefined ? '' : formatTime(event.startsAt, departsTz)}
+            onCommit={setDeparture}
           />
           <TextField
             label="Departure time zone"
             defaultValue={flight.departsTz ?? ''}
             placeholder={homeTimezone}
-            onBlur={(e) => patch({ departsTz: e.currentTarget.value.trim() || undefined })}
+            onBlur={(e) => {
+              const timezone = e.currentTarget.value.trim() || undefined;
+              patchFlight({ departsTz: timezone });
+              onPatch({ timezone });
+            }}
           />
         </div>
 
@@ -76,24 +122,20 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
             label="Arriving at"
             defaultValue={flight.to ?? ''}
             placeholder="ITM"
-            onBlur={(e) => patch({ to: e.currentTarget.value.trim().toUpperCase() || undefined })}
+            onBlur={(e) => patchFlight({ to: e.currentTarget.value.trim().toUpperCase() || undefined })}
           />
-          <TextField
+          <TimeField
             label={`Arrives (${arrivesTz})`}
-            defaultValue={flight.arrivesAt ? formatTime(flight.arrivesAt, arrivesTz) : ''}
-            placeholder="09:20"
-            onBlur={(e) => {
-              const raw = e.currentTarget.value.trim();
-              if (!raw) return patch({ arrivesAt: undefined });
-              const at = setTimeOfDay(flight.arrivesAt ?? flight.departsAt ?? Date.now(), arrivesTz, raw);
-              if (at !== null) patch({ arrivesAt: at, arrivesTz });
-            }}
+            value={arrivesAt === undefined ? '' : formatTime(arrivesAt, arrivesTz)}
+            disabled={event.startsAt === undefined}
+            hint={event.startsAt === undefined ? 'Set the departure time first.' : undefined}
+            onCommit={setArrival}
           />
           <TextField
             label="Arrival time zone"
             defaultValue={flight.arrivesTz ?? ''}
             placeholder={departsTz}
-            onBlur={(e) => patch({ arrivesTz: e.currentTarget.value.trim() || undefined })}
+            onBlur={(e) => patchFlight({ arrivesTz: e.currentTarget.value.trim() || undefined })}
           />
         </div>
       </div>
@@ -103,19 +145,19 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
           label="Seat"
           defaultValue={flight.seat ?? ''}
           placeholder="32A"
-          onBlur={(e) => patch({ seat: e.currentTarget.value.trim() || undefined })}
+          onBlur={(e) => patchFlight({ seat: e.currentTarget.value.trim() || undefined })}
         />
         <TextField
           label="Terminal"
           defaultValue={flight.terminal ?? ''}
           placeholder="1"
-          onBlur={(e) => patch({ terminal: e.currentTarget.value.trim() || undefined })}
+          onBlur={(e) => patchFlight({ terminal: e.currentTarget.value.trim() || undefined })}
         />
         <TextField
           label="Gate"
           defaultValue={flight.gate ?? ''}
           placeholder="12"
-          onBlur={(e) => patch({ gate: e.currentTarget.value.trim() || undefined })}
+          onBlur={(e) => patchFlight({ gate: e.currentTarget.value.trim() || undefined })}
         />
       </div>
     </section>
@@ -133,9 +175,15 @@ export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeT
   const departsTz = flight.departsTz ?? event.timezone ?? homeTimezone;
   const arrivesTz = flight.arrivesTz ?? departsTz;
 
+  const departsAt = event.startsAt;
+  const arrivesAt =
+    event.startsAt === undefined || event.durationMinutes === undefined
+      ? undefined
+      : event.startsAt + event.durationMinutes * 60_000;
+
   const shift =
-    flight.departsAt !== undefined && flight.arrivesAt !== undefined
-      ? offsetHours(flight.arrivesAt, arrivesTz) - offsetHours(flight.departsAt, departsTz)
+    departsAt !== undefined && arrivesAt !== undefined
+      ? offsetHours(arrivesAt, arrivesTz) - offsetHours(departsAt, departsTz)
       : null;
 
   return (
@@ -145,14 +193,14 @@ export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeT
     >
       <span className="font-medium text-ink">{flight.from ?? '???'}</span>
       <span className="text-ink-muted">
-        {flight.departsAt ? formatTime(flight.departsAt, departsTz) : '--:--'}
+        {departsAt ? formatTime(departsAt, departsTz) : '--:--'}
       </span>
 
       <span aria-hidden="true" className="flex-1 border-t border-dashed border-line-strong" />
       <span className="sr-only">to</span>
 
       <span className="text-ink-muted">
-        {flight.arrivesAt ? formatTime(flight.arrivesAt, arrivesTz) : '--:--'}
+        {arrivesAt ? formatTime(arrivesAt, arrivesTz) : '--:--'}
       </span>
       <span className="font-medium text-ink">{flight.to ?? '???'}</span>
 
