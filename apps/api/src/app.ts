@@ -25,7 +25,29 @@ import { sweepAllTrips } from './sweep';
 export function createApp(services: Services) {
   const app = new Hono<AppEnv>();
 
-  if (!config.isProduction) app.use('*', logger());
+  // Every request, in production too. A client that says only that it could not
+  // connect leaves nothing to go on, and whether the request arrived at all is
+  // the first thing worth knowing.
+  app.use('*', logger());
+
+  /*
+   * Why a request was turned away, which the status alone does not say.
+   *
+   * A refusal is a plain reply rather than a thrown error, so nothing below
+   * would otherwise record it: an agent stuck on a 401 and a server with no
+   * sign of it is the case this exists for.
+   */
+  app.use('*', async (c, next) => {
+    await next();
+
+    if (c.res.status >= 400) {
+      const reason = c.res.headers.get('WWW-Authenticate');
+      console.warn(
+        `${c.req.method} ${c.req.path} refused with ${c.res.status}`,
+        reason ? `(${reason})` : '',
+      );
+    }
+  });
 
   /*
    * Answer in JSON even when something breaks. A client that gets HTML back

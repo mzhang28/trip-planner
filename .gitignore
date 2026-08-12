@@ -4,6 +4,10 @@ build/
 storybook-static/
 *.tsbuildinfo
 
+# The service worker the PWA plugin writes on every dev run. Regenerated from
+# source, and its precache revisions change each time.
+dev-dist/
+
 # Runtime data: the SQLite database and filesystem blob store
 data/
 
