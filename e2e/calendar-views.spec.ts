@@ -422,6 +422,23 @@ test.describe('getting between events', () => {
 });
 
 test.describe('filling an event in gradually', () => {
+  test('the trip canvas uses the full desktop width', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 900 });
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    await expect
+      .poll(() => page.locator('main').evaluate((element) => element.getBoundingClientRect().width))
+      .toBe(1920);
+    await expect
+      .poll(() =>
+        page
+          .getByTestId('trip-toolbar')
+          .evaluate((element) => element.getBoundingClientRect().width),
+      )
+      .toBe(1920);
+  });
+
   test('only the day event list scrolls', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');

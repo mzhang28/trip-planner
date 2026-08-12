@@ -544,7 +544,10 @@ export function TripView() {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
       <header className="z-10 shrink-0 border-b border-line bg-page/95 backdrop-blur">
-        <div className="relative mx-auto flex w-full max-w-[100rem] flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div
+          data-testid="trip-toolbar"
+          className="relative flex w-full flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8"
+        >
           <div className="flex min-w-0 items-center gap-3">
             <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline">
               All trips
@@ -584,7 +587,7 @@ export function TripView() {
         </div>
 
         {/* Below the large breakpoint the search box gets the whole row. */}
-        <div className="mx-auto w-full max-w-[100rem] px-4 pb-3 lg:hidden">
+        <div className="w-full px-4 pb-3 lg:hidden">
           <SearchBar
             doc={doc}
             homeTimezone={homeTimezone}
@@ -596,7 +599,7 @@ export function TripView() {
       </header>
 
       <main
-        className={`mx-auto min-h-0 w-full max-w-[100rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 ${
+        className={`min-h-0 w-full flex-1 px-4 py-6 sm:px-6 lg:px-8 ${
           view === 'month' ? 'overflow-y-auto' : 'flex flex-col overflow-hidden'
         }`}
       >
@@ -700,7 +703,7 @@ export function TripView() {
             <div className="flex h-full min-h-0 flex-col gap-4 lg:flex-row">
               <div
                 data-testid="day-list-scroll"
-                className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:max-w-4xl lg:pr-1"
+                className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:pr-1"
               >
           {days.map(([key, dayEvents]) => (
             <section key={key} className="mb-8">
