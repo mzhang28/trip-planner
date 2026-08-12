@@ -30,10 +30,16 @@ function start(command, args, options = {}) {
   return child;
 }
 
-function mirror(stream, prefix) {
-  stream.on('data', (chunk) => {
-    process.stdout.write(`[${prefix}] ${chunk}`);
-  });
+function consumeServerOutput(stream, prefix) {
+  if (process.env.E2E_SERVER_LOGS === '1') {
+    stream.on('data', (chunk) => {
+      process.stdout.write(`[${prefix}] ${chunk}`);
+    });
+  } else {
+    // Keep the pipe drained without making CI process thousands of routine
+    // sync request lines. Set E2E_SERVER_LOGS=1 when server output is useful.
+    stream.resume();
+  }
 }
 
 /** Reads both output streams until the server announces the port it bound. */
@@ -154,8 +160,8 @@ try {
     'API',
     /api listening on http:\/\/[^:]+:(\d+)/,
   );
-  mirror(api.stdout, 'api');
-  mirror(api.stderr, 'api');
+  consumeServerOutput(api.stdout, 'api');
+  consumeServerOutput(api.stderr, 'api');
   const apiPort = await apiPortPromise;
 
   await run('pnpm', ['--filter', '@trip/web', 'exec', 'node', 'scripts/build-icons.mjs'], {
@@ -186,8 +192,8 @@ try {
     },
   );
   const webPortPromise = portFromOutput(web, 'Web preview', /Local:\s+http:\/\/[^:]+:(\d+)/);
-  mirror(web.stdout, 'web');
-  mirror(web.stderr, 'web');
+  consumeServerOutput(web.stdout, 'web');
+  consumeServerOutput(web.stderr, 'web');
   const webPort = await webPortPromise;
 
   const args = process.argv.slice(2);

@@ -4,9 +4,10 @@ const WEB_URL = process.env.E2E_BASE_URL;
 if (!WEB_URL) throw new Error('No E2E server is running. Start tests with `pnpm test:e2e`.');
 
 /*
- * Three viewports, because the layouts differ rather than merely reflow: the
- * week view scrolls sideways on a phone and fits on a desktop, and the day view
- * puts the map beside the timeline only from tablet up.
+ * Behaviour is covered once on desktop. Tests tagged @responsive also run on
+ * phone and tablet, where width, touch, or mobile browser behaviour can change
+ * the result. Running every data and workflow test at all three sizes tripled
+ * the suite without exercising a different code path.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -35,9 +36,10 @@ export default defineConfig({
    * layout question that is about width and pointer type, not about the engine.
    */
   projects: [
-    { name: 'phone', use: { ...devices['Pixel 7'] } },
+    { name: 'phone', grep: /@(responsive|touch)/, use: { ...devices['Pixel 7'] } },
     {
       name: 'tablet',
+      grep: /@(responsive|touch)/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 820, height: 1180 },
@@ -47,6 +49,7 @@ export default defineConfig({
     },
     {
       name: 'desktop',
+      grepInvert: /@touch/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },
   ],

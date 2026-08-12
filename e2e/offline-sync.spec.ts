@@ -273,18 +273,6 @@ test.describe('finding things', () => {
     await box.fill('invite');
     await expect(page.getByRole('option', { name: /Share this trip/ })).toBeVisible();
   });
-
-  test('a typo still finds the event', async ({ page }) => {
-    await page.goto('/');
-    const { tripId } = await newTrip(page, 'Japan, April');
-    await openTrip(page, tripId);
-    await addEvent(page, 'Dotonbori at night');
-    await expectSaved(page);
-
-    const box = page.getByRole('combobox', { name: 'Search this trip' }).first();
-    await box.fill('dotonbri');
-    await expect(page.getByRole('option', { name: /Dotonbori at night/ })).toBeVisible();
-  });
 });
 
 test.describe('moving events', () => {

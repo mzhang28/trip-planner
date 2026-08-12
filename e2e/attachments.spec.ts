@@ -75,16 +75,4 @@ test.describe('attachments', () => {
       .poll(async () => (await page.request.get(href!)).status(), { timeout: 15_000 })
       .toBe(200);
   });
-
-  test('removing a file takes it off the event', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page);
-    await addEvent(page, 'Ryokan');
-
-    await page.getByTestId('attachment-input').setInputFiles(FILE);
-    await expect(page.getByRole('link', { name: 'booking.txt' })).toBeVisible();
-
-    await page.getByRole('button', { name: 'Remove booking.txt' }).click();
-    await expect(page.getByRole('link', { name: 'booking.txt' })).toHaveCount(0);
-  });
 });

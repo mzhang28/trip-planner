@@ -563,9 +563,7 @@ test.describe('trips you cannot open', () => {
 });
 
 test.describe('reaching things with a finger', () => {
-  test('a week day can be added to without dragging', async ({ page }) => {
-    test.skip(test.info().project.name === 'desktop', 'A mouse drags the time out instead.');
-
+  test('a week day can be added to without dragging', { tag: '@touch' }, async ({ page }) => {
     await page.goto('/');
     await newTrip(page);
 
@@ -600,9 +598,7 @@ test.describe('reaching things with a finger', () => {
     await expect(page.getByTestId('event-date')).toHaveValue(today);
   });
 
-  test('an event can be ticked without hovering it first', async ({ page }) => {
-    test.skip(test.info().project.name === 'desktop', 'Hover reveals the box on a desktop.');
-
+  test('an event can be ticked without hovering it first', { tag: '@touch' }, async ({ page }) => {
     await page.goto('/');
     await newTrip(page);
 
@@ -615,29 +611,33 @@ test.describe('reaching things with a finger', () => {
     await expect(page.getByTestId('selection-bar')).toBeVisible();
   });
 
-  test('a long editor can be closed from where it ends', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page);
+  test(
+    'a long editor can be closed from where it ends',
+    { tag: '@responsive' },
+    async ({ page }) => {
+      await page.goto('/');
+      await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await eventRow(page, 'Fushimi Inari').click();
+      await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await eventRow(page, 'Fushimi Inari').click();
 
-    // Enough fields open that the editor is taller than the screen, which is
-    // the state the complaint is about.
-    for (const field of ['when', 'duration', 'city', 'place', 'confirmation', 'links']) {
-      await reveal(page, field);
-    }
+      // Enough fields open that the editor is taller than the screen, which is
+      // the state the complaint is about.
+      for (const field of ['when', 'duration', 'city', 'place', 'confirmation', 'links']) {
+        await reveal(page, field);
+      }
 
-    // Scrolled to the top of the editor: the card header is the other way out,
-    // and from here it is several screens up.
-    await page.getByTestId('event-name').scrollIntoViewIfNeeded();
+      // Scrolled to the top of the editor: the card header is the other way out,
+      // and from here it is several screens up.
+      await page.getByTestId('event-name').scrollIntoViewIfNeeded();
 
-    const done = page.getByTestId('close-editor');
-    await expect(done).toBeInViewport();
-    await done.click();
-    await expect(page.getByTestId('event-editor')).toHaveCount(0);
-  });
+      const done = page.getByTestId('close-editor');
+      await expect(done).toBeInViewport();
+      await done.click();
+      await expect(page.getByTestId('event-editor')).toHaveCount(0);
+    },
+  );
 });
 
 test.describe('a stay', () => {

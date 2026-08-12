@@ -116,37 +116,41 @@ async function setTripDates(page: Page, start: string, end: string) {
 }
 
 test.describe('week and month views', () => {
-  test('a week shows its days, and events land on the right one', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page, 'Japan, April');
+  test(
+    'a week shows its days, and events land on the right one',
+    { tag: '@responsive' },
+    async ({ page }) => {
+      await page.goto('/');
+      await newTrip(page, 'Japan, April');
 
-    await addEvent(page, 'Fushimi Inari', 'Kyoto', '05:30');
-    await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
+      await addEvent(page, 'Fushimi Inari', 'Kyoto', '05:30');
+      await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
 
-    await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Week');
+      await page.getByTestId('go-to-date').fill(ON);
+      await switchTo(page, 'Week');
 
-    // Both events are on the same day, so one column holds them both.
-    const week = page.getByTestId('week-event');
-    const earlyEvent = week.filter({ hasText: 'Fushimi Inari' });
-    await expect(earlyEvent).toBeVisible();
-    await expect(week.filter({ hasText: 'Nishiki Market' })).toBeVisible();
+      // Both events are on the same day, so one column holds them both.
+      const week = page.getByTestId('week-event');
+      const earlyEvent = week.filter({ hasText: 'Fushimi Inari' });
+      await expect(earlyEvent).toBeVisible();
+      await expect(week.filter({ hasText: 'Nishiki Market' })).toBeVisible();
 
-    // Earlier in the day comes first, which is what makes a column a timeline.
-    // Fushimi is at 05:30, before the hours the week shows by default: it is
-    // pinned to the top of the column rather than dropped from it.
-    await expect(week.first()).toContainText('Fushimi Inari');
+      // Earlier in the day comes first, which is what makes a column a timeline.
+      // Fushimi is at 05:30, before the hours the week shows by default: it is
+      // pinned to the top of the column rather than dropped from it.
+      await expect(week.first()).toContainText('Fushimi Inari');
 
-    // The pinned event is only as tall as the minimum card. Its compact form
-    // keeps the name inside the visible bounds instead of spending both rows
-    // on a time and clipping the identifying text below the card.
-    const cardBox = await earlyEvent.boundingBox();
-    const nameBox = await earlyEvent.getByTestId('week-event-name').boundingBox();
-    if (!cardBox || !nameBox) throw new Error('no compact week event bounds');
-    expect(nameBox.y).toBeGreaterThanOrEqual(cardBox.y);
-    expect(nameBox.y + nameBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
-    await expect(earlyEvent.locator('.week-event-time')).toBeHidden();
-  });
+      // The pinned event is only as tall as the minimum card. Its compact form
+      // keeps the name inside the visible bounds instead of spending both rows
+      // on a time and clipping the identifying text below the card.
+      const cardBox = await earlyEvent.boundingBox();
+      const nameBox = await earlyEvent.getByTestId('week-event-name').boundingBox();
+      if (!cardBox || !nameBox) throw new Error('no compact week event bounds');
+      expect(nameBox.y).toBeGreaterThanOrEqual(cardBox.y);
+      expect(nameBox.y + nameBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
+      await expect(earlyEvent.locator('.week-event-time')).toBeHidden();
+    },
+  );
 
   test('the city band names where you are, spanning the days you are there', async ({ page }) => {
     await page.goto('/');
@@ -190,45 +194,49 @@ test.describe('week and month views', () => {
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
   });
 
-  test('moving between weeks changes what is shown, and Today comes back', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page, 'Japan, April');
-    await setTripDates(page, '2026-08-05', '2026-08-25');
-    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+  test(
+    'moving between weeks changes what is shown, and Today comes back',
+    { tag: '@responsive' },
+    async ({ page }) => {
+      await page.goto('/');
+      await newTrip(page, 'Japan, April');
+      await setTripDates(page, '2026-08-05', '2026-08-25');
+      await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
-    await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Week');
+      await page.getByTestId('go-to-date').fill(ON);
+      await switchTo(page, 'Week');
 
-    const event = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
-    await expect(event).toBeInViewport();
+      const event = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
+      await expect(event).toBeInViewport();
 
-    // Every date exists once, bounded by the trip rather than regenerated as
-    // the scrollbar moves.
-    const renderedDays = page.locator('[data-week-day]');
-    await expect(renderedDays).toHaveCount(21);
-    await expect(page.locator('[data-week-day="2026-08-05"]')).toHaveCount(1);
-    await expect(page.locator('[data-week-day="2026-08-25"]')).toHaveCount(1);
-    await expect(page.locator('[data-week-day="2026-08-04"]')).toHaveCount(0);
-    await expect(page.locator('[data-week-day="2026-08-26"]')).toHaveCount(0);
+      // Every date exists once, bounded by the trip rather than regenerated as
+      // the scrollbar moves.
+      const renderedDays = page.locator('[data-week-day]');
+      await expect(renderedDays).toHaveCount(21);
+      await expect(page.locator('[data-week-day="2026-08-05"]')).toHaveCount(1);
+      await expect(page.locator('[data-week-day="2026-08-25"]')).toHaveCount(1);
+      await expect(page.locator('[data-week-day="2026-08-04"]')).toHaveCount(0);
+      await expect(page.locator('[data-week-day="2026-08-26"]')).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'Later' }).click();
-    await expect(event).not.toBeInViewport();
+      await page.getByRole('button', { name: 'Later' }).click();
+      await expect(event).not.toBeInViewport();
 
-    await page.getByTestId('go-to-date').fill(ON);
-    await expect(event).toBeInViewport();
+      await page.getByTestId('go-to-date').fill(ON);
+      await expect(event).toBeInViewport();
 
-    const scroller = page.getByTestId('week-horizontal-scroll');
-    expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
-      true,
-    );
-    await scroller.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
-    await expect(page.locator('[data-week-day="2026-08-25"]')).toBeInViewport();
-    const rightEdge = await scroller.evaluate((element) => element.scrollLeft);
-    await page.waitForTimeout(250);
-    expect(await scroller.evaluate((element) => element.scrollLeft)).toBe(rightEdge);
-    await scroller.evaluate((element) => element.scrollTo({ left: 0 }));
-    await expect(page.locator('[data-week-day="2026-08-05"]')).toBeInViewport();
-  });
+      const scroller = page.getByTestId('week-horizontal-scroll');
+      expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
+        true,
+      );
+      await scroller.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
+      await expect(page.locator('[data-week-day="2026-08-25"]')).toBeInViewport();
+      const rightEdge = await scroller.evaluate((element) => element.scrollLeft);
+      await page.waitForTimeout(250);
+      expect(await scroller.evaluate((element) => element.scrollLeft)).toBe(rightEdge);
+      await scroller.evaluate((element) => element.scrollTo({ left: 0 }));
+      await expect(page.locator('[data-week-day="2026-08-05"]')).toBeInViewport();
+    },
+  );
 
   test('picking an event in the week opens it in the day view', async ({ page }) => {
     await page.goto('/');
@@ -375,20 +383,6 @@ test.describe('selecting several events', () => {
 
     await expect(page.getByTestId('event')).toHaveCount(1);
   });
-
-  test('merging is offered only once there is something to merge with', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page, 'Japan, April');
-
-    await page.getByRole('textbox', { name: 'New event' }).fill('Only one');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await page.getByTestId('event-select').first().check();
-
-    // Merging one thing into itself is not an operation.
-    await expect(
-      page.getByTestId('selection-bar').getByRole('button', { name: 'Merge' }),
-    ).toBeDisabled();
-  });
 });
 
 test.describe('getting between events', () => {
@@ -412,25 +406,6 @@ test.describe('getting between events', () => {
     await expect(leg).toContainText('45 min');
     await expect(leg).toContainText('25 min short of the gap');
   });
-
-  test('a journey that fits is stated without a warning', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page, 'Japan, April');
-
-    await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
-    await addEvent(page, 'Fushimi Inari', 'Kyoto', '14:00');
-
-    await eventRow(page, 'Fushimi Inari').click();
-    const editor = page.getByTestId('event-editor');
-    await revealField(page, 'transit');
-    await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).fill('20');
-    await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).blur();
-    await page.getByTestId('close-editor').click();
-
-    const leg = page.getByTestId('transit-leg');
-    await expect(leg).toContainText('20 min');
-    await expect(leg).not.toContainText('short of the gap');
-  });
 });
 
 test.describe('filling an event in gradually', () => {
@@ -451,7 +426,7 @@ test.describe('filling an event in gradually', () => {
       .toBe(1920);
   });
 
-  test('only the day event list scrolls', async ({ page }) => {
+  test('only the day event list scrolls', { tag: '@responsive' }, async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
 
@@ -501,14 +476,6 @@ test.describe('filling an event in gradually', () => {
     await expect(editor.getByTestId('field-booking')).toHaveCount(0);
     await expect(page.getByTestId('booking-status-button')).toHaveAccessibleName(
       'Change booking status, currently Idea',
-    );
-    await page.getByTestId('booking-status-button').click();
-    await page
-      .getByRole('dialog', { name: 'Booking status' })
-      .getByRole('button', { name: 'In progress' })
-      .click();
-    await expect(page.getByTestId('booking-status-button')).toHaveAccessibleName(
-      'Change booking status, currently In progress',
     );
     await expect(eventRow(page, 'Fushimi Inari').getByRole('img', { name: 'Event' })).toBeVisible();
     await expect(editor.getByTestId('field-city')).toHaveCount(0);

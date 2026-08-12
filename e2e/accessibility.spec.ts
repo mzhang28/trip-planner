@@ -53,20 +53,24 @@ test.describe('accessibility', () => {
     expect(describeViolations(results)).toBe('');
   });
 
-  test('the day view has no violations, with an event open', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page);
+  test(
+    'the day view has no violations, with an event open',
+    { tag: '@responsive' },
+    async ({ page }) => {
+      await page.goto('/');
+      await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await page.getByTestId('event').first().click();
-    await expect(page.getByTestId('event-editor')).toBeVisible();
+      await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await page.getByTestId('event').first().click();
+      await expect(page.getByTestId('event-editor')).toBeVisible();
 
-    const results = await scan(page);
-    expect(describeViolations(results)).toBe('');
-  });
+      const results = await scan(page);
+      expect(describeViolations(results)).toBe('');
+    },
+  );
 
-  test('the week and month views have no violations', async ({ page }) => {
+  test('the week and month views have no violations', { tag: '@responsive' }, async ({ page }) => {
     await page.goto('/');
     await newTrip(page);
 

@@ -76,6 +76,9 @@ ports. The harness discovers both ports from their stdout, builds into a unique
 temporary directory, and uses a fresh SQLite database and blob directory. Test
 runs can therefore run beside `pnpm dev` and beside each other.
 
+Routine server request logs are suppressed during the browser suite. Run with
+`E2E_SERVER_LOGS=1 pnpm test:e2e` when those logs are needed for debugging.
+
 | Port | What                                            |
 | ---- | ----------------------------------------------- |
 | 5173 | web, `pnpm dev`                                 |
