@@ -32,8 +32,13 @@ export async function loadTripList(): Promise<TripSummary[] | null> {
 }
 
 export interface StoredSync {
-  /** The server's sync state, opaque here and handed straight back to it. */
-  serverState?: string;
+  /**
+   * When this device last heard from the server about this trip.
+   *
+   * Kept across reloads because it is what the server checks against its
+   * tombstone sweep when this device next connects, to decide whether the copy
+   * here is still safe to merge.
+   */
   lastSyncedAt?: number;
 }
 

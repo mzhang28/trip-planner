@@ -13,8 +13,11 @@
     "@automerge/automerge": "^3.4.0",
     "@aws-sdk/client-s3": "^3.1107.0",
     "@aws-sdk/s3-request-presigner": "^3.1107.0",
+    "@bufbuild/protobuf": "^2.13.0",
+    "@connectrpc/connect": "^2.1.2",
     "@hono/node-server": "^1.19.9",
     "@trip/crdt": "workspace:*",
+    "@trip/proto": "workspace:*",
     "@trip/schema": "workspace:^",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.2",
@@ -23,6 +26,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@connectrpc/connect-web": "^2.1.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^24.10.1",
     "drizzle-kit": "^0.31.10",

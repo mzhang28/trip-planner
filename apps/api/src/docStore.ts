@@ -23,8 +23,40 @@ import type { Db, Executor } from './db';
  */
 export class DocStore {
   readonly #cache = new Map<string, Doc>();
+  readonly #watchers = new Set<(tripId: string, doc: Doc) => void>();
 
   constructor(private readonly db: Db) {}
+
+  /**
+   * Calls back whenever a trip's document gains something, whatever put it
+   * there.
+   *
+   * Sync is not the only way a trip changes: an agent editing over MCP, a
+   * rename from trip settings and the nightly sweep all arrive here instead.
+   * Watching the store rather than the sync endpoint is what lets someone with
+   * the trip open see all of those without asking for them.
+   */
+  watch(listener: (tripId: string, doc: Doc) => void): () => void {
+    this.#watchers.add(listener);
+    return () => this.#watchers.delete(listener);
+  }
+
+  #announce(tripId: string, doc: Doc): void {
+    for (const listener of this.#watchers) listener(tripId, doc);
+  }
+
+  /**
+   * Replaces the cached handle when the document itself has not moved.
+   *
+   * Applying a sync message marks the handle it was applied to as outdated even
+   * when the message carried nothing new, which a reader's messages routinely
+   * do. Keeping the superseded handle would fail the next message against it,
+   * and going through `commit` instead would rewrite the snapshot and the whole
+   * projection for a document that nobody changed.
+   */
+  advance(tripId: string, doc: Doc): void {
+    this.#cache.set(tripId, doc);
+  }
 
   create(tripId: string, name: string, homeTimezone: string): Doc {
     return this.adopt(tripId, createTrip(name, homeTimezone));
@@ -43,6 +75,7 @@ export class DocStore {
     this.#cache.set(tripId, doc);
     this.#persistSnapshot(tripId, doc);
     this.#project(tripId, doc);
+    this.#announce(tripId, doc);
     return doc;
   }
 
@@ -107,6 +140,7 @@ export class DocStore {
       // follow, or the change exists only in memory until the next restart.
       this.#persistSnapshot(tripId, next);
       this.#project(tripId, next);
+      this.#announce(tripId, next);
       return;
     }
 
@@ -124,6 +158,9 @@ export class DocStore {
     this.db.insert(tripChanges).values(rows).onConflictDoNothing().run();
 
     this.#project(tripId, next);
+    // After the projection, so a listener that reads the relational tables sees
+    // them agreeing with the document it was handed.
+    this.#announce(tripId, next);
   }
 
   /**

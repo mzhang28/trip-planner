@@ -1,4 +1,5 @@
 import { relative } from 'node:path';
+import { createContextValues } from '@connectrpc/connect';
 import { TOMBSTONE_TTL_MS } from '@trip/crdt';
 import { trips } from '@trip/schema';
 import { serveStatic } from '@hono/node-server/serve-static';
@@ -20,11 +21,17 @@ import { mcpRoutes } from './routes/mcp';
 import { metadataRoutes, oauthRoutes } from './routes/oauth';
 import { placeRoutes, weatherRoutes } from './routes/places';
 import { shareRoutes, tripRoutes } from './routes/trips';
-import { syncRoutes } from './routes/sync';
+import { connectHandler } from './sync/connect';
+import { identityContext, syncService } from './sync/service';
+import { SyncSessions } from './sync/sessions';
 import { sweepAllTrips } from './sweep';
 
 export function createApp(services: Services) {
   const app = new Hono<AppEnv>();
+
+  // Everyone with a trip open right now. Held per app rather than per request,
+  // because carrying one person's edit to another person is the whole point.
+  const sessions = new SyncSessions(services.docs);
 
   // Every request, in production too. A client that says only that it could not
   // connect leaves nothing to go on, and whether the request arrived at all is
@@ -178,10 +185,18 @@ export function createApp(services: Services) {
   app.route('/api/trips', tripRoutes());
   app.route('/api/share', shareRoutes());
 
-  // Membership is resolved once here rather than inside the sync handler, so
-  // the same check guards every route added under this prefix later.
-  app.use('/api/sync/:tripId', requireMembership);
-  app.route('/api/sync', syncRoutes());
+  /*
+   * Sync is the one part of the API that is not REST.
+   *
+   * It needs the server to speak first -- someone with the trip open should see
+   * another person's edit without having asked for it -- and a request/response
+   * endpoint has no way to do that. The handlers sit under /api so that the
+   * session cookie is resolved by the same middleware as everything else.
+   */
+  const rpc = connectHandler(syncService(services, sessions), { prefix: '/api/rpc' });
+  app.all('/api/rpc/*', (c) =>
+    rpc(c.req.raw, createContextValues().set(identityContext, c.var.identity)),
+  );
 
   app.use('/api/audit/:tripId', requireMembership);
   app.use('/api/audit/:tripId/*', requireMembership);

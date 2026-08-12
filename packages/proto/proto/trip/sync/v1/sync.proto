@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package trip.sync.v1;
+
+// Keeping one trip's document in step across everyone who has it open.
+//
+// The two calls are one conversation. Subscribe opens a session and is the only
+// way the server sends anything; Push is the only way a client sends anything.
+// Splitting the directions like this is what lets a browser take part: a
+// browser can read a streaming response but cannot write a streaming request,
+// so the client's half of every exchange arrives as a separate unary call that
+// names the session it belongs to.
+service SyncService {
+  // Opens a session and streams the trip until the caller lets go.
+  rpc Subscribe(SubscribeRequest) returns (stream SyncEvent);
+
+  // Hands over one sync message from the client's side of a session.
+  rpc Push(PushRequest) returns (PushResponse);
+}
+
+message SubscribeRequest {
+  string trip_id = 1;
+
+  // When this client last finished a sync, checked against the tombstone sweep.
+  // Absent from a client that has never synced this trip.
+  optional int64 last_synced_at = 2;
+
+  // Whether this client is carrying anything of its own.
+  //
+  // A client with an empty document cannot bring a swept event back, so it is
+  // safe to admit whatever its history says.
+  bool has_local_changes = 3;
+}
+
+message SyncEvent {
+  oneof event {
+    SessionOpened opened = 1;
+    SyncMessage message = 2;
+    ResyncRequired resync_required = 3;
+  }
+}
+
+// Always the first event on a stream. The id is what Push quotes to say which
+// side of which conversation it is speaking for.
+message SessionOpened {
+  string session_id = 1;
+}
+
+message SyncMessage {
+  // An Automerge sync message, as its own bytes rather than text. The old JSON
+  // endpoint carried these base64-encoded, which cost a third of the size.
+  bytes payload = 1;
+
+  // Server time when this was sent, kept by the client as its last sync.
+  int64 synced_at = 2;
+}
+
+// This client's copy is older than the last tombstone sweep, so merging it
+// could put deleted events back. It has to start again from a fresh copy.
+message ResyncRequired {
+  optional int64 swept_at = 1;
+}
+
+message PushRequest {
+  string session_id = 1;
+  bytes payload = 2;
+}
+
+message PushResponse {
+  int64 synced_at = 1;
+}

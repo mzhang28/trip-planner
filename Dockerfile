@@ -30,10 +30,12 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/crdt/package.json packages/crdt/
+COPY packages/proto/package.json packages/proto/
 COPY packages/schema/package.json packages/schema/
 COPY packages/ui/package.json packages/ui/
 # Only the two apps and the packages they depend on. The root package holds
-# Playwright and Vitest, which nothing in the image runs.
+# Playwright, Vitest, and the protobuf compiler, none of which the image runs:
+# the generated client is committed, so nothing here regenerates it.
 #
 # The store is mounted rather than copied in, so editing one dependency
 # re-links the rest from the cache instead of downloading them again. It also
@@ -48,6 +50,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
 FROM deps AS web-build
 COPY tsconfig.base.json ./
 COPY packages/crdt packages/crdt
+COPY packages/proto packages/proto
 COPY packages/ui packages/ui
 COPY apps/web apps/web
 # Writes the PWA icons from the SVG, then bundles.
@@ -69,9 +72,11 @@ ENV NODE_ENV=production \
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=deps /app/packages/crdt/node_modules ./packages/crdt/node_modules
+COPY --from=deps /app/packages/proto/node_modules ./packages/proto/node_modules
 COPY --from=deps /app/packages/schema/node_modules ./packages/schema/node_modules
 COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
 COPY packages/crdt packages/crdt
+COPY packages/proto packages/proto
 COPY packages/schema packages/schema
 COPY apps/api apps/api
 COPY --from=web-build /app/apps/web/dist apps/web/dist

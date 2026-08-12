@@ -1,10 +1,8 @@
 import * as A from '@automerge/automerge';
-import {
-  normalizeBookingStatuses,
-  normalizeEventKinds,
-  type Doc,
-  type TripDoc,
-} from '@trip/crdt';
+import { ConnectError, Code } from '@connectrpc/connect';
+import { normalizeBookingStatuses, normalizeEventKinds, type Doc, type TripDoc } from '@trip/crdt';
+import type { SyncEvent } from '@trip/proto';
+import { syncClient } from '../lib/syncClient';
 import {
   forgetDoc,
   forgetRecovery,
@@ -40,27 +38,51 @@ export interface TripState {
   recoverableChanges?: number;
 }
 
-const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
-const un64 = (value: string) => Uint8Array.from(atob(value), (ch) => ch.charCodeAt(0));
+/** Longest wait between attempts to get the connection back. */
+const SLOWEST_RETRY_MS = 30_000;
 
 /**
- * One trip's replica: the document, the sync loop, and what the UI subscribes to.
+ * One trip's replica: the document, the connection, and what the UI subscribes
+ * to.
  *
  * Every change is applied locally and saved first, then sent. That ordering is
  * what makes the app usable with no signal — nothing waits on a response, and a
  * failed send is a retry rather than a lost edit.
+ *
+ * While there is a connection it is held open, and the server sends other
+ * people's changes down it as they are made. That is the difference between a
+ * trip that updates when you touch it and one that updates when anybody does.
  */
 export class TripStore {
   #doc: Doc;
   #phase: SyncPhase = 'idle';
   #sync: StoredSync = {};
-  #localState = A.initSyncState();
   #listeners = new Set<() => void>();
   #snapshot: TripState;
-  #inFlight: Promise<void> | null = null;
-  #dirty = false;
-  #retryAt: ReturnType<typeof setTimeout> | null = null;
+  #recoverable: number | undefined;
+
+  /**
+   * Automerge's record of what the server is believed to have already.
+   *
+   * Reset with every connection. The server keeps the matching record in
+   * memory only, so a server that restarted has forgotten what it knew about
+   * this device; starting both sides afresh costs one extra exchange and means
+   * the two can never disagree about where they left off.
+   */
+  #localState = A.initSyncState();
+
+  /** Names this device's side of the conversation. Absent when not connected. */
+  #sessionId: string | null = null;
+
+  #connection: AbortController | null = null;
+  #closed = false;
   #failures = 0;
+
+  /** Cuts short a wait, when there is now a reason not to keep waiting. */
+  #wake: (() => void) | null = null;
+
+  #pushing: Promise<void> | null = null;
+  #pushAgain = false;
 
   private constructor(
     readonly tripId: string,
@@ -85,7 +107,7 @@ export class TripStore {
     if (recovery) store.#recoverable = recovery.changeCount;
 
     store.#listen();
-    void store.sync();
+    void store.#stayConnected();
     return store;
   }
 
@@ -103,8 +125,16 @@ export class TripStore {
     const onOffline = () => {
       this.#phase = 'pending';
       this.#publish();
+      // Drop the connection rather than wait for it to time out, so coming back
+      // starts a new one instead of writing into a socket that is already gone.
+      this.#connection?.abort();
     };
-    const onOnline = () => void this.sync();
+
+    const onOnline = () => {
+      this.#failures = 0;
+      this.#wake?.();
+      this.#connection?.abort();
+    };
 
     window.addEventListener('offline', onOffline);
     window.addEventListener('online', onOnline);
@@ -116,38 +146,15 @@ export class TripStore {
   }
 
   dispose(): void {
+    this.#closed = true;
     this.#teardown?.();
     this.#teardown = null;
-    if (this.#retryAt) clearTimeout(this.#retryAt);
-    this.#retryAt = null;
+    this.#connection?.abort();
+    this.#connection = null;
+    // A loop asleep between attempts would otherwise hold on until its timer
+    // ran out, keeping this trip's document alive after the page left it.
+    this.#wake?.();
     this.#listeners.clear();
-  }
-
-  /**
-   * Marks the sync as not having landed, and arranges to try again.
-   *
-   * Without this a change that failed to send would sit there until the person
-   * made another edit or the browser noticed the network return — so one bad
-   * response could leave an edit stranded on the device indefinitely while the
-   * badge quietly said it was fine.
-   *
-   * The first retry is almost immediate, because most failures are a server
-   * that was busy for a moment. From there the delay doubles up to half a
-   * minute, so one that is actually down is not hammered.
-   */
-  #failed(): void {
-    this.#phase = 'pending';
-    this.#publish();
-
-    if (this.#retryAt) return;
-
-    const delay = Math.min(500 * 2 ** this.#failures, 30_000);
-    this.#failures += 1;
-
-    this.#retryAt = setTimeout(() => {
-      this.#retryAt = null;
-      void this.sync();
-    }, delay);
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -157,6 +164,24 @@ export class TripStore {
 
   /** Stable between notifications, as useSyncExternalStore requires. */
   getSnapshot = (): TripState => this.#snapshot;
+
+  /**
+   * Whether the trip itself has reached this device yet.
+   *
+   * A replica opened on a device that has never held this trip starts as an
+   * empty document, and stays empty until the server's first message lands.
+   * Sending succeeds before then -- there is nothing to send, so it succeeds
+   * trivially -- which is why finishing a send is not on its own a reason to
+   * say the trip is safe here.
+   */
+  #arrived(): boolean {
+    return 'meta' in this.#doc;
+  }
+
+  /** Idle once the trip is here; until then a send that landed proves nothing. */
+  #settled(): SyncPhase {
+    return this.#arrived() ? 'idle' : 'syncing';
+  }
 
   #publish(patch: Partial<TripState> = {}): void {
     this.#snapshot = {
@@ -170,7 +195,7 @@ export class TripStore {
   }
 
   /**
-   * Applies a change locally, saves it, and pushes when it can.
+   * Applies a change locally, saves it, and sends it when it can.
    *
    * The caller gets the new state immediately; whether the network is there
    * only affects when other people see it.
@@ -184,33 +209,49 @@ export class TripStore {
   }
 
   /**
-   * Runs the sync protocol to completion.
+   * Sends whatever this device is holding that the server has not got.
    *
-   * Calls that arrive while one is running set a flag instead of queueing, so a
-   * burst of edits produces one more round after the current one rather than a
-   * round each. Automerge messages carry everything outstanding, so the last
-   * round covers the lot.
+   * Public because the recovery banner reaches for it after merging a set-aside
+   * copy back in, and because a test can wait on it.
    */
   async sync(): Promise<void> {
-    if (this.#inFlight) {
-      this.#dirty = true;
-      return this.#inFlight;
+    if (this.#pushing) {
+      /*
+       * A burst of edits produces one more send after the current one rather
+       * than a send each. An Automerge message carries everything outstanding
+       * at the moment it is made, so the last one covers the lot.
+       */
+      this.#pushAgain = true;
+      return this.#pushing;
     }
 
-    this.#inFlight = this.#runSync().finally(() => {
-      this.#inFlight = null;
-      if (this.#dirty) {
-        this.#dirty = false;
+    this.#pushing = this.#push().finally(() => {
+      this.#pushing = null;
+      if (this.#pushAgain) {
+        this.#pushAgain = false;
         void this.sync();
       }
     });
 
-    return this.#inFlight;
+    return this.#pushing;
   }
 
-  async #runSync(): Promise<void> {
-    if (!navigator.onLine) {
+  async #push(): Promise<void> {
+    const sessionId = this.#sessionId;
+
+    // Nothing to send into. The connection loop is already trying to get one
+    // back, and the change is saved on the device until it does.
+    if (!sessionId) {
       this.#phase = 'pending';
+      this.#publish();
+      return;
+    }
+
+    const [state, message] = A.generateSyncMessage(this.#doc, this.#localState);
+    this.#localState = state;
+
+    if (!message) {
+      this.#phase = this.#settled();
       this.#publish();
       return;
     }
@@ -219,66 +260,181 @@ export class TripStore {
     this.#publish();
 
     try {
-      for (let round = 0; round < 12; round++) {
-        const [nextLocal, message] = A.generateSyncMessage(this.#doc, this.#localState);
-        this.#localState = nextLocal;
+      const { syncedAt } = await syncClient.push({ sessionId, payload: message });
 
-        const response = await fetch(`/api/sync/${this.tripId}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            syncState: this.#sync.serverState,
-            message: b64(message ?? new Uint8Array()),
-            lastSyncedAt: this.#sync.lastSyncedAt,
-            hasLocalChanges: A.getAllChanges(this.#doc).length > 0,
-          }),
-        });
+      this.#sync = { lastSyncedAt: Number(syncedAt) };
+      await saveSync(this.tripId, this.#sync);
 
-        if (response.status === 409) {
-          await this.#startAgain();
-          return;
-        }
-
-        if (!response.ok) {
-          this.#failed();
-          return;
-        }
-
-        const body = (await response.json()) as {
-          syncState: string;
-          message: string | null;
-          syncedAt: number;
-        };
-
-        this.#sync = { serverState: body.syncState, lastSyncedAt: body.syncedAt };
-
-        if (body.message) {
-          const before = this.#doc;
-          const [received, nextLocalState] = A.receiveSyncMessage(
-            this.#doc,
-            this.#localState,
-            un64(body.message),
-          );
-          this.#doc = normalizeEventKinds(normalizeBookingStatuses(received));
-          this.#localState = nextLocalState;
-
-          if (A.getChanges(before, this.#doc).length > 0) {
-            await saveDoc(this.tripId, this.#doc);
-          }
-        } else if (!message) {
-          break;
-        }
+      this.#phase = this.#settled();
+      this.#publish();
+    } catch (error) {
+      /*
+       * A session the server does not recognise is not a failure to retry
+       * against: it means the connection this message belonged to is gone, and
+       * the reply is to open a new one. Anything else is the network, and the
+       * edit is already on the device, so there is nothing to recover — only
+       * something to send again.
+       */
+      if (ConnectError.from(error).code === Code.NotFound) {
+        this.#sessionId = null;
+        this.#connection?.abort();
       }
 
-      await saveSync(this.tripId, this.#sync);
-      this.#failures = 0;
-      this.#phase = 'idle';
+      this.#phase = 'pending';
       this.#publish();
-    } catch {
-      // A failed fetch is the network, not a bug. The edit is already on the
-      // device, so there is nothing to recover -- only something to retry.
-      this.#failed();
     }
+  }
+
+  /**
+   * Holds a connection open for as long as this trip is on screen.
+   *
+   * A dropped stream is the ordinary case rather than an error: phones sleep,
+   * proxies time out idle connections, and servers restart. Each attempt after
+   * a failure waits longer than the last, up to half a minute, so a server that
+   * is actually down is not hammered by every open tab.
+   */
+  async #stayConnected(): Promise<void> {
+    while (!this.#closed) {
+      if (!navigator.onLine) {
+        this.#phase = 'pending';
+        this.#publish();
+
+        // Waits to be told the network is back rather than asking repeatedly.
+        // There is nothing a retry could discover that the event will not say.
+        await this.#waitToBeWoken();
+        continue;
+      }
+
+      await this.#runConnection();
+
+      if (this.#closed) return;
+      await this.#backOff();
+    }
+  }
+
+  async #runConnection(): Promise<void> {
+    const connection = new AbortController();
+    this.#connection = connection;
+
+    try {
+      const stream = syncClient.subscribe(
+        {
+          tripId: this.tripId,
+          lastSyncedAt:
+            this.#sync.lastSyncedAt === undefined ? undefined : BigInt(this.#sync.lastSyncedAt),
+          /*
+           * A device with an empty document cannot bring a swept event back, so
+           * the server can admit it whatever its history says. This is exactly
+           * the state a device is in just after being told to start again.
+           */
+          hasLocalChanges: A.getAllChanges(this.#doc).length > 0,
+        },
+        { signal: connection.signal },
+      );
+
+      for await (const event of stream) {
+        await this.#received(event);
+      }
+    } catch {
+      // Losing the stream says nothing about the edits, which are on the device
+      // either way. The loop above will try again.
+      this.#sessionId = null;
+      this.#failures += 1;
+
+      if (this.#closed) return;
+
+      if (this.#phase !== 'resync-required') this.#phase = 'pending';
+      this.#publish();
+      return;
+    }
+
+    // The server ended the stream rather than the connection breaking, which is
+    // what it does after telling a client to start again.
+    this.#sessionId = null;
+  }
+
+  async #received(event: SyncEvent): Promise<void> {
+    switch (event.event.case) {
+      case 'opened': {
+        this.#sessionId = event.event.value.sessionId;
+        this.#failures = 0;
+
+        /*
+         * Both sides start the conversation over. The server has just made a
+         * fresh record of what this device has, so a stale one here would have
+         * it hold back changes the server is waiting for.
+         */
+        this.#localState = A.initSyncState();
+
+        if (this.#phase === 'pending' || this.#phase === 'resync-required') {
+          this.#phase = this.#settled();
+        }
+        this.#publish();
+
+        // Say what this device has, without waiting to be asked for it.
+        void this.sync();
+        return;
+      }
+
+      case 'message': {
+        const before = this.#doc;
+        const [received, state] = A.receiveSyncMessage(
+          this.#doc,
+          this.#localState,
+          event.event.value.payload,
+        );
+
+        this.#doc = normalizeEventKinds(normalizeBookingStatuses(received));
+        this.#localState = state;
+        this.#sync = { lastSyncedAt: Number(event.event.value.syncedAt) };
+
+        if (A.getChanges(before, this.#doc).length > 0) {
+          await saveDoc(this.tripId, this.#doc);
+          await saveSync(this.tripId, this.#sync);
+        }
+
+        this.#publish();
+
+        // Automerge's protocol is an alternating exchange, so what arrived is
+        // usually owed an answer -- and this is also how someone else's edit,
+        // once applied, gets acknowledged back to the server.
+        void this.sync();
+        return;
+      }
+
+      case 'resyncRequired':
+        await this.#startAgain();
+        return;
+    }
+  }
+
+  /**
+   * Waits before trying the connection again.
+   *
+   * A stream that ended without failing is reopened at once: that is what the
+   * server does after telling a client to start again, and making someone wait
+   * for a fresh copy of their trip would be waiting for nothing. Only a failure
+   * earns a delay, and each consecutive one doubles it.
+   */
+  async #backOff(): Promise<void> {
+    if (this.#failures === 0) return;
+
+    const delay = Math.min(500 * 2 ** (this.#failures - 1), SLOWEST_RETRY_MS);
+    await this.#waitToBeWoken(delay);
+  }
+
+  /** Sleeps until woken, or until `delay` passes when one is given. */
+  async #waitToBeWoken(delay?: number): Promise<void> {
+    await new Promise<void>((resolve) => {
+      const timer = delay === undefined ? null : setTimeout(resolve, delay);
+
+      this.#wake = () => {
+        if (timer !== null) clearTimeout(timer);
+        resolve();
+      };
+    });
+
+    this.#wake = null;
   }
 
   /**
@@ -309,14 +465,15 @@ export class TripStore {
     this.#doc = A.init<TripDoc>();
     this.#localState = A.initSyncState();
     this.#sync = {};
+    this.#sessionId = null;
     this.#phase = 'resync-required';
     this.#recoverable = unsent > 0 ? unsent : undefined;
     this.#publish();
 
-    await this.#runSync();
+    // The server ends the stream after saying this, and the connection loop
+    // opens another one -- this time with an empty document, which it accepts.
+    this.#failures = 0;
   }
-
-  #recoverable: number | undefined;
 
   /**
    * Merges the set-aside copy back in.

@@ -82,10 +82,17 @@ export function TripFields() {
 
   const doc = state?.doc as TripDoc | undefined;
   const defs = useMemo(() => liveFieldDefs(doc), [doc]);
-  const homeTimezone = doc?.meta.homeTimezone ?? trip?.homeTimezone ?? 'UTC';
-  const tripStart =
-    doc?.meta.startsAt === undefined ? '' : toDateInput(doc.meta.startsAt, homeTimezone);
-  const tripEnd = doc?.meta.endsAt === undefined ? '' : toDateInput(doc.meta.endsAt, homeTimezone);
+  /*
+   * A replica that has been opened but whose document has not arrived yet has
+   * no meta at all, so every read of it goes through the optional chain. This
+   * screen renders before the first sync on a device that has never held this
+   * trip, and reaching into a document that is not there took the whole app
+   * down to a blank page.
+   */
+  const meta = doc?.meta;
+  const homeTimezone = meta?.homeTimezone ?? trip?.homeTimezone ?? 'UTC';
+  const tripStart = meta?.startsAt === undefined ? '' : toDateInput(meta.startsAt, homeTimezone);
+  const tripEnd = meta?.endsAt === undefined ? '' : toDateInput(meta.endsAt, homeTimezone);
 
   function setTripStart(day: string) {
     if (!store) return;

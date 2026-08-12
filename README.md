@@ -22,10 +22,16 @@ responses. Automerge gives the merge semantics, SQLite stores the documents and 
 queryable projection of them, and the server relays changes rather than deciding
 which one wins.
 
+While a trip is open the browser holds a connection to the server, and changes
+anyone else makes arrive on it as they are made rather than the next time this
+browser asks. Losing that connection costs nothing but the liveness: edits are
+applied and saved locally first, and the connection is reopened when it can be.
+
 | Piece    | Choice                                        |
 | -------- | --------------------------------------------- |
 | Frontend | React 19, Vite, Tailwind v4, installable PWA   |
 | Data     | Automerge CRDT, persisted to IndexedDB locally |
+| Sync     | Connect RPC, a stream down and calls up        |
 | Backend  | Hono, Drizzle, SQLite                          |
 | Maps     | Leaflet with OpenStreetMap tiles               |
 | Weather  | Open-Meteo                                     |
@@ -36,6 +42,7 @@ which one wins.
 
 ```
 packages/crdt      the trip document type, mutations, and search text
+packages/proto     the sync service definition and the code generated from it
 packages/schema    Drizzle tables and migrations
 packages/ui        design tokens, primitives, and their stories
 apps/api           Hono server: sync, blobs, weather, OAuth, MCP
