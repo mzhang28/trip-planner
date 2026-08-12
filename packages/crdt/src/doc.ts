@@ -14,6 +14,7 @@ import type {
   OptionId,
   TripDoc,
   TripEvent,
+  TripFile,
   TripMeta,
   UserId,
 } from './types';
@@ -34,6 +35,7 @@ function stamp(event: TripEvent, author: Author): void {
 export function createTrip(name: string, homeTimezone: string): Doc {
   return A.from<TripDoc>({
     meta: { name, homeTimezone },
+    files: {},
     fieldDefs: {},
     events: {},
   });
@@ -242,9 +244,60 @@ export function addAttachment(
     const event = d.events[eventId];
     if (!event) return;
 
-    event.attachments[attachmentId] = attachment;
+    d.files ??= {};
+    if (d.files[attachment.blobHash] === undefined) {
+      d.files[attachment.blobHash] = {
+        blobHash: attachment.blobHash,
+        filename: attachment.filename,
+        mime: attachment.mime,
+        size: attachment.size,
+        addedAt: attachment.addedAt,
+      };
+    }
+    // `attachment` can be an Automerge proxy when it came from the trip file
+    // library. A document object cannot be inserted at a second path, so each
+    // attachment gets a new plain object containing the same blob reference.
+    event.attachments[attachmentId] = {
+      blobHash: attachment.blobHash,
+      filename: attachment.filename,
+      mime: attachment.mime,
+      size: attachment.size,
+      addedAt: attachment.addedAt,
+    };
     stamp(event, author);
   });
+}
+
+/** Adds an upload to the trip library without requiring an event attachment. */
+export function addTripFile(doc: Doc, file: TripFile): Doc {
+  return A.change(doc, (d) => {
+    d.files ??= {};
+    d.files[file.blobHash] = {
+      blobHash: file.blobHash,
+      filename: file.filename,
+      mime: file.mime,
+      size: file.size,
+      addedAt: file.addedAt,
+    };
+  });
+}
+
+/**
+ * Returns every reusable file, including attachments from older documents.
+ * Library metadata wins when the same bytes already have a library entry.
+ */
+export function tripFiles(doc: TripDoc | undefined): TripFile[] {
+  const files = new Map<string, TripFile>();
+
+  for (const event of Object.values(doc?.events ?? {})) {
+    for (const attachment of Object.values(event.attachments ?? {})) {
+      files.set(attachment.blobHash, attachment);
+    }
+  }
+
+  for (const file of Object.values(doc?.files ?? {})) files.set(file.blobHash, file);
+
+  return [...files.values()];
 }
 
 /**
@@ -271,7 +324,7 @@ export function removeAttachment(
 
 /** Every blob hash the trip still points at, for deciding what may be deleted. */
 export function referencedBlobs(doc: TripDoc | undefined): Set<string> {
-  const hashes = new Set<string>();
+  const hashes = new Set<string>(Object.keys(doc?.files ?? {}));
 
   // Includes tombstoned events on purpose: a deleted event can be undone, and
   // its files have to still be there when it is.

@@ -1,17 +1,21 @@
 import * as A from '@automerge/automerge';
 import { describe, expect, it } from 'vitest';
 import {
+  addAttachment,
   addEvent,
   addFieldDef,
   addFieldOption,
   addLink,
+  addTripFile,
   createTrip,
   deleteEvent,
   deleteEvents,
   liveEvents,
   mergeEvents,
+  referencedBlobs,
   setCityColor,
   setCustomField,
+  tripFiles,
   updateEvent,
   updateFieldOption,
   updateTripMeta,
@@ -42,6 +46,51 @@ function trip(): Doc {
   doc = addEvent(doc, { id: 'e1', name: 'Fushimi Inari' }, ada);
   return doc;
 }
+
+describe('trip file library', () => {
+  const file = {
+    blobHash: 'a'.repeat(64),
+    filename: 'booking.pdf',
+    mime: 'application/pdf',
+    size: 42,
+    addedAt: 123,
+  };
+
+  it('stores one reusable file while the same bytes are attached to several events', () => {
+    let doc = trip();
+    doc = addEvent(doc, { id: 'e2', name: 'Hotel' }, ada);
+    doc = addAttachment(doc, 'e1', 'a1', file, ada);
+    doc = addAttachment(doc, 'e2', 'a2', file, ada);
+
+    expect(tripFiles(doc as TripDoc)).toEqual([file]);
+    expect(Object.keys((doc as TripDoc).files ?? {})).toEqual([file.blobHash]);
+  });
+
+  it('attaches a file read from the Automerge library without reusing its document object', () => {
+    let doc = addTripFile(trip(), file);
+    const libraryFile = (doc as TripDoc).files![file.blobHash]!;
+
+    expect(() => {
+      doc = addAttachment(doc, 'e1', 'a1', libraryFile, ada);
+    }).not.toThrow();
+    expect((doc as TripDoc).events.e1!.attachments.a1).toEqual(file);
+  });
+
+  it('keeps a standalone library upload reachable by blob collection', () => {
+    const doc = addTripFile(createTrip('Japan', 'Asia/Tokyo'), file);
+
+    expect(referencedBlobs(doc as TripDoc)).toEqual(new Set([file.blobHash]));
+  });
+
+  it('discovers attachments made before the library existed', () => {
+    const doc = A.change(trip(), (draft) => {
+      delete draft.files;
+      draft.events.e1!.attachments.a1 = file;
+    });
+
+    expect(tripFiles(doc as TripDoc)).toEqual([file]);
+  });
+});
 
 describe('trip dates', () => {
   it('sets and clears the trip-wide bounds', () => {

@@ -393,7 +393,12 @@ export function EventEditor({
         label: 'Files',
         filled: Object.keys(event.attachments).length > 0,
         render: () => (
-          <Attachments event={event} onAdd={onAddAttachment} onRemove={onRemoveAttachment} />
+          <Attachments
+            event={event}
+            doc={doc}
+            onAdd={onAddAttachment}
+            onRemove={onRemoveAttachment}
+          />
         ),
       },
       {

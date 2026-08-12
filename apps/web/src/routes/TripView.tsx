@@ -55,6 +55,7 @@ import { DayDropZone, DraggableEvent } from '../trip/DayDropZone';
 import { EventRow } from '../trip/EventRow';
 import { SearchBar } from '../trip/SearchBar';
 import { SyncBadge } from '../trip/SyncBadge';
+import { TripChrome } from '../trip/TripChrome';
 import type { CommandId } from '../trip/search';
 import { useEvents, useTripState, useTripStore } from '../trip/useTrip';
 import { setZonePreference, useZonePreference } from '../trip/useDisplayZone';
@@ -619,20 +620,26 @@ export function TripView() {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
+    <TripChrome tripId={tripId ?? ''} tripName={trip?.name ?? doc?.meta?.name ?? 'Trip'}>
       <header className="z-10 shrink-0 border-b border-line bg-page/95 backdrop-blur">
         <div
           data-testid="trip-toolbar"
           className="relative flex w-full flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8"
         >
           <div className="flex min-w-0 items-center gap-3">
-            <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline">
+            <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden">
               All trips
             </Link>
             <h1 className="max-w-48 truncate text-lg xl:max-w-80">{trip?.name ?? 'Trip'}</h1>
             <Link
+              to={`/t/${tripId}/files`}
+              className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+            >
+              Files
+            </Link>
+            <Link
               to={`/t/${tripId}/fields`}
-              className="text-xs text-ink-muted underline-offset-2 hover:underline"
+              className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
             >
               Trip settings
             </Link>
@@ -1036,6 +1043,6 @@ export function TripView() {
           />
         )}
       </main>
-    </div>
+    </TripChrome>
   );
 }

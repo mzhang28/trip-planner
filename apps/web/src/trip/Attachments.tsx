@@ -1,104 +1,73 @@
-import type { EventAttachment, TripEvent } from '@trip/crdt';
-import { cn } from '@trip/ui';
-import { Loader2, Paperclip, Trash2 } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { tripFiles, type EventAttachment, type TripDoc, type TripEvent } from '@trip/crdt';
+import { Button, cn } from '@trip/ui';
+import { FilePlus2, Loader2, Paperclip, Search, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { randomId } from '../lib/crypto';
-import { flushUploads, hashFile, isPending, queueUpload } from './uploads';
-
-/** Matches the server's own ceiling, so a refusal is explained before the upload. */
-const MAX_BYTES = 25 * 1024 * 1024;
+import { FileDropZone, readableFileSize } from './FileDropZone';
+import { flushUploads, isPending, subscribeUploadQueue } from './uploads';
 
 export interface AttachmentsProps {
   event: TripEvent;
+  doc: TripDoc | undefined;
   onAdd: (id: string, attachment: EventAttachment) => void;
   onRemove: (id: string) => void;
 }
 
-function readableSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
-  const input = useRef<HTMLInputElement>(null);
-  const inputId = useId();
+export function Attachments({ event, doc, onAdd, onRemove }: AttachmentsProps) {
+  const popup = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
-  const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Set<string>>(new Set());
 
   const attachments = Object.entries(event.attachments);
+  const attachedHashes = new Set(attachments.map(([, file]) => file.blobHash));
+  const reusable = tripFiles(doc)
+    .filter((file) => !attachedHashes.has(file.blobHash))
+    .filter((file) => file.filename.toLowerCase().includes(query.trim().toLowerCase()))
+    .sort((a, b) => b.addedAt - a.addedAt);
 
-  // Which of these are still waiting to be sent, so they can say so.
+  useEffect(() => {
+    if (!open) return;
+
+    function dismiss(event: PointerEvent) {
+      if (!popup.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
   useEffect(() => {
     let live = true;
 
-    void Promise.all(
-      attachments.map(async ([, attachment]) =>
-        (await isPending(attachment.blobHash)) ? attachment.blobHash : null,
-      ),
-    ).then((hashes) => {
-      if (live) setPending(new Set(hashes.filter((hash): hash is string => hash !== null)));
-    });
+    const refresh = () => {
+      void Promise.all(
+        attachments.map(async ([, attachment]) =>
+          (await isPending(attachment.blobHash)) ? attachment.blobHash : null,
+        ),
+      ).then((hashes) => {
+        if (live) setPending(new Set(hashes.filter((hash): hash is string => hash !== null)));
+      });
+    };
+
+    refresh();
+    const unsubscribe = subscribeUploadQueue(refresh);
 
     return () => {
       live = false;
+      unsubscribe();
     };
   }, [event.attachments]);
 
-  async function attach(files: FileList | null) {
-    if (!files?.length) return;
-
-    setBusy(true);
-    setError(null);
-
-    try {
-      for (const file of files) {
-        if (file.size > MAX_BYTES) {
-          setError(`${file.name} is ${readableSize(file.size)}. The limit is 25 MB.`);
-          continue;
-        }
-
-        const { hash, bytes } = await hashFile(file);
-
-        /*
-         * Queued before the reference goes in, and the reference goes in
-         * whether or not the send works. Someone photographing a booking on a
-         * train keeps the photograph; the bytes catch up when there is signal.
-         */
-        await queueUpload({
-          hash,
-          filename: file.name,
-          mime: file.type || 'application/octet-stream',
-          size: file.size,
-          bytes,
-          queuedAt: Date.now(),
-        });
-
-        onAdd(`a_${randomId()}`, {
-          blobHash: hash,
-          filename: file.name,
-          mime: file.type || 'application/octet-stream',
-          size: file.size,
-          addedAt: Date.now(),
-        });
-      }
-
-      const { remaining } = await flushUploads();
-      if (remaining === 0) setPending(new Set());
-    } finally {
-      setBusy(false);
-      if (input.current) input.current.value = '';
-    }
-  }
-
-  /**
-   * Tries the queue again, and says what happened.
-   *
-   * A file waiting on this device said so and offered nothing to press, so the
-   * only way to find out whether it could go was to close the app and hope.
-   */
   async function retry() {
     setBusy(true);
     setError(null);
@@ -112,16 +81,102 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
     }
   }
 
+  function attach(file: EventAttachment) {
+    onAdd(`a_${randomId()}`, file);
+  }
+
   return (
     <section className="flex flex-col gap-2">
-      <span className="text-xs font-medium text-ink-secondary">Files</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-ink-secondary">Files</span>
+        <div ref={popup} className="relative">
+          <Button
+            size="sm"
+            data-testid="open-file-picker"
+            aria-expanded={open}
+            aria-haspopup="dialog"
+            onPress={() => setOpen((value) => !value)}
+          >
+            <FilePlus2 aria-hidden="true" className="size-3.5" />
+            Add file
+          </Button>
+
+          <div
+            role="dialog"
+            aria-label="Add a file"
+            hidden={!open}
+            className={cn(
+              'absolute top-full right-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-lg',
+              'border border-line-default bg-raised p-3 shadow-lg',
+            )}
+          >
+            <p className="mb-3 text-sm font-medium text-ink">Upload a new file</p>
+            <FileDropZone
+              compact
+              inputTestId="attachment-input"
+              dropTestId="attachment-drop"
+              onUploaded={(file) => {
+                attach(file);
+              }}
+            />
+
+            <div className="my-3 flex items-center gap-2 text-2xs text-ink-muted before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
+              or reuse from this trip
+            </div>
+
+            {tripFiles(doc).filter((file) => !attachedHashes.has(file.blobHash)).length > 0 ? (
+              <>
+                <label className="mb-2 flex h-8 items-center gap-2 rounded-md border border-line-input bg-card px-2">
+                  <Search aria-hidden="true" className="size-3.5 text-ink-muted" />
+                  <span className="sr-only">Find a file</span>
+                  <input
+                    type="search"
+                    placeholder="Find a file"
+                    value={query}
+                    onChange={(event) => setQuery(event.currentTarget.value)}
+                    className="min-w-0 flex-1 bg-transparent text-xs text-ink outline-none placeholder:text-ink-muted"
+                  />
+                </label>
+                <ul className="max-h-44 overflow-y-auto">
+                  {reusable.map((file) => (
+                    <li key={file.blobHash}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          attach(file);
+                          setOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2 focus-visible:-outline-offset-1"
+                      >
+                        <Paperclip aria-hidden="true" className="size-3.5 shrink-0 text-ink-muted" />
+                        <span className="min-w-0 flex-1 truncate text-xs text-ink">
+                          {file.filename}
+                        </span>
+                        <span className="shrink-0 text-2xs text-ink-muted">
+                          {readableFileSize(file.size)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                  {reusable.length === 0 && (
+                    <li className="px-2 py-3 text-center text-xs text-ink-muted">No files match.</li>
+                  )}
+                </ul>
+              </>
+            ) : (
+              <p className="py-2 text-center text-xs text-ink-muted">
+                No other files in this trip yet.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
 
       {attachments.length > 0 && (
         <ul className="flex flex-col gap-1">
           {attachments.map(([id, attachment]) => (
             <li key={id} className="flex items-center gap-2">
               <Paperclip aria-hidden="true" className="size-3.5 shrink-0 text-ink-muted" />
-
               <a
                 href={`/api/blobs/${attachment.blobHash}?mime=${encodeURIComponent(attachment.mime)}`}
                 download={attachment.filename}
@@ -129,11 +184,9 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
               >
                 {attachment.filename}
               </a>
-
-              <span className="tabular shrink-0 text-2xs text-ink-muted">
-                {readableSize(attachment.size)}
+              <span className="shrink-0 text-2xs text-ink-muted">
+                {readableFileSize(attachment.size)}
               </span>
-
               {pending.has(attachment.blobHash) && (
                 <>
                   <span
@@ -142,20 +195,16 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
                   >
                     Waiting to send
                   </span>
-
-                  {/* Something to press. It said it had not been sent and left
-                      it there, with no way to find out why or try again. */}
                   <button
                     type="button"
                     data-testid="retry-upload"
                     onClick={() => void retry()}
                     className="shrink-0 text-2xs text-accent-text underline underline-offset-2"
                   >
-                    Send now
+                    {busy ? <Loader2 aria-label="Sending" className="size-3 animate-spin" /> : 'Send now'}
                   </button>
                 </>
               )}
-
               <button
                 type="button"
                 aria-label={`Remove ${attachment.filename}`}
@@ -169,53 +218,7 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
         </ul>
       )}
 
-      {/*
-        A place to drop things, and the limit said before a file is chosen
-        rather than after one is refused. The bare file input gave neither.
-      */}
-      <div
-        data-testid="attachment-drop"
-        onDragOver={(e) => {
-          e.preventDefault();
-          setOver(true);
-        }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setOver(false);
-          void attach(e.dataTransfer.files);
-        }}
-        className={cn(
-          'flex flex-wrap items-center gap-2 rounded-md border border-dashed px-3 py-2',
-          over ? 'border-accent bg-accent-soft' : 'border-line',
-        )}
-      >
-        <label htmlFor={inputId} className="sr-only">
-          Attach files to {event.name}
-        </label>
-        <input
-          ref={input}
-          id={inputId}
-          type="file"
-          multiple
-          data-testid="attachment-input"
-          onChange={(e) => void attach(e.target.files)}
-          className={cn(
-            'text-xs text-ink-muted',
-            'file:mr-2 file:cursor-pointer file:rounded-md file:border file:border-line-default',
-            'file:bg-card file:px-2 file:py-1 file:text-xs file:text-ink hover:file:bg-sunken',
-          )}
-        />
-
-        <span className="text-2xs text-ink-muted">or drop them here · up to 25 MB each</span>
-
-        {busy && (
-          <span className="flex items-center gap-1 text-2xs text-ink-muted">
-            <Loader2 aria-hidden="true" className="size-3 animate-spin" />
-            Adding
-          </span>
-        )}
-      </div>
+      {attachments.length === 0 && <p className="text-xs text-ink-muted">No files attached.</p>}
 
       {error && (
         <p role="alert" className="text-2xs text-danger">
@@ -226,12 +229,7 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
   );
 }
 
-/**
- * Sends anything still waiting whenever the network comes back.
- *
- * Mounted once beside the trip rather than per event, so a queue built up
- * across several events drains in one pass.
- */
+/** Sends anything still waiting whenever the network comes back. */
 export function useUploadFlush(): void {
   useEffect(() => {
     const flush = () => void flushUploads();

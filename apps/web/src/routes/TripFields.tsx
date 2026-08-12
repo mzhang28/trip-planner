@@ -21,6 +21,7 @@ import { isTimeZone, knownTimeZones, setDay, toDateInput } from '../lib/time';
 import { CheckedField } from '../trip/CheckedField';
 import { AuditPanel } from '../trip/AuditPanel';
 import { SyncBadge } from '../trip/SyncBadge';
+import { TripChrome } from '../trip/TripChrome';
 import { useTripState, useTripStore } from '../trip/useTrip';
 
 const TYPES: Array<{ value: FieldType; label: string; hint: string }> = [
@@ -170,16 +171,22 @@ export function TripFields() {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
+    <TripChrome tripId={tripId ?? ''} tripName={trip?.name ?? doc?.meta?.name ?? 'Trip'}>
       <header className="shrink-0 border-b border-line">
         <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <Link
             to={`/t/${tripId}`}
-            className="text-xs text-ink-muted underline-offset-2 hover:underline"
+            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
           >
             Back to trip
           </Link>
           <h1 className="flex-1 text-lg">Trip settings</h1>
+          <Link
+            to={`/t/${tripId}/files`}
+            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+          >
+            Files
+          </Link>
           <SyncBadge state={state} />
           <ThemeToggle />
         </div>
@@ -409,7 +416,7 @@ export function TripFields() {
           )}
         </div>
       </main>
-    </div>
+    </TripChrome>
   );
 }
 

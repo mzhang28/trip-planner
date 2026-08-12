@@ -9,6 +9,17 @@ import { sha256Hex } from '../lib/crypto';
  * which is everyone who opened a trip before ever attaching a file.
  */
 const store = createStore('trip-planner-uploads', 'uploads');
+const listeners = new Set<() => void>();
+
+function publishQueueChange(): void {
+  for (const listener of listeners) listener();
+}
+
+/** Lets file rows update immediately when a queued upload is sent or retried. */
+export function subscribeUploadQueue(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 
 export interface QueuedUpload {
   hash: string;
@@ -36,6 +47,7 @@ export async function hashFile(file: File): Promise<{ hash: string; bytes: Array
  */
 export async function queueUpload(upload: QueuedUpload): Promise<void> {
   await set(`upload:${upload.hash}`, upload, store);
+  publishQueueChange();
 }
 
 export async function pendingUploads(): Promise<QueuedUpload[]> {
@@ -46,6 +58,7 @@ export async function pendingUploads(): Promise<QueuedUpload[]> {
 
 export async function forgetUpload(hash: string): Promise<void> {
   await del(`upload:${hash}`, store);
+  publishQueueChange();
 }
 
 export interface FlushResult {

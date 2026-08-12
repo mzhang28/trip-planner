@@ -75,4 +75,35 @@ test.describe('attachments', () => {
       .poll(async () => (await page.request.get(href!)).status(), { timeout: 15_000 })
       .toBe(200);
   });
+
+  test('a trip file can be reused on multiple events', async ({ page }) => {
+    await page.goto('/');
+    const tripId = await newTrip(page);
+
+    await page.goto(`/t/${tripId}/files`);
+    await page.getByTestId('file-upload-input').setInputFiles(FILE);
+    await expect(page.getByRole('link', { name: 'booking.txt' })).toBeVisible();
+
+    await page.goto(`/t/${tripId}`);
+    await addEvent(page, 'Ryokan');
+    await page.getByTestId('open-file-picker').click();
+    await page
+      .getByRole('dialog', { name: 'Add a file' })
+      .getByRole('button', { name: /booking\.txt/ })
+      .click();
+    await expect(page.getByRole('link', { name: 'booking.txt' })).toBeVisible();
+
+    await page.getByTestId('close-editor').click();
+    await addEvent(page, 'Flight');
+    await page.getByTestId('open-file-picker').click();
+    await page
+      .getByRole('dialog', { name: 'Add a file' })
+      .getByRole('button', { name: /booking\.txt/ })
+      .click();
+    await expect(page.getByRole('link', { name: 'booking.txt' })).toBeVisible();
+
+    await page.goto(`/t/${tripId}/files`);
+    await expect(page.getByRole('link', { name: 'booking.txt' })).toBeVisible();
+    await expect(page.getByText('2 events')).toBeVisible();
+  });
 });

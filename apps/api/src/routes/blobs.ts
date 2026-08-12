@@ -32,7 +32,10 @@ export function blobRoutes() {
     if (!(await blobs.has(hash))) return c.json({ error: 'not_found' }, 404);
 
     if (blobs.presignGet) {
-      return c.json({ url: await blobs.presignGet(hash) });
+      // File links point at this route for both storage modes. Redirecting
+      // keeps that contract identical when S3 is configured; returning the URL
+      // as JSON would make the browser download a JSON document instead.
+      return c.redirect(await blobs.presignGet(hash));
     }
 
     const bytes = await blobs.get(hash);

@@ -8,6 +8,7 @@ export {
 
 export {
   addAttachment,
+  addTripFile,
   addEvent,
   addFieldDef,
   addFieldOption,
@@ -26,6 +27,7 @@ export {
   removeFieldOption,
   setCityColor,
   setCustomField,
+  tripFiles,
   updateTripMeta,
   updateEvent,
   updateFieldDef,
@@ -49,6 +51,7 @@ export {
 
 export type {
   AttachmentId,
+  BlobHash,
   Booking,
   CustomValue,
   EventAttachment,
@@ -70,6 +73,7 @@ export type {
   TransitMode,
   TripDoc,
   TripEvent,
+  TripFile,
   TripMeta,
   UserId,
 } from './types';

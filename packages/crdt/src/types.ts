@@ -3,6 +3,7 @@ import type { BookingStatus } from './status';
 export type EventId = string;
 export type LinkId = string;
 export type AttachmentId = string;
+export type BlobHash = string;
 export type FieldDefId = string;
 export type OptionId = string;
 export type UserId = string;
@@ -40,14 +41,17 @@ export interface EventLink {
   addedAt: Instant;
 }
 
-export interface EventAttachment {
+export interface TripFile {
   /** SHA-256 of the bytes. The bytes themselves live in the blob store. */
-  blobHash: string;
+  blobHash: BlobHash;
   filename: string;
   mime: string;
   size: number;
   addedAt: Instant;
 }
+
+/** An event points at a file from the trip library with its display metadata. */
+export type EventAttachment = TripFile;
 
 export interface FlightDetails {
   airline?: string;
@@ -200,6 +204,14 @@ export type TripDoc = {
   meta: TripMeta;
   /** User-assigned colours shared by every occurrence of a city label. */
   cityColors?: Record<string, string>;
+  /**
+   * Files available throughout the trip, keyed by their content hash.
+   *
+   * Optional for documents created before the file library existed. Readers
+   * also discover their event attachments, so an old file is immediately
+   * reusable without a migration pass.
+   */
+  files?: Record<BlobHash, TripFile>;
   fieldDefs: Record<FieldDefId, FieldDef>;
   events: Record<EventId, TripEvent>;
 };
