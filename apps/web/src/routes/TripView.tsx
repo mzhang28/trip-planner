@@ -192,6 +192,13 @@ export function TripView() {
    */
   const [revealedFields, setRevealedFields] = useState<Record<string, ReadonlySet<string>>>({});
 
+  /*
+   * The itinerary holds every day of the trip, so moving the navigation used
+   * to change the map and the range label while the list stayed where it was
+   * -- Earlier and Later appeared to do nothing to the thing being read.
+   */
+  const dayListRef = useRef<HTMLDivElement>(null);
+
   /** The last deletion, while it can still be taken back. */
   const [undoable, setUndoable] = useState<{ ids: string[]; message: string } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -245,6 +252,7 @@ export function TripView() {
   const [anchor, setAnchor] = useState<DayKey>(() => new Date().toISOString().slice(0, 10));
   const [anchored, setAnchored] = useState(false);
   const today = dayKey(Date.now(), homeTimezone);
+
   const tripRange = useMemo(
     () => tripDateRange(doc?.meta, events, homeTimezone, today),
     [doc?.meta, events, homeTimezone, today],
@@ -306,6 +314,32 @@ export function TripView() {
    * numbered one to forty across three weeks would say nothing about the order
    * of anything.
    */
+  /*
+   * Brings the anchored day into view whenever it changes, rather than only
+   * changing the map and the label beside the buttons.
+   */
+  useEffect(() => {
+    if (view !== 'day') return;
+
+    const list = dayListRef.current;
+    const section = list?.querySelector<HTMLElement>(`[data-day-section="${anchor}"]`);
+    if (!list || !section) return;
+
+    /*
+     * The list is moved by hand rather than with scrollIntoView. That walks up
+     * the ancestors and scrolls whichever ones it can, and the page itself can
+     * be scrolled programmatically even though it is set not to -- which
+     * carried the app header off the top of the window with no way back.
+     */
+    list.scrollTop += section.getBoundingClientRect().top - list.getBoundingClientRect().top;
+  }, [anchor, view, days.length]);
+
+  /** Everything with no day yet, which the week and month cannot draw. */
+  const undated = useMemo(
+    () => events.filter((event) => event.startsAt === undefined),
+    [events],
+  );
+
   const mappable = useMemo(
     () => events.filter((event) => eventDay(event, homeTimezone) === anchor),
     [events, homeTimezone, anchor],
@@ -666,6 +700,43 @@ export function TripView() {
 
         <div className={view === 'month' ? undefined : 'min-h-0 flex-1 overflow-hidden'}>
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          {/*
+            Everything still waiting for a day. The week and the month are
+            drawn from dates, so an event without one was invisible in both --
+            the calendar gave no clue that the work was outstanding. Drag one
+            onto a day, or open it and pick a date.
+          */}
+          {view !== 'day' && undated.length > 0 && (
+            <div
+              data-testid="unscheduled-tray"
+              className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-1.5"
+            >
+              <span className="text-2xs text-ink-muted">
+                {undated.length} with no date yet
+              </span>
+
+              {undated.slice(0, 6).map((event) => (
+                <DraggableEvent key={event.id} id={event.id} disabled={readOnly}>
+                  {(handle) => (
+                    <button
+                      {...handle}
+                      type="button"
+                      data-testid="unscheduled-item"
+                      onClick={() => focusEvent(event.id)}
+                      className="max-w-40 truncate rounded-sm border border-line bg-card px-1.5 py-0.5 text-2xs text-ink hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
+                    >
+                      {event.name || 'Unnamed'}
+                    </button>
+                  )}
+                </DraggableEvent>
+              ))}
+
+              {undated.length > 6 && (
+                <span className="text-2xs text-ink-muted">+{undated.length - 6} more</span>
+              )}
+            </div>
+          )}
+
           {view === 'week' && (
             <WeekView
               anchor={anchor}
@@ -702,11 +773,12 @@ export function TripView() {
           {view === 'day' && (
             <div className="flex h-full min-h-0 flex-col gap-4 lg:flex-row">
               <div
+                ref={dayListRef}
                 data-testid="day-list-scroll"
                 className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:pr-1"
               >
           {days.map(([key, dayEvents]) => (
-            <section key={key} className="mb-8">
+            <section key={key} data-day-section={key} className="mb-8">
               <h2 className="mb-2 text-sm text-ink-muted">
                 {key === UNSCHEDULED ? (
                   'No date yet'
@@ -890,6 +962,7 @@ export function TripView() {
             selected={selected}
             events={events}
             dayEvents={mappable}
+            dayLabel={formatDayHeading(Date.parse(`${anchor}T12:00:00Z`), 'UTC')}
             onSelectAll={(ids) => setSelected(new Set(ids))}
             onClear={() => setSelected(new Set())}
             onDelete={bulkDelete}

@@ -46,7 +46,7 @@ test.describe('putting an event on a chosen day', () => {
     const date = page.getByTestId('event-date');
     await date.fill('2026-09-03');
 
-    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+    await page.getByTestId('close-editor').click();
     await page.getByTestId('go-to-date').fill('2026-09-03');
 
     await expect(page.getByTestId('range-label')).toContainText('3 September 2026');
@@ -60,7 +60,7 @@ test.describe('putting an event on a chosen day', () => {
     await page.getByTestId('go-to-date').fill('2026-09-03');
     await page.getByTestId('add-on-2026-09-03').click();
 
-    const name = page.getByTestId('event-editor').getByRole('textbox', { name: 'Name' });
+    const name = page.getByRole('textbox', { name: 'Name' });
     await expect(name).toBeFocused();
     await name.fill('Decided later');
     await name.blur();
@@ -451,8 +451,9 @@ test.describe('text a field will not take', () => {
 
     await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
-    await eventRow(page, 'Fushimi Inari').click();
-
+    // One click opens the event; a double-click on its name goes straight to
+    // the compact inline name editor.
+    await eventRow(page, 'Fushimi Inari').getByTestId('event-name').dblclick();
     const name = page.getByRole('textbox', { name: 'Name' });
     await name.fill('');
     await name.blur();
@@ -618,7 +619,7 @@ test.describe('reaching things with a finger', () => {
 
     // Scrolled to the top of the editor: the card header is the other way out,
     // and from here it is several screens up.
-    await page.getByRole('textbox', { name: 'Name' }).scrollIntoViewIfNeeded();
+    await page.getByTestId('event-name').scrollIntoViewIfNeeded();
 
     const done = page.getByTestId('close-editor');
     await expect(done).toBeInViewport();
@@ -635,8 +636,8 @@ test.describe('a stay', () => {
     await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await eventRow(page, 'Ryokan').click();
-    await reveal(page, 'kind');
-    await page.getByTestId('event-editor').getByText('Stay', { exact: true }).click();
+    await page.getByTestId('event-kind-button').click();
+    await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Stay' }).click();
 
     // Stay dates are the canonical event schedule, so duplicate generic date
     // and duration controls cannot disagree with them.
@@ -666,7 +667,8 @@ test.describe('a stay', () => {
     await page.getByRole('textbox', { name: 'New event' }).fill('City Hotel');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await eventRow(page, 'City Hotel').click();
-    await page.getByTestId('event-editor').getByText('Stay', { exact: true }).click();
+    await page.getByTestId('event-kind-button').click();
+    await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Stay' }).click();
     await page.getByTestId('check-in').fill('2026-08-17');
     await page.getByTestId('check-out').fill('2026-08-19');
     await page.getByTestId('close-editor').click();
@@ -689,8 +691,8 @@ test.describe('a flight', () => {
     await page.getByRole('textbox', { name: 'New event' }).fill('NH017');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await eventRow(page, 'NH017').click();
-    await reveal(page, 'kind');
-    await page.getByTestId('event-editor').getByText('Flight', { exact: true }).click();
+    await page.getByTestId('event-kind-button').click();
+    await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Flight' }).click();
   }
 
   test('asks for the departure date rather than assuming today', async ({ page }) => {
@@ -915,5 +917,61 @@ test.describe('a trip is more than its name', () => {
     await expect(card).toContainText('14 Apr');
     await expect(card).toContainText('Kyoto');
     await expect(card).toContainText('Next on 14 Apr');
+  });
+});
+
+test.describe('days and what has none', () => {
+  test('moving the navigation moves the itinerary too', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    async function addOn(day: string, name: string) {
+      await page.getByTestId('go-to-date').fill(day);
+      await page.getByTestId(`add-on-${day}`).click();
+
+      const field = page.getByRole('textbox', { name: 'Name' });
+      await field.fill(name);
+      await field.blur();
+      await page.getByTestId('close-editor').click();
+      await expect(page.getByTestId('event-editor')).toHaveCount(0);
+    }
+
+    await addOn('2026-09-03', 'Later day');
+    await addOn('2026-09-10', 'Latest day');
+
+    // Earlier and Later used to move the map and the label while the list
+    // stayed where it was, so they looked as though they did nothing.
+    await page.getByTestId('go-to-date').fill('2026-09-03');
+    await expect(eventRow(page, 'Later day')).toBeInViewport();
+
+    await page.getByTestId('go-to-date').fill('2026-09-10');
+    await expect(eventRow(page, 'Latest day')).toBeInViewport();
+
+    // The list moves, and nothing else does. Scrolling a section into view by
+    // asking the browser walked up past the list and carried the app header
+    // off the top of the window.
+    await expect(page.getByRole('banner')).toBeInViewport();
+  });
+
+  test('events with no date are offered by the week and the month', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Book the ryokan');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await expect(eventRow(page, 'Book the ryokan')).toBeVisible();
+
+    for (const view of ['Week', 'Month'] as const) {
+      await page
+        .getByRole('radiogroup', { name: 'Calendar view' })
+        .getByText(view, { exact: true })
+        .click();
+
+      // Both views are drawn from dates, so an event without one was
+      // invisible in them and nothing said it was waiting.
+      const tray = page.getByTestId('unscheduled-tray');
+      await expect(tray).toContainText('1 with no date yet');
+      await expect(tray.getByTestId('unscheduled-item')).toContainText('Book the ryokan');
+    }
   });
 });

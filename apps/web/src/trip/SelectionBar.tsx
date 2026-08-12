@@ -12,6 +12,8 @@ export interface SelectionBarProps {
   events: TripEvent[];
   /** The events on the day the list is anchored on, for "all in this day". */
   dayEvents: TripEvent[];
+  /** That day, written out. The scope was a day nobody could see named. */
+  dayLabel: string;
   onSelectAll: (ids: string[]) => void;
   onClear: () => void;
   onDelete: () => void;
@@ -29,6 +31,7 @@ export function SelectionBar({
   selected,
   events,
   dayEvents,
+  dayLabel,
   onSelectAll,
   onClear,
   onDelete,
@@ -54,7 +57,7 @@ export function SelectionBar({
 
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" onPress={() => onSelectAll(dayEvents.map((event) => event.id))}>
-          All in this day
+          All on {dayLabel}
         </Button>
         <Button size="sm" onPress={() => onSelectAll(events.map((event) => event.id))}>
           All in the trip
