@@ -24,6 +24,7 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
   const input = useRef<HTMLInputElement>(null);
   const inputId = useId();
   const [busy, setBusy] = useState(false);
+  const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<Set<string>>(new Set());
 
@@ -92,6 +93,25 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
     }
   }
 
+  /**
+   * Tries the queue again, and says what happened.
+   *
+   * A file waiting on this device said so and offered nothing to press, so the
+   * only way to find out whether it could go was to close the app and hope.
+   */
+  async function retry() {
+    setBusy(true);
+    setError(null);
+
+    try {
+      const { remaining } = await flushUploads();
+      if (remaining === 0) setPending(new Set());
+      else setError('Still waiting. The server could not be reached.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="flex flex-col gap-2">
       <span className="text-xs font-medium text-ink-secondary">Files</span>
@@ -115,12 +135,25 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
               </span>
 
               {pending.has(attachment.blobHash) && (
-                <span
-                  className="shrink-0 rounded-sm bg-pending-soft px-1.5 py-0.5 text-2xs text-pending-text"
-                  title="On this device. It will upload when there is a connection."
-                >
-                  Not sent yet
-                </span>
+                <>
+                  <span
+                    className="shrink-0 rounded-sm bg-pending-soft px-1.5 py-0.5 text-2xs text-pending-text"
+                    title="On this device. It will upload when there is a connection."
+                  >
+                    Waiting to send
+                  </span>
+
+                  {/* Something to press. It said it had not been sent and left
+                      it there, with no way to find out why or try again. */}
+                  <button
+                    type="button"
+                    data-testid="retry-upload"
+                    onClick={() => void retry()}
+                    className="shrink-0 text-2xs text-accent-text underline underline-offset-2"
+                  >
+                    Send now
+                  </button>
+                </>
               )}
 
               <button
@@ -136,7 +169,27 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
         </ul>
       )}
 
-      <div className="flex items-center gap-2">
+      {/*
+        A place to drop things, and the limit said before a file is chosen
+        rather than after one is refused. The bare file input gave neither.
+      */}
+      <div
+        data-testid="attachment-drop"
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          void attach(e.dataTransfer.files);
+        }}
+        className={cn(
+          'flex flex-wrap items-center gap-2 rounded-md border border-dashed px-3 py-2',
+          over ? 'border-accent bg-accent-soft' : 'border-line',
+        )}
+      >
         <label htmlFor={inputId} className="sr-only">
           Attach files to {event.name}
         </label>
@@ -153,6 +206,8 @@ export function Attachments({ event, onAdd, onRemove }: AttachmentsProps) {
             'file:bg-card file:px-2 file:py-1 file:text-xs file:text-ink hover:file:bg-sunken',
           )}
         />
+
+        <span className="text-2xs text-ink-muted">or drop them here · up to 25 MB each</span>
 
         {busy && (
           <span className="flex items-center gap-1 text-2xs text-ink-muted">

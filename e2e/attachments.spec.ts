@@ -46,7 +46,7 @@ test.describe('attachments', () => {
     await page.getByTestId('attachment-input').setInputFiles(FILE);
 
     await expect(page.getByRole('link', { name: 'booking.txt' })).toBeVisible();
-    await expect(page.getByText('Not sent yet')).toHaveCount(0);
+    await expect(page.getByText('Waiting to send')).toHaveCount(0);
 
     // The bytes came back, which is the only thing that proves it was stored.
     const href = await page.getByRole('link', { name: 'booking.txt' }).getAttribute('href');
@@ -65,7 +65,7 @@ test.describe('attachments', () => {
 
     // On the event straight away, and honest about not having gone anywhere.
     await expect(page.getByRole('link', { name: 'booking.txt' })).toBeVisible();
-    await expect(page.getByText('Not sent yet')).toBeVisible();
+    await expect(page.getByText('Waiting to send')).toBeVisible();
 
     await context.setOffline(false);
     await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });

@@ -1033,3 +1033,39 @@ test.describe('custom fields', () => {
     await expect(page.getByRole('button', { name: /^Remove/ })).toHaveCount(1);
   });
 });
+
+test.describe('attaching files', () => {
+  test('the limit is said up front, and a waiting file can be sent by hand', async ({
+    page,
+    context,
+  }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Ryokan').click();
+    await reveal(page, 'files');
+
+    // Said before a file is chosen rather than after one is refused, and
+    // somewhere to drop them.
+    const drop = page.getByTestId('attachment-drop');
+    await expect(drop).toContainText('up to 25 MB each');
+
+    await context.setOffline(true);
+    await page.getByTestId('attachment-input').setInputFiles({
+      name: 'booking.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('confirmation'),
+    });
+
+    // It waits on the device, and there is something to press about it.
+    await expect(page.getByText('Waiting to send')).toBeVisible();
+    await page.getByTestId('retry-upload').click();
+    await expect(page.getByText('Still waiting')).toBeVisible();
+
+    await context.setOffline(false);
+    await page.getByTestId('retry-upload').click();
+    await expect(page.getByText('Waiting to send')).toHaveCount(0);
+  });
+});
