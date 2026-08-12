@@ -127,13 +127,24 @@ test.describe('week and month views', () => {
 
     // Both events are on the same day, so one column holds them both.
     const week = page.getByTestId('week-event');
-    await expect(week.filter({ hasText: 'Fushimi Inari' })).toBeVisible();
+    const earlyEvent = week.filter({ hasText: 'Fushimi Inari' });
+    await expect(earlyEvent).toBeVisible();
     await expect(week.filter({ hasText: 'Nishiki Market' })).toBeVisible();
 
     // Earlier in the day comes first, which is what makes a column a timeline.
     // Fushimi is at 05:30, before the hours the week shows by default: it is
     // pinned to the top of the column rather than dropped from it.
     await expect(week.first()).toContainText('Fushimi Inari');
+
+    // The pinned event is only as tall as the minimum card. Its compact form
+    // keeps the name inside the visible bounds instead of spending both rows
+    // on a time and clipping the identifying text below the card.
+    const cardBox = await earlyEvent.boundingBox();
+    const nameBox = await earlyEvent.getByTestId('week-event-name').boundingBox();
+    if (!cardBox || !nameBox) throw new Error('no compact week event bounds');
+    expect(nameBox.y).toBeGreaterThanOrEqual(cardBox.y);
+    expect(nameBox.y + nameBox.height).toBeLessThanOrEqual(cardBox.y + cardBox.height);
+    await expect(earlyEvent.locator('.week-event-time')).toBeHidden();
   });
 
   test('the city band names where you are, spanning the days you are there', async ({ page }) => {

@@ -679,10 +679,21 @@ test.describe('a stay', () => {
       .click();
     const hotels = page.getByTestId('week-lodging');
     await expect(hotels).toHaveCount(2);
+    await expect(page.getByTestId('week-event')).toHaveCount(0);
+    await expect(page.getByTestId('week-untimed-event')).toHaveCount(0);
     const tops = await hotels.evaluateAll((items) =>
       items.map((item) => Math.round(item.getBoundingClientRect().top)),
     );
     expect(new Set(tops).size).toBe(1);
+
+    // The stay rail ends above the horizontal scrollbar instead of letting the
+    // scrollbar draw across the hotel controls and their names.
+    const scrollerBox = await page.getByTestId('week-horizontal-scroll').boundingBox();
+    const hotelBox = await hotels.first().boundingBox();
+    if (!scrollerBox || !hotelBox) throw new Error('no lodging rail bounds');
+    expect(hotelBox.y + hotelBox.height).toBeLessThanOrEqual(
+      scrollerBox.y + scrollerBox.height - 12,
+    );
   });
 });
 

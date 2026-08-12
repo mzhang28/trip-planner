@@ -431,6 +431,10 @@ export function WeekView({
     setCreating(null);
   }
   const byDay = eventsByDay(events, homeTimezone);
+  const calendarByDay = eventsByDay(
+    events.filter((event) => event.kind !== 'lodging'),
+    homeTimezone,
+  );
   const displayZone = useDisplayZone();
   const cities = citySegments(byDay, days);
   const beds = lodgingSpans(events, homeTimezone).filter((span) => spanWithin(span, days));
@@ -439,7 +443,7 @@ export function WeekView({
   // to no point in it, so they get a row of their own above the grid.
   const untimed = new Map<DayKey, TripEvent[]>();
   for (const day of days) {
-    const waiting = (byDay.get(day) ?? []).filter((event) => event.timeUndecided);
+    const waiting = (calendarByDay.get(day) ?? []).filter((event) => event.timeUndecided);
     if (waiting.length > 0) untimed.set(day, waiting);
   }
 
@@ -637,7 +641,7 @@ export function WeekView({
 
               {days.map((day) => {
                 const positioned = positionEvents(
-                  byDay.get(day) ?? [],
+                  calendarByDay.get(day) ?? [],
                   displayZone,
                   homeTimezone,
                   windowStart,
@@ -692,7 +696,7 @@ export function WeekView({
                             width: `calc(${100 / columns}% - 4px)`,
                           }}
                           className={cn(
-                            'absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2',
+                            'week-event-card absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2',
                             // A cut edge, so a pinned event does not read as one that
                             // really starts or ends at the hour it is resting on.
                             outsideBefore && 'border-t-ink-muted [border-top-style:dashed]',
@@ -700,9 +704,9 @@ export function WeekView({
                           )}
                         >
                           <StatusSpine status={event.booking.status} />
-                          <span className="min-w-0 flex-1">
+                          <span className="week-event-content min-w-0 flex-1">
                             {event.startsAt !== undefined && (
-                              <span className="tabular flex items-center gap-0.5 text-2xs text-ink-muted">
+                              <span className="week-event-time tabular flex items-center gap-0.5 text-2xs text-ink-muted">
                                 {outsideBefore && (
                                   <ChevronUp aria-hidden="true" className="size-3" />
                                 )}
@@ -722,7 +726,10 @@ export function WeekView({
                                 )}
                               </span>
                             )}
-                            <span className="flex min-w-0 items-center gap-1">
+                            <span
+                              data-testid="week-event-name"
+                              className="week-event-name flex min-w-0 items-center gap-1"
+                            >
                               <EventKindIcon
                                 kind={event.kind}
                                 className="size-3 shrink-0 text-ink-muted"
@@ -767,7 +774,7 @@ export function WeekView({
             </div>
           </div>
 
-          <section className="mt-2 shrink-0" aria-label="Where you are sleeping">
+          <section className="mt-2 mb-4 shrink-0" aria-label="Where you are sleeping">
             {beds.length === 0 ? (
               <p className="px-1 py-2 text-2xs text-ink-muted">
                 No hotels this week. Add an event and set its kind to lodging to see it here.

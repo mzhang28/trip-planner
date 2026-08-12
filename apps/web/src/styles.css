@@ -18,3 +18,27 @@ body,
   block-size: 100%;
   overflow: hidden;
 }
+
+/*
+ * Timed events normally have separate time and name rows. Fit-to-view can
+ * compress a short event to the card's minimum height, where two rows cannot
+ * fit. At that size the name is the useful identifying information, so the
+ * card becomes a single compact name row instead of clipping it away.
+ */
+.week-event-card {
+  container-type: size;
+}
+
+@container (max-height: 39px) {
+  .week-event-time {
+    display: none;
+  }
+
+  .week-event-content {
+    align-self: center;
+  }
+
+  .week-event-name {
+    line-height: 1;
+  }
+}
