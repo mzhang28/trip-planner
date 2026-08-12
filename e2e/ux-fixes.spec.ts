@@ -975,3 +975,50 @@ test.describe('days and what has none', () => {
     }
   });
 });
+
+test.describe('custom fields', () => {
+  test('a field name is not taken twice, and a currency is three letters', async ({ page }) => {
+    await page.goto('/');
+    const tripId = await newTrip(page);
+    await page.goto(`/t/${tripId}/fields`);
+
+    // Exact: "Trip name" in the Basics card above also contains "name".
+    const name = page.getByRole('textbox', { name: 'Name', exact: true }).first();
+    await name.fill('Cost');
+    await page.getByRole('combobox', { name: 'Field type' }).selectOption('money');
+    await page.getByRole('button', { name: 'Add field' }).click();
+
+    // Two fields with one name are indistinguishable on a card and in search.
+    await name.fill('cost');
+    await page.getByRole('button', { name: 'Add field' }).click();
+    await expect(page.getByText('already a field called')).toBeVisible();
+
+    // The hint said three letters and the box took anything.
+    const currency = page.getByRole('textbox', { name: 'Currency' });
+    await currency.fill('yen please');
+    await currency.blur();
+    await expect(page.getByText('Three letters, like JPY')).toBeVisible();
+
+    await currency.fill('jpy');
+    await currency.blur();
+    await expect(page.getByText('Three letters, like JPY')).toHaveCount(0);
+  });
+
+  test('a choice cannot be added twice', async ({ page }) => {
+    await page.goto('/');
+    const tripId = await newTrip(page);
+    await page.goto(`/t/${tripId}/fields`);
+
+    await page.getByRole('textbox', { name: 'Name', exact: true }).first().fill('Dress code');
+    await page.getByRole('combobox', { name: 'Field type' }).selectOption('select');
+    await page.getByRole('button', { name: 'Add field' }).click();
+
+    const choice = page.getByRole('textbox', { name: 'New choice' });
+    for (const value of ['Smart', 'smart']) {
+      await choice.fill(value);
+      await choice.press('Enter');
+    }
+
+    await expect(page.getByRole('button', { name: /^Remove/ })).toHaveCount(1);
+  });
+});

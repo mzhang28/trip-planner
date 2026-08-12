@@ -136,11 +136,26 @@ export function TripFields() {
   }, [doc]);
 
   const [label, setLabel] = useState('');
+
+  /** Why the last attempt to add a field was refused. */
+  const [problem, setProblem] = useState<string | null>(null);
   const [type, setType] = useState<FieldType>('text');
 
   function create() {
     const trimmed = label.trim();
     if (!trimmed || !store) return;
+
+    /*
+     * Two fields with one name are indistinguishable everywhere they appear --
+     * on every event, in the palette, and in search, where the label is part
+     * of what is matched.
+     */
+    if (defs.some((def) => def.label.toLowerCase() === trimmed.toLowerCase())) {
+      setProblem(`There is already a field called "${trimmed}".`);
+      return;
+    }
+
+    setProblem(null);
 
     store.change((current) =>
       addFieldDef(current, {
@@ -312,14 +327,18 @@ export function TripFields() {
               className="min-w-40 flex-1"
               placeholder="Dress code"
               value={label}
-              onChange={setLabel}
+              errorMessage={problem}
+              onChange={(next) => {
+                setLabel(next);
+                setProblem(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') create();
               }}
             />
 
             <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-ink-secondary">Holds</span>
+              <span className="text-xs font-medium text-ink-secondary">Field type</span>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as FieldType)}
@@ -414,6 +433,16 @@ function FieldRow({
   const [option, setOption] = useState('');
   const isChoice = def.type === 'select' || def.type === 'multiselect';
 
+  /** Two choices with one label cannot be told apart once they are on a card. */
+  function addOption(label: string) {
+    const taken = Object.values(def.options ?? {}).some(
+      (existing) => existing.label.toLowerCase() === label.toLowerCase(),
+    );
+
+    if (!taken) onAddOption(label);
+    setOption('');
+  }
+
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex flex-wrap items-end gap-3">
@@ -465,14 +494,26 @@ function FieldRow({
       )}
 
       {def.type === 'money' && (
-        <TextField
+        <CheckedField
           label="Currency"
-          className="max-w-40"
-          isDisabled={readOnly}
           placeholder="JPY"
-          description="A three-letter code."
-          defaultValue={def.currency ?? ''}
-          onBlur={(e) => onSetCurrency(e.currentTarget.value.trim().toUpperCase() || undefined)}
+          hint="A three-letter code."
+          disabled={readOnly}
+          value={def.currency ?? ''}
+          onCommit={(raw) => {
+            if (raw === '') {
+              onSetCurrency(undefined);
+              return null;
+            }
+
+            // The hint said three letters and the box took anything, so an
+            // amount could be labelled with a word that is not a currency.
+            const code = raw.toUpperCase();
+            if (!/^[A-Z]{3}$/.test(code)) return 'Three letters, like JPY or EUR.';
+
+            onSetCurrency(code);
+            return null;
+          }}
         />
       )}
 
@@ -491,7 +532,16 @@ function FieldRow({
                   <button
                     type="button"
                     aria-label={`Remove ${opt.label}`}
-                    onClick={() => onRemoveOption(optionId)}
+                    onClick={() => {
+                      /*
+                       * Removing a choice takes it off every event that had it
+                       * ticked, and that happened with nothing said at all.
+                       */
+                      const ticked = usedBy === 0 ? '' : ` This field is filled in on ${usedBy} event${usedBy === 1 ? '' : 's'}, and any that chose it lose it.`;
+                      if (confirm(`Remove the choice “${opt.label}”?${ticked}`)) {
+                        onRemoveOption(optionId);
+                      }
+                    }}
                     className="text-ink-muted hover:text-danger focus-visible:outline-focus focus-visible:outline-2"
                   >
                     <Trash2 aria-hidden="true" className="size-3" />
@@ -510,19 +560,13 @@ function FieldRow({
               value={option}
               onChange={setOption}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && option.trim()) {
-                  onAddOption(option.trim());
-                  setOption('');
-                }
+                if (e.key === 'Enter' && option.trim()) addOption(option.trim());
               }}
             />
             <Button
               size="sm"
               isDisabled={option.trim() === ''}
-              onPress={() => {
-                onAddOption(option.trim());
-                setOption('');
-              }}
+              onPress={() => addOption(option.trim())}
             >
               Add
             </Button>
