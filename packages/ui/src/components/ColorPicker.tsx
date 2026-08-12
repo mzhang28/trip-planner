@@ -1,12 +1,7 @@
 import { Check, Palette, X } from 'lucide-react';
 import { Button, Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import { cn } from '../lib/cn';
-import {
-  DEFAULT_COLOR_PALETTE,
-  boldColor,
-  mutedColor,
-  readableTextColor,
-} from '../lib/color';
+import { DEFAULT_COLOR_PALETTE, coloredSurfaceStyle } from '../lib/color';
 
 export interface ColorPickerProps {
   value: string | undefined;
@@ -17,24 +12,12 @@ export interface ColorPickerProps {
 
 /** A fixed, accessible palette for assigning a colour to a user-defined item. */
 export function ColorPicker({ value, onChange, label, isDisabled }: ColorPickerProps) {
-  const triggerBackground = mutedColor(value);
-  const triggerBorder = boldColor(value);
-  const triggerText = triggerBackground ? readableTextColor(triggerBackground) : undefined;
-
   return (
     <DialogTrigger>
       <Button
         aria-label={`${label}, ${value ? 'color selected' : 'no color'}`}
         isDisabled={isDisabled}
-        style={
-          triggerBackground
-            ? {
-                backgroundColor: triggerBackground,
-                borderColor: triggerBorder,
-                color: triggerText,
-              }
-            : undefined
-        }
+        style={coloredSurfaceStyle(value)}
         className={cn(
           'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border',
           'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-2',
@@ -58,7 +41,6 @@ export function ColorPicker({ value, onChange, label, isDisabled }: ColorPickerP
             <div className="flex w-56 flex-col gap-2">
               <div className="grid grid-cols-8 gap-1.5">
                 {DEFAULT_COLOR_PALETTE.map((color) => {
-                  const text = readableTextColor(color.muted);
                   const selected = value?.toUpperCase() === color.bold;
 
                   return (
@@ -70,11 +52,7 @@ export function ColorPicker({ value, onChange, label, isDisabled }: ColorPickerP
                         onChange(color.bold);
                         close();
                       }}
-                      style={{
-                        backgroundColor: color.muted,
-                        borderColor: color.bold,
-                        color: text,
-                      }}
+                      style={coloredSurfaceStyle(color.bold)}
                       className={cn(
                         'flex size-6 cursor-pointer items-center justify-center rounded-full border-2',
                         'data-hovered:scale-110 data-pressed:scale-95',

@@ -292,15 +292,23 @@ function DayColumn({
       onPointerMove={(e) => onMove(minutesAt(e))}
       onPointerUp={onFinish}
       className={cn(
-        'relative block min-w-0 bg-card',
+        /*
+         * The grid is the sheet the day is written on, so it sits a step below
+         * the cards drawn on it. Holding the column at the card surface made an
+         * event with no colour the same colour as the hour behind it, and only
+         * its border said where it started.
+         */
+        'relative block min-w-0 bg-page',
         isOver && 'bg-accent-soft',
         selected && 'bg-accent-soft',
         !disabled && 'cursor-cell',
       )}
       style={{
         height: fitToView ? '100%' : (windowEnd - windowStart) * MINUTE_HEIGHT,
+        // The subtle border is one step off the page grey, which is too little to
+        // see an hour by. The default border is the next step out.
         backgroundImage:
-          'linear-gradient(to bottom, transparent calc(100% - 1px), var(--border-subtle) 1px)',
+          'linear-gradient(to bottom, transparent calc(100% - 1px), var(--border-default) 1px)',
         backgroundSize: fitToView
           ? `100% ${100 / ((windowEnd - windowStart) / 60)}%`
           : `100% ${HOUR_HEIGHT}px`,
@@ -581,7 +589,7 @@ export function WeekView({
                   Any
                 </div>
                 {days.map((day) => (
-                  <div key={day} className="flex min-w-0 flex-col gap-0.5 bg-card p-0.5">
+                  <div key={day} className="flex min-w-0 flex-col gap-0.5 bg-page p-0.5">
                     {creating?.day === day && creating.start === undefined && (
                       <InlineEventDraft
                         name={creating.name}

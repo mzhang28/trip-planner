@@ -24,14 +24,18 @@ export { cn } from './lib/cn';
 export {
   DEFAULT_COLOR_PALETTE,
   boldColor,
+  boldInkColor,
+  boldVariants,
   coloredSurfaceStyle,
   contrastBetween,
   contrastRatio,
   parseColor,
   mutedColor,
+  mutedVariants,
   readableTextColor,
   relativeLuminance,
   type DefaultColor,
+  type ThemeVariants,
 } from './lib/color';
 
 export {
