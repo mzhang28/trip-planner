@@ -53,6 +53,21 @@ test.describe('attachments', () => {
     const response = await page.request.get(href!);
     expect(response.status()).toBe(200);
     expect(await response.text()).toBe('Confirmation 7K2QLM');
+
+    // Compact content indicators stay on the day card when its editor closes.
+    const editor = page.getByTestId('event-editor');
+    if ((await editor.getByTestId('add-field-description').count()) === 0) {
+      await editor.getByTestId('expand-palette').click();
+    }
+    await editor.getByTestId('add-field-description').click();
+    const description = editor.getByRole('combobox', { name: 'Description' });
+    await description.fill('Show the confirmation at check-in.');
+    await description.blur();
+    await page.getByTestId('close-editor').click();
+
+    const row = page.getByTestId('event').filter({ hasText: 'Ryokan' });
+    await expect(row.getByTestId('attachment-indicator')).toBeVisible();
+    await expect(row.getByTestId('description-indicator')).toBeVisible();
   });
 
   test('a file attached with no network is kept and sent on reconnect', async ({ page, context }) => {

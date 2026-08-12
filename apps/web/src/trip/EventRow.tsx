@@ -18,6 +18,7 @@ import {
   cn,
   coloredSurfaceStyle,
 } from '@trip/ui';
+import { FileText, Paperclip } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Button, Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import { formatTime } from '../lib/time';
@@ -61,6 +62,40 @@ export interface EventRowProps {
   selectionActive: boolean;
   /** Rendered as the grip. Absent for a viewer, who cannot move anything. */
   dragHandle?: ReactNode;
+}
+
+function EventContentIndicators({ event }: { event: TripEvent }) {
+  const attachmentCount = Object.keys(event.attachments).length;
+  const hasDescription = Boolean(event.description?.trim());
+
+  if (attachmentCount === 0 && !hasDescription) return null;
+
+  return (
+    <span className="flex shrink-0 items-center gap-1 text-ink-muted">
+      {attachmentCount > 0 && (
+        <span
+          data-testid="attachment-indicator"
+          title={`${attachmentCount} attached file${attachmentCount === 1 ? '' : 's'}`}
+          className="inline-flex"
+        >
+          <Paperclip aria-hidden="true" className="size-3.5" />
+          <span className="sr-only">
+            {attachmentCount} attached file{attachmentCount === 1 ? '' : 's'}
+          </span>
+        </span>
+      )}
+      {hasDescription && (
+        <span
+          data-testid="description-indicator"
+          title="Has description"
+          className="inline-flex"
+        >
+          <FileText aria-hidden="true" className="size-3.5" />
+          <span className="sr-only">Has description</span>
+        </span>
+      )}
+    </span>
+  );
 }
 
 function EventKindPicker({
@@ -411,6 +446,7 @@ export function EventRow({
               startEditing={openForNameEdit}
               onCommit={(name) => onPatch({ name })}
             />
+            <EventContentIndicators event={event} />
             <BookingStatusPicker
               status={event.booking.status}
               onChange={(status) => onPatch({ booking: { ...event.booking, status } })}
@@ -441,6 +477,7 @@ export function EventRow({
                 >
                   {event.name || 'Unnamed'}
                 </span>
+                <EventContentIndicators event={event} />
               </span>
               {summary.length > 0 && (
                 <span className="block truncate text-2xs text-ink-muted">{summary.join(' · ')}</span>
