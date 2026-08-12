@@ -123,7 +123,7 @@ export function TripFiles() {
             to={`/t/${tripId}`}
             className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
           >
-            Back to trip
+            Itinerary
           </Link>
           <h1 className="min-w-0 flex-1 truncate text-lg">Files</h1>
           <Link

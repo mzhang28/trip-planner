@@ -197,7 +197,9 @@ export function EventEditor({
               hint={
                 event.startsAt === undefined
                   ? 'Pick a date first.'
-                  : undefined
+                  : event.timeUndecided
+                    ? 'The day is enough until you know the hour.'
+                    : undefined
               }
               onCommit={(raw) => {
                 if (raw === '') {

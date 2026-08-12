@@ -178,7 +178,7 @@ export function TripFields() {
             to={`/t/${tripId}`}
             className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
           >
-            Back to trip
+            Itinerary
           </Link>
           <h1 className="flex-1 text-lg">Trip settings</h1>
           <Link

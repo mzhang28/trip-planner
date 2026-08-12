@@ -567,16 +567,22 @@ test.describe('filling an event in gradually', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
 
-    await expect
-      .poll(() => page.locator('main').evaluate((element) => element.getBoundingClientRect().width))
-      .toBe(1920);
-    await expect
-      .poll(() =>
-        page
-          .getByTestId('trip-toolbar')
-          .evaluate((element) => element.getBoundingClientRect().width),
-      )
-      .toBe(1920);
+    // Everything to the right of the navigation sidebar belongs to the trip.
+    // A centred max-width column would leave empty gutters on a wide screen,
+    // so both the toolbar and the canvas must reach the far edge.
+    const sidebar = page.getByRole('complementary', { name: 'Trip navigation' });
+    const sidebarBox = await sidebar.boundingBox();
+    if (!sidebarBox) throw new Error('no sidebar bounds');
+    const contentLeft = Math.round(sidebarBox.x + sidebarBox.width);
+
+    for (const region of [page.locator('main'), page.getByTestId('trip-toolbar')]) {
+      await expect
+        .poll(async () => {
+          const box = await region.boundingBox();
+          return box && [Math.round(box.x), Math.round(box.x + box.width)];
+        })
+        .toEqual([contentLeft, 1920]);
+    }
   });
 
   test('only the day event list scrolls', { tag: '@responsive' }, async ({ page }) => {

@@ -651,18 +651,25 @@ export function TripView() {
               to={`/t/${tripId}/fields`}
               className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
             >
-              Trip settings
+              Settings
             </Link>
             <SyncBadge state={state} />
           </div>
-          <div className="absolute left-1/2 hidden w-[36vw] min-w-64 max-w-lg -translate-x-1/2 lg:flex">
-            <SearchBar
-              doc={doc}
-              homeTimezone={homeTimezone}
-              onPickEvent={focusEvent}
-              onPickDay={goToDay}
-              onRunCommand={runCommand}
-            />
+          {/*
+            In the flow of the toolbar rather than centred on top of it. While
+            it was positioned absolutely it sat over the view switcher, and
+            clicks meant for Week or Month landed in the search box instead.
+          */}
+          <div className="hidden min-w-64 flex-1 justify-center lg:flex">
+            <div className="flex w-full max-w-lg">
+              <SearchBar
+                doc={doc}
+                homeTimezone={homeTimezone}
+                onPickEvent={focusEvent}
+                onPickDay={goToDay}
+                onRunCommand={runCommand}
+              />
+            </div>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <SegmentedControl

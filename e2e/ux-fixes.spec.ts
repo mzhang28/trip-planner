@@ -1129,10 +1129,7 @@ test.describe('custom fields', () => {
 });
 
 test.describe('attaching files', () => {
-  test('the limit is said up front, and a waiting file can be sent by hand', async ({
-    page,
-    context,
-  }) => {
+  test('the limit is said up front, and a waiting file can be sent by hand', async ({ page }) => {
     await page.goto('/');
     await newTrip(page);
 
@@ -1143,9 +1140,16 @@ test.describe('attaching files', () => {
     // Said before a file is chosen rather than after one is refused, and
     // somewhere to drop them.
     const drop = page.getByTestId('attachment-drop');
-    await expect(drop).toContainText('up to 25 MB each');
+    await expect(drop).toContainText('Up to 25 MB each');
 
-    await context.setOffline(true);
+    /*
+     * The server is unreachable rather than the browser being offline. Taking
+     * the browser offline and back makes the window fire `online`, which the
+     * editor answers by flushing the queue itself -- so the button would be
+     * racing the automatic send instead of being the thing that does it.
+     */
+    const uploads = '**/api/blobs/**';
+    await page.route(uploads, (route) => route.abort());
     await page.getByTestId('attachment-input').setInputFiles({
       name: 'booking.txt',
       mimeType: 'text/plain',
@@ -1157,7 +1161,7 @@ test.describe('attaching files', () => {
     await page.getByTestId('retry-upload').click();
     await expect(page.getByText('Still waiting')).toBeVisible();
 
-    await context.setOffline(false);
+    await page.unroute(uploads);
     await page.getByTestId('retry-upload').click();
     await expect(page.getByText('Waiting to send')).toHaveCount(0);
   });

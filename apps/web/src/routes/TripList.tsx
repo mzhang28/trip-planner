@@ -152,6 +152,7 @@ export function TripList() {
             ref={archiveInput}
             type="file"
             accept=".zip,application/zip"
+            aria-label="Trip archive to import"
             className="sr-only"
             data-testid="import-trip-input"
             onChange={(e) => {
