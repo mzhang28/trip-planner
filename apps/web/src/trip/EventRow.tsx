@@ -95,7 +95,13 @@ export function EventRow({
   ].filter(Boolean);
 
   return (
-    <Card className="overflow-hidden">
+    /*
+     * Clipped while closed, so the status spine stops at the rounded corner.
+     * Open, the clip has to go: it is the box a sticky footer sticks inside,
+     * and a card taller than the screen would pin Done to the card's own
+     * bottom edge -- which is exactly the part that is off screen.
+     */
+    <Card className={cn(isOpen ? 'overflow-visible' : 'overflow-hidden')}>
       <div className="flex">
         <StatusSpine status={event.booking.status} />
 

@@ -74,6 +74,12 @@ export const trips = sqliteTable(
      * cannot merge safely and has to take a fresh copy.
      */
     tombstonesSweptAt: integer('tombstones_swept_at'),
+    /**
+     * Set when a trip is put away rather than deleted. It stays in the list
+     * behind a filter, so a finished trip stops crowding the ones being
+     * planned without anybody having to destroy it to tidy up.
+     */
+    archivedAt: integer('archived_at'),
   },
   (table) => [index('trips_created_by').on(table.createdBy)],
 );

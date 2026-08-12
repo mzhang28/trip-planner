@@ -1,5 +1,5 @@
-import { shareLinks, tripMembers, trips, users, type TripRole } from '@trip/schema';
-import { and, desc, eq, isNull, or, gt } from 'drizzle-orm';
+import { events, shareLinks, tripMembers, trips, users, type TripRole } from '@trip/schema';
+import { and, desc, eq, isNotNull, isNull, or, gt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../context';
@@ -11,6 +11,12 @@ const createSchema = z.object({
   homeTimezone: z.string().min(1).default('UTC'),
 });
 
+const basicsSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  homeTimezone: z.string().min(1).optional(),
+  archived: z.boolean().optional(),
+});
+
 const shareSchema = z.object({
   role: z.enum(['viewer', 'editor']).default('editor'),
   expiresInDays: z.number().int().positive().max(365).optional(),
@@ -19,7 +25,13 @@ const shareSchema = z.object({
 export function tripRoutes() {
   const app = new Hono<AppEnv>();
 
-  /** Every trip this person has ever opened, most recently opened first. */
+  /**
+   * Every trip this person has ever opened, most recently opened first.
+   *
+   * Each row carries what a card needs to be told apart from the one beside
+   * it: when the trip runs, where it goes, and what is next. A list of names
+   * and roles left "Japan" and "Japan again" indistinguishable.
+   */
   app.get('/', (c) => {
     const { db } = c.var.services;
 
@@ -28,6 +40,7 @@ export function tripRoutes() {
         id: trips.id,
         name: trips.name,
         homeTimezone: trips.homeTimezone,
+        archivedAt: trips.archivedAt,
         role: tripMembers.role,
         lastOpenedAt: tripMembers.lastOpenedAt,
       })
@@ -37,7 +50,35 @@ export function tripRoutes() {
       .orderBy(desc(tripMembers.lastOpenedAt))
       .all();
 
-    return c.json({ trips: rows });
+    /*
+     * Read from the projection rather than from any document. The list is the
+     * first thing rendered on every visit, and loading a CRDT document per
+     * trip to draw a card would make that the slowest screen in the app.
+     */
+    const summarised = rows.map((trip) => {
+      const dated = db
+        .select({ startsAt: events.startsAt, city: events.city })
+        .from(events)
+        .where(and(eq(events.tripId, trip.id), isNotNull(events.startsAt)))
+        .orderBy(events.startsAt)
+        .all();
+
+      const next = dated.find((event) => event.startsAt !== null && event.startsAt >= Date.now());
+      const cities = [...new Set(dated.map((event) => event.city).filter(Boolean))];
+
+      return {
+        ...trip,
+        startsAt: dated[0]?.startsAt ?? null,
+        endsAt: dated[dated.length - 1]?.startsAt ?? null,
+        // Two names and a count, the same as a month cell: enough to know
+        // which trip this is without listing an itinerary on a card.
+        destination: cities.slice(0, 2).join(' · ') || null,
+        moreCities: Math.max(0, cities.length - 2),
+        nextAt: next?.startsAt ?? null,
+      };
+    });
+
+    return c.json({ trips: summarised });
   });
 
   app.post('/', async (c) => {
@@ -69,6 +110,57 @@ export function tripRoutes() {
     return c.json({ id, name, homeTimezone, role: 'owner' satisfies TripRole }, 201);
   });
 
+  /**
+   * Changes what a trip is: its name, the zone it is planned in, whether it is
+   * put away.
+   *
+   * None of these could be changed after creation, though the first two decide
+   * how every calendar in the app groups its days.
+   */
+  app.patch('/:tripId', requireMembership, async (c) => {
+    const { db, docs } = c.var.services;
+    const membership = c.var.membership!;
+
+    if (membership.role !== 'owner') return c.json({ error: 'owner_only' }, 403);
+
+    const parsed = basicsSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: 'bad_request' }, 400);
+
+    const { name, homeTimezone, archived } = parsed.data;
+    db.update(trips)
+      .set({
+        ...(name === undefined ? {} : { name }),
+        ...(homeTimezone === undefined ? {} : { homeTimezone }),
+        ...(archived === undefined ? {} : { archivedAt: archived ? Date.now() : null }),
+      })
+      .where(eq(trips.id, membership.tripId))
+      .run();
+
+    if (name !== undefined || homeTimezone !== undefined) {
+      docs.rename(membership.tripId, { name, homeTimezone });
+    }
+
+    return c.json({ ok: true });
+  });
+
+  /** Removes a trip for everybody. Owner only, and there is no way back. */
+  app.delete('/:tripId', requireMembership, (c) => {
+    const { db, docs } = c.var.services;
+    const membership = c.var.membership!;
+
+    if (membership.role !== 'owner') return c.json({ error: 'owner_only' }, 403);
+
+    db.transaction((tx) => {
+      tx.delete(tripMembers).where(eq(tripMembers.tripId, membership.tripId)).run();
+      tx.delete(shareLinks).where(eq(shareLinks.tripId, membership.tripId)).run();
+      tx.delete(trips).where(eq(trips.id, membership.tripId)).run();
+    });
+
+    docs.forget(membership.tripId);
+
+    return c.json({ ok: true });
+  });
+
   app.get('/:tripId', requireMembership, (c) => {
     const { db } = c.var.services;
     const membership = c.var.membership!;
@@ -90,6 +182,7 @@ export function tripRoutes() {
       id: trip.id,
       name: trip.name,
       homeTimezone: trip.homeTimezone,
+      archivedAt: trip.archivedAt,
       role: membership.role,
     });
   });

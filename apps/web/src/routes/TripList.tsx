@@ -4,6 +4,35 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, deviceTimezone, type TripSummary } from '../lib/api';
 
+/*
+ * Read in the trip's own zone, like every other date in the app. A trip
+ * planned in Tokyo that starts at midnight there is 15:00 the day before in
+ * UTC, and a card that says so names the wrong day.
+ */
+function day(at: number, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone,
+  }).format(at);
+}
+
+/** The span a trip covers, or that nothing has been dated yet. */
+function when(trip: TripSummary): string {
+  const zone = trip.homeTimezone;
+  if (!trip.startsAt) return 'No dates yet';
+  if (!trip.endsAt || trip.endsAt === trip.startsAt) return day(trip.startsAt, zone);
+
+  return `${day(trip.startsAt, zone)} – ${day(trip.endsAt, zone)}`;
+}
+
+function whatIsNext(trip: TripSummary): string {
+  if (trip.nextAt) return `Next on ${day(trip.nextAt, trip.homeTimezone)}`;
+  if (trip.startsAt) return 'Nothing left to come';
+
+  return 'Nothing planned yet';
+}
+
 export function TripList() {
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
 
@@ -88,10 +117,23 @@ export function TripList() {
             <Card key={trip.id}>
               <Link
                 to={`/t/${trip.id}`}
-                className="flex items-center justify-between gap-3 px-3 py-3 hover:bg-sunken"
+                className="flex flex-col gap-1 px-3 py-3 hover:bg-sunken"
               >
-                <span className="min-w-0 truncate font-medium">{trip.name}</span>
-                <span className="text-2xs text-ink-muted">{trip.role}</span>
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate font-medium">{trip.name}</span>
+                  <span className="shrink-0 text-2xs text-ink-muted">{trip.role}</span>
+                </span>
+
+                {/*
+                  When, where, and what is next. A card showing only a name and
+                  a role made "Japan" and "Japan again" the same card twice.
+                */}
+                <span className="truncate text-2xs text-ink-secondary">
+                  {when(trip)}
+                  {trip.destination && ` · ${trip.destination}`}
+                  {trip.moreCities ? ` +${trip.moreCities}` : ''}
+                </span>
+                <span className="truncate text-2xs text-ink-muted">{whatIsNext(trip)}</span>
               </Link>
             </Card>
           ))}

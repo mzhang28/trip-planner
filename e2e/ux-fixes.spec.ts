@@ -610,8 +610,16 @@ test.describe('reaching things with a finger', () => {
     await page.getByRole('button', { name: 'Add', exact: true }).click();
     await eventRow(page, 'Fushimi Inari').click();
 
-    // The card header is the other way out, and on a phone it is several
-    // screens up by the time a few fields are open.
+    // Enough fields open that the editor is taller than the screen, which is
+    // the state the complaint is about.
+    for (const field of ['when', 'duration', 'city', 'place', 'booking', 'links']) {
+      await reveal(page, field);
+    }
+
+    // Scrolled to the top of the editor: the card header is the other way out,
+    // and from here it is several screens up.
+    await page.getByRole('textbox', { name: 'Name' }).scrollIntoViewIfNeeded();
+
     const done = page.getByTestId('close-editor');
     await expect(done).toBeInViewport();
     await done.click();
@@ -842,5 +850,70 @@ test.describe('who is on a trip', () => {
 
     await other.close();
     void tripId;
+  });
+});
+
+test.describe('a trip is more than its name', () => {
+  test('the name and the zone can be changed after it is made', async ({ page }) => {
+    await page.goto('/');
+    const tripId = await newTrip(page);
+
+    await page.goto(`/t/${tripId}/fields`);
+
+    // Neither could be changed once a trip existed, though the zone decides
+    // which day every event is grouped under.
+    const name = page.getByRole('textbox', { name: 'Trip name' });
+    await name.fill('Kyoto in autumn');
+    await name.blur();
+
+    const zone = page.getByRole('combobox', { name: 'Home time zone' });
+    await zone.fill('Not/AZone');
+    await zone.blur();
+    await expect(page.getByText('Not a time zone')).toBeVisible();
+
+    await zone.fill('Europe/Lisbon');
+    await zone.blur();
+
+    await page.goto('/');
+    await expect(page.getByText('Kyoto in autumn')).toBeVisible();
+  });
+
+  test('a trip can be put away, and deleted for everybody', async ({ page }) => {
+    await page.goto('/');
+    const tripId = await newTrip(page);
+    await page.goto(`/t/${tripId}/fields`);
+
+    await page.getByTestId('archive-trip').click();
+    await expect(page.getByRole('button', { name: 'Put back in the list' })).toBeVisible();
+
+    // Deleting asks first, because there is no way back from it.
+    await page.getByRole('button', { name: 'Delete this trip' }).click();
+    await page.getByTestId('confirm-delete-trip').click();
+
+    await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
+    await page.goto(`/t/${tripId}`);
+    await expect(page.getByTestId('no-access')).toContainText('not here');
+  });
+
+  test('a card says when the trip runs and what is next', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Fushimi Inari').click();
+    await reveal(page, 'when');
+    await page.getByTestId('event-date').fill('2027-04-14');
+    await reveal(page, 'city');
+    await page.getByRole('textbox', { name: 'City' }).fill('Kyoto');
+    await page.getByRole('textbox', { name: 'City' }).blur();
+    await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
+
+    // A name and a role made two trips called Japan the same card twice.
+    await page.goto('/');
+    const card = page.getByRole('link', { name: /Japan, April/ });
+    await expect(card).toContainText('14 Apr');
+    await expect(card).toContainText('Kyoto');
+    await expect(card).toContainText('Next on 14 Apr');
   });
 });

@@ -185,6 +185,25 @@ export class DocStore {
     });
   }
 
+  /**
+   * Writes a trip's own details into its document.
+   *
+   * They live in two places on purpose: the row answers the trip list without
+   * loading a document, and the document is what a browser reads when there is
+   * no server to ask. Changing one without the other makes the two disagree.
+   */
+  rename(tripId: string, details: { name?: string; homeTimezone?: string }): void {
+    const doc = this.load(tripId);
+    if (!doc) return;
+
+    const next = A.change(doc, (d) => {
+      if (details.name !== undefined) d.meta.name = details.name;
+      if (details.homeTimezone !== undefined) d.meta.homeTimezone = details.homeTimezone;
+    });
+
+    this.commit(tripId, next, A.getChanges(doc, next), 'system');
+  }
+
   forget(tripId: string): void {
     this.#cache.delete(tripId);
   }

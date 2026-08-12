@@ -12,11 +12,12 @@ import {
 } from '@trip/crdt';
 import { Button, Card, TextField, ThemeToggle } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
 import { randomId } from '../lib/crypto';
 import { api, type TripSummary } from '../lib/api';
-import { setDay, toDateInput } from '../lib/time';
+import { isTimeZone, knownTimeZones, setDay, toDateInput } from '../lib/time';
+import { CheckedField } from '../trip/CheckedField';
 import { AuditPanel } from '../trip/AuditPanel';
 import { SyncBadge } from '../trip/SyncBadge';
 import { useTripState, useTripStore } from '../trip/useTrip';
@@ -64,13 +65,18 @@ export function TripFields() {
   const canEdit = trip !== null && trip.role !== 'viewer';
   const readOnly = !canEdit;
 
-  useEffect(() => {
+  const navigate = useNavigate();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const load = useCallback(() => {
     if (!tripId) return;
     void api
       .getTrip(tripId)
       .then(setTrip)
       .catch(() => setTrip(null));
   }, [tripId]);
+
+  useEffect(load, [load]);
 
   const doc = state?.doc as TripDoc | undefined;
   const defs = useMemo(() => liveFieldDefs(doc), [doc]);
@@ -164,6 +170,93 @@ export function TripFields() {
       </header>
 
       <main className="mx-auto min-h-0 w-full max-w-5xl flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+        {/*
+          What the trip is. Creation asked only for a name and took the device's
+          zone without showing it, and nothing afterwards could change either --
+          though the zone decides which day every event is grouped under.
+        */}
+        <h2 className="mb-1 text-sm text-ink">Basics</h2>
+        <p className="mb-4 max-w-prose text-sm text-ink-secondary">
+          The name in your list, and the zone days are counted in when an event does not name its
+          own.
+        </p>
+
+        <Card className="mb-10 flex flex-col gap-4 p-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CheckedField
+              label="Trip name"
+              value={trip?.name ?? ''}
+              disabled={readOnly}
+              onCommit={(raw) => {
+                if (raw === '') return 'A trip needs a name.';
+                if (raw === trip?.name) return null;
+
+                void api.updateTrip(tripId!, { name: raw }).then(load);
+                return null;
+              }}
+            />
+
+            <CheckedField
+              label="Home time zone"
+              value={trip?.homeTimezone ?? ''}
+              disabled={readOnly}
+              suggestions={knownTimeZones()}
+              onCommit={(raw) => {
+                if (!isTimeZone(raw)) return 'Not a time zone. Try one from the list.';
+                if (raw === trip?.homeTimezone) return null;
+
+                void api.updateTrip(tripId!, { homeTimezone: raw }).then(load);
+                return null;
+              }}
+            />
+          </div>
+
+          {trip?.role === 'owner' && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+              <p className="min-w-0 flex-1 text-2xs text-ink-muted">
+                Putting a trip away keeps it and takes it out of the way. Deleting removes it for
+                everybody on it, and cannot be undone.
+              </p>
+
+              <Button
+                size="sm"
+                data-testid="archive-trip"
+                onPress={() =>
+                  void api.updateTrip(tripId!, { archived: !trip.archivedAt }).then(load)
+                }
+              >
+                {trip.archivedAt ? 'Put back in the list' : 'Put this trip away'}
+              </Button>
+
+              {confirmingDelete ? (
+                <>
+                  <span className="text-2xs text-danger">Delete for everyone?</span>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    data-testid="confirm-delete-trip"
+                    onPress={() => void api.deleteTrip(tripId!).then(() => navigate('/'))}
+                  >
+                    Delete it
+                  </Button>
+                  <Button size="sm" variant="ghost" onPress={() => setConfirmingDelete(false)}>
+                    Keep it
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-danger"
+                  onPress={() => setConfirmingDelete(true)}
+                >
+                  Delete this trip
+                </Button>
+              )}
+            </div>
+          )}
+        </Card>
+
         <h2 className="mb-1 text-sm text-ink">Trip dates</h2>
         <p className="mb-4 max-w-prose text-sm text-ink-secondary">
           The week timeline starts and stops on these days. Both dates are included.

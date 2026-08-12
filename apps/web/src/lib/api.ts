@@ -4,6 +4,13 @@ export interface TripSummary {
   homeTimezone: string;
   role: 'viewer' | 'editor' | 'owner';
   lastOpenedAt?: number;
+  archivedAt?: number | null;
+  /** What the card shows so one trip can be told from the next. */
+  startsAt?: number | null;
+  endsAt?: number | null;
+  destination?: string | null;
+  moreCities?: number;
+  nextAt?: number | null;
 }
 
 /**
@@ -54,6 +61,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(expiresInDays ? { role, expiresInDays } : { role }),
     }),
+
+  updateTrip: (
+    tripId: string,
+    changes: { name?: string; homeTimezone?: string; archived?: boolean },
+  ) =>
+    request<{ ok: true }>(`/api/trips/${tripId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(changes),
+    }),
+
+  deleteTrip: (tripId: string) =>
+    request<{ ok: true }>(`/api/trips/${tripId}`, { method: 'DELETE' }),
 
   redeemShareLink: (token: string) =>
     request<{ tripId: string; role: string }>(`/api/share/${token}`, { method: 'POST' }),
