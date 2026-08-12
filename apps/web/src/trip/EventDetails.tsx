@@ -1,6 +1,6 @@
 import type { CustomValue, FieldDef, TripDoc, TripEvent } from '@trip/crdt';
 import { renderCustomValue, type FieldDefId } from '@trip/crdt';
-import { StatusChip, coloredSurfaceStyle, readableTextColor } from '@trip/ui';
+import { StatusChip, coloredSurfaceStyle } from '@trip/ui';
 import { Paperclip } from 'lucide-react';
 import { formatTime } from '../lib/time';
 import { Description } from './DescriptionEditor';
@@ -38,15 +38,7 @@ function CustomValueDisplay({ value, def }: { value: CustomValue; def: FieldDef 
         return (
           <span
             key={optionId}
-            style={
-              option.color
-                ? {
-                    backgroundColor: option.color,
-                    borderColor: option.color,
-                    color: readableTextColor(option.color),
-                  }
-                : undefined
-            }
+            style={coloredSurfaceStyle(option.color)}
             className={
               option.color
                 ? 'rounded-full border px-2.5 py-0.5 text-xs'

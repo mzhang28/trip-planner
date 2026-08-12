@@ -13,7 +13,7 @@ export interface Rgb {
  * the same when the app theme changes. Names make the swatches understandable
  * to screen-reader users, for whom a bare hex value is not a useful label.
  */
-export const DEFAULT_COLOR_PALETTE = [
+const BOLD_COLOR_PALETTE = [
   { name: 'Ruby', value: '#B91C1C' },
   { name: 'Tangerine', value: '#EA580C' },
   { name: 'Gold', value: '#CA8A04' },
@@ -48,7 +48,36 @@ export const DEFAULT_COLOR_PALETTE = [
   { name: 'Wine', value: '#831843' },
 ] as const;
 
-export type DefaultColor = (typeof DEFAULT_COLOR_PALETTE)[number]['value'];
+export type DefaultColor = (typeof BOLD_COLOR_PALETTE)[number]['value'];
+
+const PASTEL_WHITE_MIX = 0.82;
+
+/** Makes the fixed palette's muted partner without weakening its bold identity colour. */
+function pastelHex(value: string): string {
+  const numeric = Number.parseInt(value.slice(1), 16);
+  const channel = (shift: number) => (numeric >> shift) & 0xff;
+  const pastel = (component: number) =>
+    Math.round(component + (255 - component) * PASTEL_WHITE_MIX);
+  const hex = (component: number) => pastel(component).toString(16).padStart(2, '0');
+  return `#${hex(channel(16))}${hex(channel(8))}${hex(channel(0))}`.toUpperCase();
+}
+
+/**
+ * Each choice has one bold value for accents and one muted value for surfaces.
+ * `value` remains an alias for `bold` so saved documents and callers written
+ * before the two-variant palette continue to store the same colour.
+ */
+export const DEFAULT_COLOR_PALETTE = BOLD_COLOR_PALETTE.map((color) => ({
+  ...color,
+  bold: color.value,
+  muted: pastelHex(color.value),
+}));
+
+const PALETTE_BY_VARIANT = new Map<string, (typeof DEFAULT_COLOR_PALETTE)[number]>();
+for (const color of DEFAULT_COLOR_PALETTE) {
+  PALETTE_BY_VARIANT.set(color.bold.toUpperCase(), color);
+  PALETTE_BY_VARIANT.set(color.muted.toUpperCase(), color);
+}
 
 const HEX_SHORT = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i;
 const HEX_LONG = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
@@ -82,6 +111,26 @@ export function parseColor(value: string): Rgb | null {
   }
 
   return null;
+}
+
+/** The strong palette variant for borders, markers, and other small accents. */
+export function boldColor(value: string | undefined): string | undefined {
+  if (!value || !parseColor(value)) return undefined;
+  return PALETTE_BY_VARIANT.get(value.trim().toUpperCase())?.bold ?? value;
+}
+
+/** The pastel palette variant used when colour occupies a surface. */
+export function mutedColor(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const parsed = parseColor(value);
+  if (!parsed) return undefined;
+
+  const paletteColor = PALETTE_BY_VARIANT.get(value.trim().toUpperCase());
+  if (paletteColor) return paletteColor.muted;
+
+  const pastel = (component: number) =>
+    Math.round(component + (255 - component) * PASTEL_WHITE_MIX);
+  return `rgb(${pastel(parsed.r)}, ${pastel(parsed.g)}, ${pastel(parsed.b)})`;
 }
 
 function toLinear(channel: number): number {
@@ -125,7 +174,7 @@ export function readableTextColor(background: string, dark = '#111827', light = 
  * background. Keeping this in one place prevents calendar views from each
  * making a different dark-colour decision.
  */
-export function coloredSurfaceStyle(background: string | undefined):
+export function coloredSurfaceStyle(color: string | undefined):
   | (CSSProperties & {
       '--text-primary': string;
       '--text-secondary': string;
@@ -134,12 +183,14 @@ export function coloredSurfaceStyle(background: string | undefined):
       '--surface-sunken': string;
     })
   | undefined {
-  if (!background || !parseColor(background)) return undefined;
+  const background = mutedColor(color);
+  const border = boldColor(color);
+  if (!background || !border) return undefined;
   const foreground = readableTextColor(background);
 
   return {
     backgroundColor: background,
-    borderColor: background,
+    borderColor: border,
     color: foreground,
     '--text-primary': foreground,
     '--text-secondary': foreground,

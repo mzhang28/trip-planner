@@ -1,5 +1,5 @@
 import type { TripEvent } from '@trip/crdt';
-import { parseColor, readableTextColor } from '@trip/ui';
+import { boldColor, parseColor, readableTextColor } from '@trip/ui';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef } from 'react';
@@ -23,7 +23,7 @@ const STATUS_COLOR: Record<string, string> = {
 /** Numbered in the order the day happens, which is how the timeline reads. */
 function pinIcon(index: number, status: string, selected: boolean, color?: string): L.DivIcon {
   // Only validated palette-shaped values enter the HTML string.
-  const custom = color && parseColor(color) ? color : undefined;
+  const custom = color && parseColor(color) ? boldColor(color) : undefined;
   const background = custom ?? STATUS_COLOR[status] ?? 'var(--status-idea)';
   const foreground = custom ? readableTextColor(custom) : 'var(--surface-card)';
 

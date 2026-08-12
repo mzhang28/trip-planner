@@ -152,12 +152,13 @@ test.describe('custom colors', () => {
       .click();
 
     const cityRibbon = page.getByText('Kyoto', { exact: true }).first();
-    await expect(cityRibbon).toHaveCSS('background-color', 'rgb(250, 204, 21)');
+    await expect(cityRibbon).toHaveCSS('background-color', 'rgb(254, 246, 213)');
+    await expect(cityRibbon).toHaveCSS('border-color', 'rgb(250, 204, 21)');
     await expect(cityRibbon).toHaveCSS('color', 'rgb(17, 24, 39)');
 
     const event = page.getByText('Night train', { exact: true });
-    await expect(event.locator('..')).toHaveCSS('background-color', 'rgb(30, 58, 138)');
-    await expect(event).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(event.locator('..')).toHaveCSS('background-color', 'rgb(215, 220, 234)');
+    await expect(event).toHaveCSS('color', 'rgb(17, 24, 39)');
   });
 });
 

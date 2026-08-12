@@ -11,7 +11,7 @@ import {
   type FieldType,
   type TripDoc,
 } from '@trip/crdt';
-import { Button, Card, ColorPicker, TextField, ThemeToggle, readableTextColor } from '@trip/ui';
+import { Button, Card, ColorPicker, TextField, ThemeToggle, coloredSurfaceStyle } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -532,15 +532,7 @@ function FieldRow({
               {Object.entries(def.options ?? {}).map(([optionId, opt]) => (
                 <li
                   key={optionId}
-                  style={
-                    opt.color
-                      ? {
-                          backgroundColor: opt.color,
-                          borderColor: opt.color,
-                          color: readableTextColor(opt.color),
-                        }
-                      : undefined
-                  }
+                  style={coloredSurfaceStyle(opt.color)}
                   className="flex items-center gap-1 rounded-full border border-line-default py-0.5 pr-1 pl-2 text-xs"
                 >
                   {opt.label}

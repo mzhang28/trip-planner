@@ -2,7 +2,7 @@ import type { CustomValue, FieldDef, OptionId } from '@trip/crdt';
 import { valueMatchesType } from '@trip/crdt';
 import { Checkbox, Label } from 'react-aria-components';
 import { cn } from '../lib/cn';
-import { readableTextColor } from '../lib/color';
+import { coloredSurfaceStyle } from '../lib/color';
 import { TextField } from './TextField';
 
 export interface CustomFieldInputProps {
@@ -195,15 +195,7 @@ export function CustomFieldInput({ def, value, onChange, isDisabled }: CustomFie
                   aria-checked={Boolean(selected[optionId])}
                   disabled={isDisabled}
                   onClick={() => toggle(optionId)}
-                  style={
-                    option.color
-                      ? {
-                          backgroundColor: option.color,
-                          borderColor: option.color,
-                          color: readableTextColor(option.color),
-                        }
-                      : undefined
-                  }
+                  style={coloredSurfaceStyle(option.color)}
                   className={cn(
                     'flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs',
                     'focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-1',

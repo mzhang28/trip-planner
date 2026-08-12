@@ -24,10 +24,12 @@ export { ThemeToggle, type ThemeToggleProps } from './components/ThemeToggle';
 export { cn } from './lib/cn';
 export {
   DEFAULT_COLOR_PALETTE,
+  boldColor,
   coloredSurfaceStyle,
   contrastBetween,
   contrastRatio,
   parseColor,
+  mutedColor,
   readableTextColor,
   relativeLuminance,
   type DefaultColor,
