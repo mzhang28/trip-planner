@@ -9,6 +9,7 @@ export {
 export {
   addAttachment,
   addTripFile,
+  addTodo,
   addEvent,
   addFieldDef,
   addFieldOption,
@@ -21,6 +22,7 @@ export {
   liveFieldDefs,
   mergeEvents,
   removeLink,
+  removeTodo,
   restoreEvent,
   referencedBlobs,
   removeAttachment,
@@ -29,6 +31,7 @@ export {
   setCustomField,
   tripFiles,
   updateTripMeta,
+  updateTodo,
   updateEvent,
   updateFieldDef,
   updateFieldOption,
@@ -37,6 +40,7 @@ export {
   type Doc,
   type EditableEventFields,
   type EditableFieldDef,
+  type EditableTodo,
   type NewEvent,
 } from './doc';
 
@@ -58,6 +62,7 @@ export type {
   EventId,
   EventKind,
   EventLink,
+  EventTodo,
   FieldDef,
   FieldDefId,
   FieldOption,
@@ -75,5 +80,6 @@ export type {
   TripEvent,
   TripFile,
   TripMeta,
+  TodoId,
   UserId,
 } from './types';

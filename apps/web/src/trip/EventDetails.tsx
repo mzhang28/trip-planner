@@ -74,6 +74,7 @@ export function EventDetails({
 }: EventDetailsProps) {
   const links = Object.values(event.links);
   const files = Object.values(event.attachments);
+  const todos = Object.values(event.todos ?? {});
   const transit = describeTransit(event);
 
   const customs = fieldDefs
@@ -180,6 +181,22 @@ export function EventDetails({
                 >
                   {file.filename}
                 </a>
+              </li>
+            ))}
+          </ul>
+        </Row>
+      )}
+
+      {todos.length > 0 && (
+        <Row label="To-dos">
+          <ul className="flex flex-col gap-1">
+            {todos.map((todo) => (
+              <li
+                key={`${todo.addedAt}:${todo.text}`}
+                className={todo.completed ? 'text-xs text-ink-muted line-through' : 'text-xs'}
+              >
+                {todo.completed ? '✓' : '○'} {todo.text}
+                {todo.deadline && <span className="ml-1 text-ink-muted">· due {todo.deadline}</span>}
               </li>
             ))}
           </ul>

@@ -6,6 +6,7 @@ import type {
   EventAttachment,
   EventId,
   EventKind,
+  EventTodo,
   FieldDef,
   FieldDefId,
   FieldOption,
@@ -16,6 +17,7 @@ import type {
   TripEvent,
   TripFile,
   TripMeta,
+  TodoId,
   UserId,
 } from './types';
 
@@ -103,6 +105,7 @@ export function addEvent(doc: Doc, event: NewEvent, author: Author): Doc {
       booking: { status: 'idea' },
       links: {},
       attachments: {},
+      todos: {},
       customFields: {},
       updatedAt: author.now ?? Date.now(),
       updatedBy: author.userId,
@@ -318,6 +321,68 @@ export function removeAttachment(
     if (!event) return;
 
     delete event.attachments[attachmentId];
+    stamp(event, author);
+  });
+}
+
+export function addTodo(
+  doc: Doc,
+  eventId: EventId,
+  todoId: TodoId,
+  todo: Pick<EventTodo, 'text' | 'deadline'>,
+  author: Author,
+): Doc {
+  return A.change(doc, (d) => {
+    const event = d.events[eventId];
+    if (!event) return;
+
+    event.todos ??= {};
+    event.todos[todoId] = {
+      text: todo.text,
+      completed: false,
+      ...(todo.deadline === undefined ? {} : { deadline: todo.deadline }),
+      addedAt: author.now ?? Date.now(),
+    };
+    stamp(event, author);
+  });
+}
+
+export type EditableTodo = Pick<EventTodo, 'text' | 'completed' | 'deadline'>;
+
+/** Updates todo fields one by one so concurrent edits to different fields merge. */
+export function updateTodo(
+  doc: Doc,
+  eventId: EventId,
+  todoId: TodoId,
+  patch: Partial<EditableTodo>,
+  author: Author,
+): Doc {
+  return A.change(doc, (d) => {
+    const event = d.events[eventId];
+    const todo = event?.todos?.[todoId];
+    if (!event || !todo) return;
+
+    if (patch.text !== undefined) todo.text = patch.text;
+    if (patch.completed !== undefined) todo.completed = patch.completed;
+    if ('deadline' in patch) {
+      if (patch.deadline === undefined) delete todo.deadline;
+      else todo.deadline = patch.deadline;
+    }
+    stamp(event, author);
+  });
+}
+
+export function removeTodo(
+  doc: Doc,
+  eventId: EventId,
+  todoId: TodoId,
+  author: Author,
+): Doc {
+  return A.change(doc, (d) => {
+    const event = d.events[eventId];
+    if (!event?.todos) return;
+
+    delete event.todos[todoId];
     stamp(event, author);
   });
 }
@@ -585,6 +650,10 @@ export function mergeEvents(
       }
       for (const [id, attachment] of Object.entries(other.attachments)) {
         if (primary.attachments[id] === undefined) primary.attachments[id] = copy(attachment);
+      }
+      primary.todos ??= {};
+      for (const [id, todo] of Object.entries(other.todos ?? {})) {
+        if (primary.todos[id] === undefined) primary.todos[id] = copy(todo);
       }
       for (const [fieldId, value] of Object.entries(other.customFields)) {
         if (primary.customFields[fieldId] === undefined) {

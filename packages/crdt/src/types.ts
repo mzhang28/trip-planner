@@ -4,6 +4,7 @@ export type EventId = string;
 export type LinkId = string;
 export type AttachmentId = string;
 export type BlobHash = string;
+export type TodoId = string;
 export type FieldDefId = string;
 export type OptionId = string;
 export type UserId = string;
@@ -52,6 +53,14 @@ export interface TripFile {
 
 /** An event points at a file from the trip library with its display metadata. */
 export type EventAttachment = TripFile;
+
+export interface EventTodo {
+  text: string;
+  completed: boolean;
+  /** A date-only deadline in YYYY-MM-DD form. */
+  deadline?: string;
+  addedAt: Instant;
+}
 
 export interface FlightDetails {
   airline?: string;
@@ -174,6 +183,8 @@ export interface TripEvent {
   description?: string;
   links: Record<LinkId, EventLink>;
   attachments: Record<AttachmentId, EventAttachment>;
+  /** Optional for events created before todos were added. */
+  todos?: Record<TodoId, EventTodo>;
   customFields: Record<FieldDefId, CustomValue>;
   flight?: FlightDetails;
   transit?: TransitDetails;

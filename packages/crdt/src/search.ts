@@ -105,6 +105,8 @@ export function eventSearchText(
     parts.push(attachment.filename);
   }
 
+  for (const todo of Object.values(event.todos ?? {})) parts.push(todo.text);
+
   for (const [fieldId, value] of Object.entries(event.customFields)) {
     const def = fieldDefs[fieldId];
     const rendered = renderCustomValue(value, def);

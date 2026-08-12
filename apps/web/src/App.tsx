@@ -4,6 +4,7 @@ import { Join } from './routes/Join';
 import { TripFields } from './routes/TripFields';
 import { TripFiles } from './routes/TripFiles';
 import { TripList } from './routes/TripList';
+import { TripTodos } from './routes/TripTodos';
 import { TripView } from './routes/TripView';
 
 export function App() {
@@ -26,6 +27,7 @@ export function App() {
         <Route path="/t/:tripId" element={<TripView />} />
         <Route path="/t/:tripId/fields" element={<TripFields />} />
         <Route path="/t/:tripId/files" element={<TripFiles />} />
+        <Route path="/t/:tripId/todos" element={<TripTodos />} />
         <Route path="/join/:token" element={<Join />} />
       </Routes>
     </BrowserRouter>

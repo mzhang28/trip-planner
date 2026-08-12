@@ -7,18 +7,21 @@ import {
   addFieldOption,
   addLink,
   addTripFile,
+  addTodo,
   createTrip,
   deleteEvent,
   deleteEvents,
   liveEvents,
   mergeEvents,
   referencedBlobs,
+  removeTodo,
   setCityColor,
   setCustomField,
   tripFiles,
   updateEvent,
   updateFieldOption,
   updateTripMeta,
+  updateTodo,
   type Doc,
 } from './doc';
 import { canSyncIncrementally, sweepTombstones, TOMBSTONE_TTL_MS } from './sweep';
@@ -89,6 +92,43 @@ describe('trip file library', () => {
     });
 
     expect(tripFiles(doc as TripDoc)).toEqual([file]);
+  });
+});
+
+describe('event todos', () => {
+  it('adds, completes, dates, and removes a todo without replacing the collection', () => {
+    let doc = trip();
+    doc = addTodo(doc, 'e1', 'todo-1', { text: 'Reserve the train' }, { ...ada, now: 10 });
+    doc = updateTodo(
+      doc,
+      'e1',
+      'todo-1',
+      { completed: true, deadline: '2026-09-03' },
+      ada,
+    );
+
+    expect((doc as TripDoc).events.e1!.todos?.['todo-1']).toEqual({
+      text: 'Reserve the train',
+      completed: true,
+      deadline: '2026-09-03',
+      addedAt: 10,
+    });
+
+    doc = removeTodo(doc, 'e1', 'todo-1', ada);
+    expect((doc as TripDoc).events.e1!.todos).toEqual({});
+  });
+
+  it('keeps todos added by two people while they are offline', () => {
+    const [left, right] = fork(trip());
+    const a = addTodo(left, 'e1', 'todo-a', { text: 'Buy tickets' }, ada);
+    const b = addTodo(right, 'e1', 'todo-b', { text: 'Check opening hours' }, bo);
+
+    for (const doc of bothWays(a, b) as TripDoc[]) {
+      expect(Object.values(doc.events.e1!.todos ?? {}).map((todo) => todo.text).sort()).toEqual([
+        'Buy tickets',
+        'Check opening hours',
+      ]);
+    }
   });
 });
 

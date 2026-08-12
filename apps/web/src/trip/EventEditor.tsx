@@ -1,5 +1,6 @@
 import type {
   CustomValue,
+  EditableTodo,
   EventAttachment,
   FieldDef,
   FieldDefId,
@@ -21,6 +22,7 @@ import { TimeField } from './TimeField';
 import { Attachments } from './Attachments';
 import { DescriptionEditor } from './DescriptionEditor';
 import { EventKindIcon } from './EventKind';
+import { EventTodos } from './EventTodos';
 import { FieldPalette, type PaletteChip } from './FieldPalette';
 import { FlightFields } from './FlightFields';
 import { PlacePicker } from './PlacePicker';
@@ -44,6 +46,9 @@ export interface EventEditorProps {
   onSetCityColor: (city: string, color: string | undefined) => void;
   onAddAttachment: (id: string, attachment: EventAttachment) => void;
   onRemoveAttachment: (id: string) => void;
+  onAddTodo: (text: string, deadline: string | undefined) => void;
+  onUpdateTodo: (id: string, patch: Partial<EditableTodo>) => void;
+  onRemoveTodo: (id: string) => void;
   onDelete: () => void;
   doc: TripDoc | undefined;
   onOpenEvent: (eventId: string) => void;
@@ -91,6 +96,9 @@ export function EventEditor({
   onSetCityColor,
   onAddAttachment,
   onRemoveAttachment,
+  onAddTodo,
+  onUpdateTodo,
+  onRemoveTodo,
   onDelete,
   doc,
   onOpenEvent,
@@ -386,6 +394,19 @@ export function EventEditor({
               </Button>
             </div>
           </section>
+        ),
+      },
+      {
+        key: 'todos',
+        label: 'To-dos',
+        filled: Object.keys(event.todos ?? {}).length > 0,
+        render: () => (
+          <EventTodos
+            todos={event.todos ?? {}}
+            onAdd={onAddTodo}
+            onUpdate={onUpdateTodo}
+            onRemove={onRemoveTodo}
+          />
         ),
       },
       {

@@ -127,6 +127,12 @@ export function TripFiles() {
           </Link>
           <h1 className="min-w-0 flex-1 truncate text-lg">Files</h1>
           <Link
+            to={`/t/${tripId}/todos`}
+            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+          >
+            To-dos
+          </Link>
+          <Link
             to={`/t/${tripId}/fields`}
             className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
           >

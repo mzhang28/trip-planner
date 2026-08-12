@@ -10,18 +10,22 @@ import {
   addAttachment,
   addEvent,
   addLink,
+  addTodo,
   deleteEvents,
   restoreEvent,
   liveFieldDefs,
   mergeEvents,
   removeAttachment,
   removeLink,
+  removeTodo,
   setCityColor,
   setCustomField,
   updateEvent,
+  updateTodo,
   type CustomValue,
   type EventAttachment,
   type EditableEventFields,
+  type EditableTodo,
   type FieldDefId,
   type TripDoc,
   type TripEvent,
@@ -632,6 +636,12 @@ export function TripView() {
             </Link>
             <h1 className="max-w-48 truncate text-lg xl:max-w-80">{trip?.name ?? 'Trip'}</h1>
             <Link
+              to={`/t/${tripId}/todos`}
+              className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+            >
+              To-dos
+            </Link>
+            <Link
               to={`/t/${tripId}/files`}
               className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
             >
@@ -943,6 +953,27 @@ export function TripView() {
                             onRemoveAttachment={(id) =>
                               store?.change((current) =>
                                 removeAttachment(current, event.id, id, { userId: 'me' }),
+                              )
+                            }
+                            onAddTodo={(text, deadline) =>
+                              store?.change((current) =>
+                                addTodo(
+                                  current,
+                                  event.id,
+                                  `todo_${randomId()}`,
+                                  { text, deadline },
+                                  { userId: 'me' },
+                                ),
+                              )
+                            }
+                            onUpdateTodo={(id, patch: Partial<EditableTodo>) =>
+                              store?.change((current) =>
+                                updateTodo(current, event.id, id, patch, { userId: 'me' }),
+                              )
+                            }
+                            onRemoveTodo={(id) =>
+                              store?.change((current) =>
+                                removeTodo(current, event.id, id, { userId: 'me' }),
                               )
                             }
                             onDelete={() =>

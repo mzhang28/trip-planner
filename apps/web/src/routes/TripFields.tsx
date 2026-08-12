@@ -182,6 +182,12 @@ export function TripFields() {
           </Link>
           <h1 className="flex-1 text-lg">Trip settings</h1>
           <Link
+            to={`/t/${tripId}/todos`}
+            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+          >
+            To-dos
+          </Link>
+          <Link
             to={`/t/${tripId}/files`}
             className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
           >

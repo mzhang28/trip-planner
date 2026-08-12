@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Files,
   List,
+  ListChecks,
   Settings,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -34,6 +35,7 @@ export function TripChrome({
 
   const items = [
     { to: `/t/${tripId}`, label: 'Itinerary', icon: CalendarDays, exact: true },
+    { to: `/t/${tripId}/todos`, label: 'To-dos', icon: ListChecks, exact: false },
     { to: `/t/${tripId}/files`, label: 'Files', icon: Files, exact: false },
     { to: `/t/${tripId}/fields`, label: 'Settings', icon: Settings, exact: false },
   ];

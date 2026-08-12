@@ -1,6 +1,7 @@
 import type {
   BookingStatus,
   CustomValue,
+  EditableTodo,
   EventAttachment,
   EventKind,
   FieldDef,
@@ -41,6 +42,9 @@ export interface EventRowProps {
   onSetCityColor: (city: string, color: string | undefined) => void;
   onAddAttachment: (id: string, attachment: EventAttachment) => void;
   onRemoveAttachment: (id: string) => void;
+  onAddTodo: (text: string, deadline: string | undefined) => void;
+  onUpdateTodo: (id: string, patch: Partial<EditableTodo>) => void;
+  onRemoveTodo: (id: string) => void;
   onDelete: () => void;
   doc: TripDoc | undefined;
   onOpenEvent: (eventId: string) => void;
@@ -318,6 +322,9 @@ export function EventRow({
   onSetCityColor,
   onAddAttachment,
   onRemoveAttachment,
+  onAddTodo,
+  onUpdateTodo,
+  onRemoveTodo,
   onDelete,
   doc,
   onOpenEvent,
@@ -525,6 +532,9 @@ export function EventRow({
           onSetCityColor={onSetCityColor}
           onAddAttachment={onAddAttachment}
           onRemoveAttachment={onRemoveAttachment}
+          onAddTodo={onAddTodo}
+          onUpdateTodo={onUpdateTodo}
+          onRemoveTodo={onRemoveTodo}
           onDelete={onDelete}
           doc={doc}
           onOpenEvent={onOpenEvent}
