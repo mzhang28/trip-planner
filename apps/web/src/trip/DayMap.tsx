@@ -147,7 +147,7 @@ export function DayMap({ events, selectedId, onSelect }: DayMapProps) {
       data-testid="day-map"
       role="application"
       aria-label="Map of this day"
-      className="h-full min-h-64 w-full rounded-lg border border-line"
+      className="h-full min-h-0 w-full rounded-lg border border-line sm:min-h-64"
     />
   );
 }

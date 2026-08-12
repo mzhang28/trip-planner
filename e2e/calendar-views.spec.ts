@@ -422,6 +422,32 @@ test.describe('getting between events', () => {
 });
 
 test.describe('filling an event in gradually', () => {
+  test('only the day event list scrolls', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    for (let index = 1; index <= 18; index += 1) {
+      await page.getByRole('textbox', { name: 'New event' }).fill(`Event ${index}`);
+      await page.getByRole('button', { name: 'Add', exact: true }).click();
+    }
+
+    const list = page.getByTestId('day-list-scroll');
+    await expect
+      .poll(() => list.evaluate((element) => element.scrollHeight > element.clientHeight))
+      .toBe(true);
+
+    const navigator = page.getByTestId('range-label');
+    const navigatorTop = (await navigator.boundingBox())!.y;
+    await list.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+
+    expect(await list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    expect(await page.locator('main').evaluate((element) => element.scrollTop)).toBe(0);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    expect((await navigator.boundingBox())!.y).toBeCloseTo(navigatorTop, 0);
+  });
+
   test('a new event shows almost nothing, and fields arrive when asked for', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');

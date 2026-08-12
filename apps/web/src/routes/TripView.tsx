@@ -597,9 +597,10 @@ export function TripView() {
 
       <main
         className={`mx-auto min-h-0 w-full max-w-[100rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 ${
-          view === 'week' ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'
+          view === 'month' ? 'overflow-y-auto' : 'flex flex-col overflow-hidden'
         }`}
       >
+        <div className={view === 'month' ? undefined : 'shrink-0'}>
         {state && store && <RecoveryBanner state={state} store={store} />}
 
         {/*
@@ -658,8 +659,9 @@ export function TripView() {
           tripEnd={tripRange.end}
           onChange={moveAnchor}
         />
+        </div>
 
-        <div className={view === 'week' ? 'min-h-0 flex-1' : undefined}>
+        <div className={view === 'month' ? undefined : 'min-h-0 flex-1 overflow-hidden'}>
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           {view === 'week' && (
             <WeekView
@@ -695,8 +697,11 @@ export function TripView() {
           )}
 
           {view === 'day' && (
-            <div className="lg:flex lg:items-start lg:gap-4">
-              <div className="min-w-0 lg:flex-1 lg:max-w-4xl">
+            <div className="flex h-full min-h-0 flex-col gap-4 lg:flex-row">
+              <div
+                data-testid="day-list-scroll"
+                className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:max-w-4xl lg:pr-1"
+              >
           {days.map(([key, dayEvents]) => (
             <section key={key} className="mb-8">
               <h2 className="mb-2 text-sm text-ink-muted">
@@ -857,8 +862,8 @@ export function TripView() {
               <aside
                 className={
                   mappable.some((event) => event.location?.lat !== undefined)
-                    ? 'mt-6 h-80 lg:sticky lg:top-0 lg:mt-0 lg:h-[calc(100dvh-11rem)] lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
-                    : 'mt-6 lg:sticky lg:top-0 lg:mt-0 lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
+                    ? 'h-48 shrink-0 sm:h-64 lg:h-full lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
+                    : 'shrink-0 lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
                 }
               >
                 <DayMap
