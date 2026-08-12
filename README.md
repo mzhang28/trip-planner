@@ -71,17 +71,16 @@ database to `data/trip-planner.db` unless configured otherwise.
 
 ### Ports
 
-The test run starts its own pair of servers against its own database, so
-`pnpm test:e2e` can run while `pnpm dev` is up. Neither has to stop for the
-other.
+Every `pnpm test:e2e` invocation starts the API and web preview on OS-assigned
+ports. The harness discovers both ports from their stdout, builds into a unique
+temporary directory, and uses a fresh SQLite database and blob directory. Test
+runs can therefore run beside `pnpm dev` and beside each other.
 
 | Port | What                                            |
 | ---- | ----------------------------------------------- |
 | 5173 | web, `pnpm dev`                                 |
 | 8787 | api, `pnpm dev`                                 |
 | 6006 | Storybook                                       |
-| 5273 | web, under test — override with `WEB_PORT`      |
-| 8887 | api, under test — override with `API_PORT`      |
 
 All three dev servers listen on `0.0.0.0` and accept any hostname, so they are
 reachable from another machine on the network.

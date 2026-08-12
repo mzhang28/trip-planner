@@ -1,13 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-/*
- * Tests run on their own pair of ports, beside the dev server on 5173/8787
- * rather than instead of it. Nobody has to stop what they are doing to run the
- * suite.
- */
-const API_PORT = process.env.API_PORT ?? '8887';
-const WEB_PORT = process.env.WEB_PORT ?? '5273';
-const WEB_URL = `http://localhost:${WEB_PORT}`;
+const WEB_URL = process.env.E2E_BASE_URL;
+if (!WEB_URL) throw new Error('No E2E server is running. Start tests with `pnpm test:e2e`.');
 
 /*
  * Three viewports, because the layouts differ rather than merely reflow: the
@@ -57,39 +51,4 @@ export default defineConfig({
     },
   ],
 
-  webServer: [
-    {
-      command: 'pnpm --filter @trip/api dev',
-      env: { PORT: API_PORT, DATABASE_PATH: 'data/test.db' },
-      url: `http://localhost:${API_PORT}/api/health`,
-      /*
-       * Started fresh every run. A server left over from earlier answers on this
-       * port whatever database and code it was started with, and a suite that
-       * silently tests something other than the working tree is worse than one
-       * that takes a few seconds longer.
-       */
-      reuseExistingServer: false,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-    {
-      // Built and previewed rather than run from the dev server, so the service
-      // worker under test is the one that ships. In dev, Vite serves unbundled
-      // modules the worker never precaches, and an offline reload fails for a
-      // reason that does not exist in the built app.
-      command: 'pnpm --filter @trip/web build && pnpm --filter @trip/web preview',
-      env: { WEB_PORT, API_PORT },
-      url: WEB_URL,
-      timeout: 180_000,
-      /*
-       * Never reused. This serves a static build, so a server left over from a
-       * previous run would serve whatever was built then — the suite would pass
-       * or fail against code that is no longer on disk, which is worse than
-       * being slow.
-       */
-      reuseExistingServer: false,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    },
-  ],
 });

@@ -5,6 +5,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 import wasm from 'vite-plugin-wasm';
 
 export default defineConfig({
+  // The E2E harness gives each concurrent build its own generated public
+  // assets instead of having them race in apps/web/public.
+  publicDir: process.env.WEB_PUBLIC_DIR ?? 'public',
   // ES2022 for top-level await, which loading Automerge's WebAssembly needs.
   build: { target: 'es2022' },
   esbuild: { target: 'es2022' },

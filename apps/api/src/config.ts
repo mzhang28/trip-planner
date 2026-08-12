@@ -6,7 +6,9 @@ import { z } from 'zod';
  * environment set and nothing external running.
  */
 const schema = z.object({
-  PORT: z.coerce.number().int().positive().default(8787),
+  // Port 0 asks the OS for an unused port, which keeps concurrent test runs
+  // isolated without a race-prone "find a port, then bind it" gap.
+  PORT: z.coerce.number().int().min(0).default(8787),
   HOST: z.string().default('0.0.0.0'),
 
   /** Where the SQLite file lives, relative to the repository root. */

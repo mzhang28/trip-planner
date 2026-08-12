@@ -11,7 +11,9 @@ import sharp from 'sharp';
  */
 const here = dirname(fileURLToPath(import.meta.url));
 const source = resolve(here, '../public/icon.svg');
-const out = resolve(here, '../public');
+const out = process.env.ICON_OUTPUT_DIR
+  ? resolve(process.env.ICON_OUTPUT_DIR)
+  : resolve(here, '../public');
 
 mkdirSync(out, { recursive: true });
 
