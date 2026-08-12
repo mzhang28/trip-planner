@@ -26,7 +26,19 @@ export class DocStore {
   constructor(private readonly db: Db) {}
 
   create(tripId: string, name: string, homeTimezone: string): Doc {
-    const doc = createTrip(name, homeTimezone);
+    return this.adopt(tripId, createTrip(name, homeTimezone));
+  }
+
+  /**
+   * Takes a document built elsewhere as a new trip's starting state.
+   *
+   * No changes are recorded against it, the same as a trip created empty: the
+   * snapshot already holds everything, and there is no peer that could be
+   * waiting for the individual changes of a document that did not exist a
+   * moment ago. Only ever for a trip id nothing has written yet -- adopting
+   * over a document that already exists replaces it rather than merging.
+   */
+  adopt(tripId: string, doc: Doc): Doc {
     this.#cache.set(tripId, doc);
     this.#persistSnapshot(tripId, doc);
     this.#project(tripId, doc);

@@ -11,6 +11,27 @@ export function stripMentionMarkup(text: string): string {
 }
 
 /**
+ * Points the mentions in a description at different events.
+ *
+ * Both kinds of mention that name an event move together: a `place` mention is
+ * an event's location, so it carries an event id like an `event` mention does.
+ * `file` mentions name an attachment rather than an event and are left alone.
+ *
+ * An id the map says nothing about keeps what it had. It already refers to
+ * nothing findable, and inventing a target for it would silently aim a sentence
+ * at an event that has nothing to do with what was written.
+ */
+export function remapMentionIds(text: string, ids: ReadonlyMap<string, string>): string {
+  return text.replace(
+    /@\[([^\]]*)\]\((event|place):([^)]+)\)/g,
+    (whole, label: string, kind: string, id: string) => {
+      const next = ids.get(id);
+      return next === undefined ? whole : `@[${label}](${kind}:${next})`;
+    },
+  );
+}
+
+/**
  * Renders one custom field value the way it reads on screen.
  *
  * Findable by what it looks like, not by what it looks like in storage: a date

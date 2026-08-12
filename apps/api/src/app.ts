@@ -8,6 +8,7 @@ import type { AppEnv, Services } from './context';
 import { renameUser } from './identity';
 import { requireMembership, withIdentity, withServices } from './middleware';
 import { airportRoutes } from './routes/airports';
+import { archiveRoutes } from './routes/archive';
 import { auditRoutes } from './routes/audit';
 import { blobRoutes } from './routes/blobs';
 import { mcpRoutes } from './routes/mcp';
@@ -101,6 +102,9 @@ export function createApp(services: Services) {
   app.route('/api/blobs', blobRoutes());
   app.route('/api/places', placeRoutes());
   app.route('/api/weather', weatherRoutes());
+  // Before the trip routes, so that /import is read as itself rather than as
+  // the name of a trip.
+  app.route('/api/trips', archiveRoutes());
   app.route('/api/trips', tripRoutes());
   app.route('/api/share', shareRoutes());
 

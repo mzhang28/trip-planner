@@ -12,7 +12,7 @@ import {
   type TripDoc,
 } from '@trip/crdt';
 import { Button, Card, ColorPicker, TextField, ThemeToggle, coloredSurfaceStyle } from '@trip/ui';
-import { Plus, Trash2 } from 'lucide-react';
+import { Download, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { randomId } from '../lib/crypto';
@@ -238,6 +238,29 @@ export function TripFields() {
                 return null;
               }}
             />
+          </div>
+
+          {/*
+            Offered to everyone on the trip, not only its owner. A viewer can
+            already read every event and download the attachments one at a
+            time, so withholding the zip costs them an afternoon and withholds
+            nothing.
+          */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+            <p className="min-w-0 flex-1 text-2xs text-ink-muted">
+              A zip of the whole trip: every event, and the files attached to them. Importing it
+              from the trip list makes a new trip and leaves this one alone.
+            </p>
+
+            <a
+              href={api.exportUrl(tripId!)}
+              download
+              data-testid="export-trip"
+              className="inline-flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-line-default bg-card px-2.5 text-xs font-medium whitespace-nowrap text-ink shadow-xs transition-colors duration-100 hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              <Download aria-hidden="true" className="size-3.5" />
+              Export this trip
+            </a>
           </div>
 
           {trip?.role === 'owner' && (

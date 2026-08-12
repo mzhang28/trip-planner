@@ -1,8 +1,26 @@
 import { Button, Card, TextField, ThemeToggle } from '@trip/ui';
-import { Plus } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Plus, Upload } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { api, deviceTimezone, type TripSummary } from '../lib/api';
+import { ApiError, api, deviceTimezone, type ImportedTrip, type TripSummary } from '../lib/api';
+
+/**
+ * What went wrong, in words about the file rather than about the server.
+ *
+ * Somebody importing a trip has a file in their hand and one question about it.
+ * "bad_manifest" answers a different question, and "import failed" answers
+ * none: whether to look for a better copy, or to go and make one.
+ */
+const IMPORT_PROBLEMS: Record<string, string> = {
+  not_a_zip: 'That file is not a trip archive.',
+  no_manifest: 'That zip has no trip in it. It may be the wrong file.',
+  bad_manifest: 'That archive is damaged, or was not written by this app.',
+  unsupported_version:
+    'That archive comes from a newer version than this one, which cannot read it.',
+  file_corrupt: 'That archive is damaged: one of its files is not the file it claims to be.',
+  too_large: 'That archive is too large to import.',
+  empty: 'That file is empty.',
+};
 
 /*
  * Read in the trip's own zone, like every other date in the app. A trip
@@ -65,6 +83,44 @@ export function TripList() {
     void navigate(`/t/${trip.id}`);
   }
 
+  const archiveInput = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importProblem, setImportProblem] = useState<string | null>(null);
+
+  /** An import that arrived short of some of its files, and so has to be read. */
+  const [incomplete, setIncomplete] = useState<ImportedTrip | null>(null);
+
+  async function importArchive(archive: File) {
+    setImporting(true);
+    setImportProblem(null);
+    setIncomplete(null);
+
+    try {
+      const trip = await api.importTrip(archive);
+
+      /*
+       * A trip that arrived whole is opened, the same as one just created.
+       * One missing attachments stops here instead: this is the only notice
+       * anybody gets that part of the archive did not survive, and navigating
+       * away from it would be the same as not saying so at all.
+       */
+      if (trip.droppedFiles.length === 0) {
+        void navigate(`/t/${trip.id}`);
+        return;
+      }
+
+      setIncomplete(trip);
+      load();
+    } catch (error) {
+      setImportProblem(
+        (error instanceof ApiError ? IMPORT_PROBLEMS[error.code] : null) ??
+          'That trip could not be imported.',
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-page text-ink">
       <header className="shrink-0 border-b border-line">
@@ -91,7 +147,61 @@ export function TripList() {
             <Plus className="size-4" />
             New trip
           </Button>
+
+          <input
+            ref={archiveInput}
+            type="file"
+            accept=".zip,application/zip"
+            className="sr-only"
+            data-testid="import-trip-input"
+            onChange={(e) => {
+              const archive = e.currentTarget.files?.[0];
+              // Cleared so that choosing the same file again still fires, which
+              // is exactly what somebody does after an import goes wrong.
+              e.currentTarget.value = '';
+              if (archive) void importArchive(archive);
+            }}
+          />
+          <Button
+            data-testid="import-trip"
+            isDisabled={importing}
+            onPress={() => archiveInput.current?.click()}
+          >
+            <Upload aria-hidden="true" className="size-4" />
+            {importing ? 'Importing…' : 'Import'}
+          </Button>
         </div>
+
+        {importProblem && (
+          <p
+            data-testid="import-problem"
+            className="mb-8 rounded-md border border-line bg-sunken px-3 py-2 text-sm text-danger"
+          >
+            {importProblem}
+          </p>
+        )}
+
+        {incomplete && (
+          <div
+            data-testid="import-incomplete"
+            className="mb-8 rounded-md border border-line bg-sunken px-3 py-2 text-sm text-ink-secondary"
+          >
+            <p>
+              <Link to={`/t/${incomplete.id}`} className="text-accent-text underline">
+                {incomplete.name}
+              </Link>{' '}
+              was imported, but the archive had no bytes for{' '}
+              {incomplete.droppedFiles.length === 1
+                ? 'one file'
+                : `${incomplete.droppedFiles.length} files`}
+              , so {incomplete.droppedFiles.length === 1 ? 'it is' : 'they are'} not on the trip:{' '}
+              {incomplete.droppedFiles.join(', ')}.
+            </p>
+            <p className="mt-1 text-2xs text-ink-muted">
+              Everything else came through. Attaching them again is the only way back.
+            </p>
+          </div>
+        )}
 
         {unreachable ? (
           <div

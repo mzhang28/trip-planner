@@ -11,6 +11,10 @@ when it starts, how long it takes, whether it is booked, links, files, and any
 custom field this particular trip needs. Share a trip with a link. See it as a
 month of cities, a week with your hotels along the bottom, or a day beside a map.
 
+Take a whole trip away as a zip, attachments included, and import it back as a new
+trip here or on another server. The archive is a plain JSON document beside the
+files it names, so it can be read without this application.
+
 ## Stack
 
 The client holds a real replica of the trip rather than a cache of server

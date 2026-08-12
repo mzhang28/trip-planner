@@ -45,8 +45,46 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export interface ImportedTrip extends TripSummary {
+  events: number;
+  files: number;
+  /**
+   * Attachments the archive had no bytes for, by the name they were saved
+   * under. Empty for an archive that travelled whole.
+   */
+  droppedFiles: string[];
+}
+
+/**
+ * Sends an archive as its own bytes.
+ *
+ * Not through `request`, which puts a JSON content type on everything it sends.
+ * A zip inside a JSON body would have to be base64, which is a third more to
+ * upload than the file already is -- and this is the largest thing the app
+ * sends anywhere.
+ */
+async function importTrip(archive: File): Promise<ImportedTrip> {
+  const response = await fetch('/api/trips/import', {
+    method: 'POST',
+    headers: { 'content-type': 'application/zip' },
+    body: archive,
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, body.error ?? `import returned ${response.status}`);
+  }
+
+  return response.json() as Promise<ImportedTrip>;
+}
+
 export const api = {
   listTrips: () => request<{ trips: TripSummary[] }>('/api/trips'),
+
+  importTrip,
+
+  /** The download itself, which is a link rather than a request. */
+  exportUrl: (tripId: string) => `/api/trips/${tripId}/export`,
 
   createTrip: (name: string, homeTimezone: string) =>
     request<TripSummary>('/api/trips', {
