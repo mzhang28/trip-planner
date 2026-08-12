@@ -889,7 +889,7 @@ export function TripView() {
                                   {...handle}
                                   type="button"
                                   aria-label={`Move ${event.name} to another day`}
-                                  className="cursor-grab touch-none px-1 text-ink-placeholder hover:text-ink-muted focus-visible:outline-focus focus-visible:outline-2"
+                                  className="flex cursor-grab touch-none items-center justify-center px-1 text-ink-placeholder hover:text-ink-muted focus-visible:outline-focus focus-visible:outline-2"
                                 >
                                   <GripVertical aria-hidden="true" className="size-4" />
                                 </button>

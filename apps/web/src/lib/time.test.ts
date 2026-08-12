@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   dayKey,
+  endTimeFromClock,
+  formatDuration,
   formatDayHeading,
   formatTime,
   moveToDay,
@@ -73,6 +75,32 @@ describe('setTimeOfDay', () => {
   it('accepts a single-digit hour', () => {
     const at = Date.UTC(2026, 7, 14, 3, 0);
     expect(formatTime(setTimeOfDay(at, TOKYO, '9:05')!, TOKYO)).toBe('09:05');
+  });
+});
+
+describe('endTimeFromClock', () => {
+  it('uses the same day when the end is later than the start', () => {
+    const start = setTimeOfDay(Date.UTC(2026, 7, 14, 3), TOKYO, '13:15')!;
+    const end = endTimeFromClock(start, TOKYO, '21:00')!;
+
+    expect(formatTime(end, TOKYO)).toBe('21:00');
+    expect((end - start) / 60_000).toBe(465);
+  });
+
+  it('uses the following day when the clock is earlier', () => {
+    const start = setTimeOfDay(Date.UTC(2026, 7, 14, 3), TOKYO, '23:30')!;
+    const end = endTimeFromClock(start, TOKYO, '01:00')!;
+
+    expect(dayKey(end, TOKYO)).not.toBe(dayKey(start, TOKYO));
+    expect((end - start) / 60_000).toBe(90);
+  });
+});
+
+describe('formatDuration', () => {
+  it('uses hours and minutes instead of exposing stored minutes', () => {
+    expect(formatDuration(465)).toBe('7 hr 45 min');
+    expect(formatDuration(120)).toBe('2 hr');
+    expect(formatDuration(45)).toBe('45 min');
   });
 });
 

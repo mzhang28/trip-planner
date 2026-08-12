@@ -42,3 +42,12 @@ body,
     line-height: 1;
   }
 }
+
+/*
+ * An event header contains separate controls for moving, opening, and changing
+ * status. Its hover still belongs to the row as a whole. `!important` is
+ * needed for events whose custom colour is applied as an inline background.
+ */
+.event-row-header:hover {
+  background-color: var(--surface-sunken) !important;
+}

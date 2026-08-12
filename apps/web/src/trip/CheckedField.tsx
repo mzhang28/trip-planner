@@ -61,7 +61,7 @@ export function CheckedField({
         autoFocus={autoFocus}
         list={suggestions ? `${id}-suggestions` : undefined}
         aria-invalid={error !== null}
-        aria-describedby={`${id}-hint`}
+        aria-describedby={error || hint ? `${id}-hint` : undefined}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => setError(onCommit(draft.trim()))}
         className={cn(
@@ -81,9 +81,11 @@ export function CheckedField({
         </datalist>
       )}
 
-      <span id={`${id}-hint`} className={cn('text-2xs', error ? 'text-danger' : 'text-ink-muted')}>
-        {error ?? hint}
-      </span>
+      {(error || hint) && (
+        <span id={`${id}-hint`} className={cn('text-2xs', error ? 'text-danger' : 'text-ink-muted')}>
+          {error ?? hint}
+        </span>
+      )}
     </div>
   );
 }

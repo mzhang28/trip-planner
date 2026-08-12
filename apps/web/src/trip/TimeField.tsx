@@ -1,9 +1,11 @@
 import { cn } from '@trip/ui';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { TimezonePicker } from './TimezonePicker';
 
 export interface TimeFieldProps {
   label: string;
+  /** Short derived information shown on the same line as the label. */
+  labelDetail?: ReactNode;
   value: string;
   hint?: string;
   disabled?: boolean;
@@ -17,6 +19,7 @@ export interface TimeFieldProps {
 /** A checked time of day with its time zone attached to the same control. */
 export function TimeField({
   label,
+  labelDetail,
   value,
   hint,
   disabled,
@@ -37,9 +40,12 @@ export function TimeField({
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <label htmlFor={id} className="text-xs font-medium text-ink-secondary">
-        {label}
-      </label>
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-xs font-medium text-ink-secondary">
+          {label}
+        </label>
+        {labelDetail && <span className="text-2xs text-ink-muted">{labelDetail}</span>}
+      </div>
 
       <div
         className={cn(
@@ -56,7 +62,7 @@ export function TimeField({
           placeholder="09:00"
           inputMode="numeric"
           aria-invalid={error !== null}
-          aria-describedby={`${id}-hint`}
+          aria-describedby={error || hint ? `${id}-hint` : undefined}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={() => setError(onCommit(draft.trim()))}
           className="h-full min-w-0 flex-1 bg-transparent font-mono text-sm text-ink outline-none placeholder:text-ink-placeholder disabled:cursor-not-allowed"
@@ -72,9 +78,11 @@ export function TimeField({
         )}
       </div>
 
-      <span id={`${id}-hint`} className={cn('text-2xs', error ? 'text-danger' : 'text-ink-muted')}>
-        {error ?? hint}
-      </span>
+      {(error || hint) && (
+        <span id={`${id}-hint`} className={cn('text-2xs', error ? 'text-danger' : 'text-ink-muted')}>
+          {error ?? hint}
+        </span>
+      )}
     </div>
   );
 }

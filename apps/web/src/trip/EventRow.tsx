@@ -260,7 +260,7 @@ function InlineEventName({
           if (event.key === 'Enter' || event.key === 'F2') setEditing(true);
         }}
         className={cn(
-          'mt-1.5 min-w-0 flex-1 cursor-text truncate rounded-sm px-2 text-sm font-medium',
+          'flex h-8 min-w-0 flex-1 cursor-text items-center truncate rounded-sm px-2 text-sm font-medium',
           'focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-1',
           value ? 'text-ink' : 'text-ink-placeholder italic',
         )}
@@ -406,9 +406,27 @@ export function EventRow({
      * and a card taller than the screen would pin Done to the card's own
      * bottom edge -- which is exactly the part that is off screen.
      */
-    <Card className={cn(isOpen ? 'overflow-visible' : 'overflow-hidden')}>
-      <div className="flex" style={coloredSurfaceStyle(event.color)}>
-        <StatusSpine status={event.booking.status} />
+    <Card className={cn('relative', isOpen ? 'overflow-visible' : 'overflow-hidden')}>
+      {isOpen && (
+        <span
+          className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+          style={{ borderRadius: 'inherit' }}
+        >
+          <StatusSpine
+            status={event.booking.status}
+            className="absolute inset-y-0 left-0"
+          />
+        </span>
+      )}
+
+      <div
+        className={cn(
+          'event-row-header group/event-row flex transition-colors duration-100',
+          isOpen && 'rounded-t-lg pl-1',
+        )}
+        style={coloredSurfaceStyle(event.color)}
+      >
+        {!isOpen && <StatusSpine status={event.booking.status} />}
 
         {!readOnly && (
           <label
@@ -422,7 +440,7 @@ export function EventRow({
                */
               !selectionActive &&
                 !isSelected &&
-                '[@media(hover:hover)]:opacity-0 focus-within:opacity-100 hover:opacity-100',
+                '[@media(hover:hover)]:opacity-0 focus-within:opacity-100 group-hover/event-row:opacity-100',
             )}
           >
             <span className="sr-only">Select {event.name}</span>
@@ -439,10 +457,10 @@ export function EventRow({
         {dragHandle}
 
         {isOpen && !readOnly ? (
-          <div data-testid="event" className="flex min-w-0 flex-1 items-start gap-2 px-3 py-2">
+          <div data-testid="event" className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
             {/* Keeps row lookup and announcements useful while the visible name is an input. */}
             <span className="sr-only">{event.name || 'Unnamed'}</span>
-            <span className="tabular mt-2 w-11 shrink-0 text-xs text-ink-muted">
+            <span className="tabular w-11 shrink-0 text-xs text-ink-muted">
               {time ?? '--:--'}
             </span>
             <EventKindPicker kind={event.kind} onChange={(kind) => onPatch({ kind })} />
@@ -460,7 +478,6 @@ export function EventRow({
             <BookingStatusPicker
               status={event.booking.status}
               onChange={(status) => onPatch({ booking: { ...event.booking, status } })}
-              className="mt-1"
             />
           </div>
         ) : (
@@ -471,7 +488,7 @@ export function EventRow({
               aria-expanded={isOpen}
               className={cn(
                 'flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left',
-                'data-hovered:bg-sunken data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-2',
+                'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-2',
               )}
             >
               <span className="tabular w-11 shrink-0 text-xs text-ink-muted">{time ?? '--:--'}</span>

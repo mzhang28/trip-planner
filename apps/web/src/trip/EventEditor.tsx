@@ -11,17 +11,17 @@ import { Button, ColorPicker, CustomFieldInput, SegmentedControl, TextField, cn 
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import {
+  endTimeFromClock,
+  formatDuration,
   formatTime,
   setDay,
   setTimeOfDay,
   toDateInput,
   zoneFor,
 } from '../lib/time';
-import { CheckedField } from './CheckedField';
 import { TimeField } from './TimeField';
 import { Attachments } from './Attachments';
 import { DescriptionEditor } from './DescriptionEditor';
-import { EventKindIcon } from './EventKind';
 import { EventTodos } from './EventTodos';
 import { FieldPalette, type PaletteChip } from './FieldPalette';
 import { FlightFields } from './FlightFields';
@@ -68,10 +68,18 @@ export interface EventEditorProps {
 interface Section {
   key: string;
   label: string;
+  /** How much of the three-column details grid this field needs. */
+  width: 'one' | 'two' | 'full';
   /** Whether this event has something in it, and so shows without asking. */
   filled: boolean;
   render: () => ReactNode;
 }
+
+const SECTION_WIDTH: Record<Section['width'], string> = {
+  one: 'md:col-span-1',
+  two: 'md:col-span-2',
+  full: 'md:col-span-3',
+};
 
 /**
  * What is known about an event, and a way to say more.
@@ -124,9 +132,10 @@ export function EventEditor({
       {
         key: 'when',
         label: 'Date',
+        width: 'two',
         filled: event.startsAt !== undefined,
         render: () => (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-ink-secondary">Date</span>
               {/*
@@ -188,9 +197,7 @@ export function EventEditor({
               hint={
                 event.startsAt === undefined
                   ? 'Pick a date first.'
-                  : event.timeUndecided
-                    ? 'Not set. The day is enough until you know the hour.'
-                    : 'Leave blank while you are still working out when.'
+                  : undefined
               }
               onCommit={(raw) => {
                 if (raw === '') {
@@ -216,37 +223,48 @@ export function EventEditor({
       },
       {
         key: 'duration',
-        label: 'How long',
+        label: 'End time',
+        width: 'one',
         filled: event.durationMinutes !== undefined,
-        render: () => (
-          <CheckedField
-            label="How long"
-            inputMode="numeric"
-            placeholder="90"
-            hint="In minutes."
-            value={event.durationMinutes === undefined ? '' : String(event.durationMinutes)}
-            onCommit={(raw) => {
-              if (raw === '') {
-                onPatch({ durationMinutes: undefined });
+        render: () => {
+          const hasStart = event.startsAt !== undefined && !event.timeUndecided;
+          const endsAt =
+            hasStart && event.durationMinutes !== undefined
+              ? event.startsAt! + event.durationMinutes * 60_000
+              : undefined;
+
+          return (
+            <TimeField
+              label="Ends"
+              labelDetail={
+                event.durationMinutes === undefined
+                  ? undefined
+                  : `Duration: ${formatDuration(event.durationMinutes)}`
+              }
+              value={endsAt === undefined ? '' : formatTime(endsAt, zone)}
+              disabled={!hasStart}
+              hint={!hasStart ? 'Set a start time first.' : undefined}
+              onCommit={(raw) => {
+                if (raw === '') {
+                  onPatch({ durationMinutes: undefined });
+                  return null;
+                }
+
+                if (!hasStart) return 'Set a start time first.';
+                const end = endTimeFromClock(event.startsAt!, zone, raw);
+                if (end === null) return 'Use a 24-hour time, like 17:30';
+
+                onPatch({ durationMinutes: Math.round((end - event.startsAt!) / 60_000) });
                 return null;
-              }
-
-              // A negative or fractional length used to be stored as typed, and
-              // then drew an event of negative height on the week grid.
-              const minutes = Number(raw);
-              if (!Number.isInteger(minutes) || minutes <= 0) {
-                return 'A whole number of minutes, more than zero.';
-              }
-
-              onPatch({ durationMinutes: minutes });
-              return null;
-            }}
-          />
-        ),
+              }}
+            />
+          );
+        },
       },
       {
         key: 'city',
         label: 'City',
+        width: 'two',
         filled: event.city !== undefined,
         render: () => (
           <div className="flex items-start gap-3">
@@ -255,7 +273,6 @@ export function EventEditor({
               className="min-w-0 flex-1"
               defaultValue={event.city ?? ''}
               placeholder="Kyoto"
-              description="Groups the day in month view."
               onBlur={(e) => onPatch({ city: e.currentTarget.value.trim() || undefined })}
             />
             {event.city && (
@@ -274,6 +291,7 @@ export function EventEditor({
       {
         key: 'place',
         label: 'Place',
+        width: 'two',
         filled: event.location !== undefined,
         render: () => (
           <PlacePicker value={event.location} onChange={(location) => onPatch({ location })} />
@@ -282,6 +300,7 @@ export function EventEditor({
       {
         key: 'confirmation',
         label: 'Confirmation',
+        width: 'one',
         filled: event.booking.confirmationCode !== undefined,
         render: () => (
           <TextField
@@ -302,6 +321,7 @@ export function EventEditor({
       {
         key: 'note',
         label: 'Note',
+        width: 'one',
         filled: event.booking.note !== undefined,
         render: () => (
           <TextField
@@ -319,6 +339,7 @@ export function EventEditor({
       {
         key: 'description',
         label: 'Description',
+        width: 'full',
         filled: event.description !== undefined,
         render: () => (
           <DescriptionEditor
@@ -333,6 +354,7 @@ export function EventEditor({
       {
         key: 'links',
         label: 'Links',
+        width: 'full',
         filled: Object.keys(event.links).length > 0,
         render: () => (
           <section className="flex flex-col gap-2">
@@ -399,6 +421,7 @@ export function EventEditor({
       {
         key: 'todos',
         label: 'To-dos',
+        width: 'full',
         filled: Object.keys(event.todos ?? {}).length > 0,
         render: () => (
           <EventTodos
@@ -412,6 +435,7 @@ export function EventEditor({
       {
         key: 'files',
         label: 'Files',
+        width: 'full',
         filled: Object.keys(event.attachments).length > 0,
         render: () => (
           <Attachments
@@ -425,6 +449,7 @@ export function EventEditor({
       {
         key: 'transit',
         label: 'Getting here',
+        width: 'full',
         filled: event.transitIn !== undefined,
         render: () => (
           <section className="flex flex-col gap-2">
@@ -500,6 +525,7 @@ export function EventEditor({
       list.push({
         key: 'lodging',
         label: 'Nights',
+        width: 'full',
         filled: true,
         render: () => {
           /*
@@ -549,7 +575,6 @@ export function EventEditor({
                       'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
                     )}
                   />
-                  <span className="text-2xs text-ink-muted">Shown along the bottom of the week.</span>
                 </label>
 
                 <label className="flex flex-col gap-1">
@@ -582,7 +607,6 @@ export function EventEditor({
                       wrongWayRound ? 'border-danger' : 'border-line-input focus:border-accent',
                     )}
                   />
-                  <span className="text-2xs text-ink-muted">The day you leave, not the last night.</span>
                 </label>
               </div>
 
@@ -601,6 +625,7 @@ export function EventEditor({
       list.push({
         key: 'flight',
         label: 'Flight',
+        width: 'full',
         filled: true,
         render: () => (
           <FlightFields
@@ -618,6 +643,7 @@ export function EventEditor({
       list.push({
         key: 'route',
         label: 'Route',
+        width: 'full',
         filled: true,
         render: () => (
           <TransitFields
@@ -634,6 +660,12 @@ export function EventEditor({
       list.push({
         key: `custom:${def.id}`,
         label: def.label,
+        width:
+          def.type === 'longtext'
+            ? 'full'
+            : def.type === 'select' || def.type === 'multiselect'
+              ? 'two'
+              : 'one',
         filled: event.customFields[def.id] !== undefined,
         render: () => (
           <CustomFieldInput
@@ -698,39 +730,31 @@ export function EventEditor({
   return (
     <div
       data-testid="event-editor"
-      className="flex flex-col gap-5 border-t border-line px-3 py-4"
+      className="flex flex-col gap-3 border-t border-line px-3 pt-3 pb-4"
     >
-      {shown.map((section) => (
-        <div key={section.key} data-testid={`field-${section.key}`}>
-          {section.render()}
-        </div>
-      ))}
-
-      <FieldPalette
-        chips={chips}
-        onAdd={onReveal}
-      />
+      <div className="grid grid-cols-1 gap-x-3 gap-y-3 md:grid-cols-3">
+        {shown.map((section) => (
+          <div
+            key={section.key}
+            data-testid={`field-${section.key}`}
+            className={SECTION_WIDTH[section.width]}
+          >
+            {section.render()}
+          </div>
+        ))}
+      </div>
 
       {/*
         Sticky, because an event with most of its fields open is several screens
-        tall on a phone and the card header -- the only way out -- is at the top
-        of them. The name comes along so it is clear what is being edited.
+        tall on a phone and the card header is several screens away. Field
+        discovery and the editor actions share one toolbar: two separate rows
+        repeated context and made a short event feel like a form page.
       */}
-      <div className="sticky bottom-0 -mx-3 -mb-4 flex items-center gap-3 border-t border-line bg-card px-3 py-2">
-        <span className="flex min-w-0 flex-1 items-center gap-1.5">
-          <EventKindIcon kind={event.kind} className="size-3.5 shrink-0 text-ink-muted" />
-          <span
-            className={cn(
-              'truncate text-xs',
-              event.name ? 'text-ink-secondary' : 'text-ink-placeholder italic',
-            )}
-          >
-            {event.name || 'Unnamed'}
-          </span>
-        </span>
+      <div className="sticky bottom-0 -mx-3 -mb-4 flex flex-wrap items-center gap-2 border-t border-line bg-card px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <FieldPalette chips={chips} onAdd={onReveal} collapsedCount={3} />
+        </div>
 
-        {/* Said in full to a screen reader, short on a phone where it sits
-            beside the name it applies to. */}
         <Button
           variant="ghost"
           size="sm"

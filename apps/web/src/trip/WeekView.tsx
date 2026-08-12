@@ -2,7 +2,14 @@ import type { TripEvent } from '@trip/crdt';
 import { StatusSpine, cn, coloredSurfaceStyle } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useLayoutEffect,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import type { DayKey } from '../lib/calendar';
 import {
   addDays,
@@ -147,6 +154,100 @@ function positionEvents(
       outsideAfter: item.outsideAfter,
     };
   });
+}
+
+/**
+ * A multi-day stay whose identity follows the visible part of its bar.
+ *
+ * The label is sticky inside the stay rather than fixed to the viewport, so it
+ * can never escape the dates the hotel covers. When less than one natural
+ * label-width remains visible, hiding it is clearer than showing a clipped
+ * fragment that looks like a second, tiny stay.
+ */
+function WeekLodging({
+  event,
+  gridColumn,
+  scroller,
+  onOpen,
+}: {
+  event: TripEvent;
+  gridColumn: string;
+  scroller: RefObject<HTMLDivElement | null>;
+  onOpen: () => void;
+}) {
+  const bar = useRef<HTMLButtonElement>(null);
+  const label = useRef<HTMLSpanElement>(null);
+  const [showLabel, setShowLabel] = useState(true);
+
+  useEffect(() => {
+    const viewport = scroller.current;
+    const barElement = bar.current;
+    const labelElement = label.current;
+    if (!viewport || !barElement || !labelElement) return;
+
+    const measure = () => {
+      const viewportRect = viewport.getBoundingClientRect();
+      const barRect = barElement.getBoundingClientRect();
+      // The first 2.5rem is the sticky time-axis gutter, not usable rail.
+      const visibleStart = viewportRect.left + 40;
+      const visibleWidth = Math.max(
+        0,
+        Math.min(barRect.right, viewportRect.right) - Math.max(barRect.left, visibleStart),
+      );
+      const startsOffscreen = barRect.left < visibleStart;
+      const enoughRoom = visibleWidth >= labelElement.offsetWidth;
+      setShowLabel(!startsOffscreen || enoughRoom);
+    };
+
+    measure();
+    viewport.addEventListener('scroll', measure, { passive: true });
+    const resize = new ResizeObserver(measure);
+    resize.observe(viewport);
+    resize.observe(barElement);
+    resize.observe(labelElement);
+
+    return () => {
+      viewport.removeEventListener('scroll', measure);
+      resize.disconnect();
+    };
+  }, [scroller]);
+
+  return (
+    <button
+      ref={bar}
+      type="button"
+      data-testid="week-lodging"
+      onClick={onOpen}
+      style={{
+        ...coloredSurfaceStyle(event.color),
+        gridColumn,
+        gridRow: 1,
+      }}
+      className={cn(
+        'min-w-0 rounded-full border border-line-default bg-sunken text-left text-2xs text-ink',
+        'hover:bg-card focus-visible:outline-focus focus-visible:outline-2',
+      )}
+    >
+      <span
+        ref={label}
+        data-testid="week-lodging-label"
+        data-visible={showLabel ? 'true' : 'false'}
+        className={cn(
+          'sticky left-[calc(2.5rem+0.5rem)] flex w-max max-w-[calc(100%-1rem)] items-center gap-1.5 px-2 py-1',
+          'transition-opacity duration-100',
+          showLabel ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        <StatusSpine
+          status={event.booking.status}
+          orientation="horizontal"
+          className="w-4 shrink-0"
+        />
+        <EventKindIcon kind={event.kind} className="size-3 shrink-0 text-ink-muted" />
+        <span className="truncate">{event.name}</span>
+      </span>
+    </button>
+  );
 }
 
 export interface WeekViewProps {
@@ -825,32 +926,13 @@ export function WeekView({
                   const placed = spanWithin(span, days)!;
 
                   return (
-                    <button
+                    <WeekLodging
                       key={span.event.id}
-                      type="button"
-                      data-testid="week-lodging"
-                      onClick={() => onOpenEvent(span.event.id)}
-                      style={{
-                        ...coloredSurfaceStyle(span.event.color),
-                        gridColumn: `${placed.start + 2} / span ${placed.length}`,
-                        gridRow: 1,
-                      }}
-                      className={cn(
-                        'flex min-w-0 items-center gap-1.5 truncate rounded-full border border-line-default bg-sunken px-2 py-1',
-                        'text-left text-2xs text-ink hover:bg-card focus-visible:outline-focus focus-visible:outline-2',
-                      )}
-                    >
-                      <StatusSpine
-                        status={span.event.booking.status}
-                        orientation="horizontal"
-                        className="w-4 shrink-0"
-                      />
-                      <EventKindIcon
-                        kind={span.event.kind}
-                        className="size-3 shrink-0 text-ink-muted"
-                      />
-                      <span className="truncate">{span.event.name}</span>
-                    </button>
+                      event={span.event}
+                      gridColumn={`${placed.start + 2} / span ${placed.length}`}
+                      scroller={horizontalScroller}
+                      onOpen={() => onOpenEvent(span.event.id)}
+                    />
                   );
                 })}
               </div>

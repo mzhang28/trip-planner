@@ -108,11 +108,11 @@ async function switchTo(page: Page, view: 'Day' | 'Week' | 'Month') {
 }
 
 async function setTripDates(page: Page, start: string, end: string) {
-  await page.getByRole('link', { name: 'Trip settings' }).click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.getByTestId('trip-start-date').fill(start);
   await page.getByTestId('trip-end-date').fill(end);
   await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
-  await page.getByRole('link', { name: 'Back to trip' }).click();
+  await page.getByRole('link', { name: 'Itinerary', exact: true }).click();
 }
 
 test.describe('week and month views', () => {
@@ -448,8 +448,8 @@ test.describe('flights and the map', () => {
     await editor.getByRole('textbox', { name: 'Time' }).fill('09:00');
     await editor.getByRole('textbox', { name: 'Time' }).blur();
     await revealField(page, 'duration');
-    await editor.getByRole('textbox', { name: 'How long' }).fill('180');
-    await editor.getByRole('textbox', { name: 'How long' }).blur();
+    await editor.getByRole('textbox', { name: 'Ends' }).fill('12:00');
+    await editor.getByRole('textbox', { name: 'Ends' }).blur();
     await page.getByTestId('close-editor').click();
 
     await switchTo(page, 'Week');
@@ -780,6 +780,7 @@ test.describe('making an event from the calendar', () => {
 
     await expect(editor.getByRole('textbox', { name: 'Time' })).toHaveValue('10:00');
     await expect(editor.getByTestId('field-duration')).toBeVisible();
-    await expect(editor.getByRole('textbox', { name: 'How long' }).first()).toHaveValue('120');
+    await expect(editor.getByRole('textbox', { name: 'Ends' })).toHaveValue('12:00');
+    await expect(editor.getByText('Duration: 2 hr')).toBeVisible();
   });
 });

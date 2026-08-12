@@ -128,6 +128,17 @@ export function formatTime(at: Instant, timeZone: string): string {
   }).format(at);
 }
 
+/** A stored minute count as the hours and minutes a person plans with. */
+export function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  const parts = [
+    hours > 0 ? `${hours} hr` : undefined,
+    remainder > 0 ? `${remainder} min` : undefined,
+  ];
+  return parts.filter(Boolean).join(' ') || '0 min';
+}
+
 export function formatDayHeading(
   at: Instant,
   timeZone: string,
@@ -178,6 +189,26 @@ export function setTimeOfDay(at: Instant, timeZone: string, hhmm: string): Insta
   const asUtc = Date.parse(`${day}T${String(hours).padStart(2, '0')}:${match[2]}:00Z`);
 
   return asUtc - offsetAt(asUtc, timeZone);
+}
+
+/**
+ * Reads an end clock relative to a start.
+ *
+ * An end earlier than (or equal to) the start means the following day. This
+ * lets an event end after midnight without requiring a second date.
+ */
+export function endTimeFromClock(
+  startsAt: Instant,
+  timeZone: string,
+  hhmm: string,
+): Instant | null {
+  const sameDay = setTimeOfDay(startsAt, timeZone, hhmm);
+  if (sameDay === null || sameDay > startsAt) return sameDay;
+
+  const day = new Date(`${dayKey(startsAt, timeZone)}T12:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + 1);
+  const nextDay = moveToDay(startsAt, timeZone, day.toISOString().slice(0, 10));
+  return nextDay === null ? null : setTimeOfDay(nextDay, timeZone, hhmm);
 }
 
 /**

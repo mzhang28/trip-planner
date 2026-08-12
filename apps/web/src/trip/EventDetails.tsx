@@ -2,7 +2,7 @@ import type { CustomValue, FieldDef, TripDoc, TripEvent } from '@trip/crdt';
 import { renderCustomValue, type FieldDefId } from '@trip/crdt';
 import { StatusChip, coloredSurfaceStyle } from '@trip/ui';
 import { Paperclip } from 'lucide-react';
-import { formatTime } from '../lib/time';
+import { formatDuration, formatTime } from '../lib/time';
 import { Description } from './DescriptionEditor';
 import { FlightSummary } from './FlightFields';
 import { describeTransit } from '../lib/transit';
@@ -96,7 +96,11 @@ export function EventDetails({
               timeZone: zone,
             }).format(event.startsAt)} · ${
               event.timeUndecided ? 'time not set' : formatTime(event.startsAt, zone)
-            }${event.durationMinutes ? ` · ${event.durationMinutes} min` : ''}`}
+            }${
+              event.durationMinutes !== undefined && !event.timeUndecided
+                ? `–${formatTime(event.startsAt + event.durationMinutes * 60_000, zone)} · ${formatDuration(event.durationMinutes)}`
+                : ''
+            }`}
       </Row>
 
       {(event.city || event.location?.label) && (

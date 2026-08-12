@@ -284,32 +284,39 @@ test.describe('sharing', () => {
 });
 
 test.describe('what a field does with input it cannot use', () => {
-  test('a duration must be a number of minutes, and says so when it is not', async ({ page }) => {
+  test('an end time calculates a readable duration and says when it cannot be used', async ({
+    page,
+  }) => {
     await page.goto('/');
     await newTrip(page);
 
     await addNewEvent(page, 'Tea ceremony');
     await eventRow(page, 'Tea ceremony').click();
+    await reveal(page, 'when');
+    await page.getByTestId('event-date').fill('2026-08-30');
+    await page.getByRole('textbox', { name: 'Time' }).fill('13:15');
+    await page.getByRole('textbox', { name: 'Time' }).blur();
     await reveal(page, 'duration');
 
-    const duration = page.getByRole('textbox', { name: 'How long' });
-    await duration.fill('-30');
-    await duration.blur();
+    const ends = page.getByRole('textbox', { name: 'Ends' });
+    await ends.fill('later');
+    await ends.blur();
 
     // The text stays put with the reason beside it, rather than being dropped
     // on the floor and leaving the old value looking accepted.
-    await expect(duration).toHaveValue('-30');
-    await expect(page.getByText('more than zero')).toBeVisible();
+    await expect(ends).toHaveValue('later');
+    await expect(page.getByText('Use a 24-hour time')).toBeVisible();
 
-    await duration.fill('90');
-    await duration.blur();
-    await expect(page.getByText('more than zero')).toHaveCount(0);
+    await ends.fill('21:00');
+    await ends.blur();
+    await expect(page.getByText('Duration: 7 hr 45 min')).toBeVisible();
 
-    // Reloaded, so this reads what was stored rather than what is still on
-    // screen: the refused text must not have been kept, and the good one must.
+    // Reloaded, so both the derived end and the human-readable duration come
+    // from what was stored rather than local input state.
     await page.reload();
     await eventRow(page, 'Tea ceremony').click();
-    await expect(page.getByRole('textbox', { name: 'How long' })).toHaveValue('90');
+    await expect(page.getByRole('textbox', { name: 'Ends' })).toHaveValue('21:00');
+    await expect(page.getByText('Duration: 7 hr 45 min')).toBeVisible();
   });
 
   test('a time zone is searched by IANA name inside the time field', async ({ page }) => {
