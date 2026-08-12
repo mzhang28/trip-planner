@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { auditLog, users } from '@trip/schema';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
+import { config } from './config';
 import { FsBlobStore } from './blobs/FsBlobStore';
 import { createDb, runMigrations, type Db } from './db';
 import { DocStore } from './docStore';
@@ -1048,6 +1049,103 @@ describe('the OAuth server', () => {
     expect(token.status).toBe(200);
     const granted = (await token.json()) as { access_token: string };
     expect((await rpc(app, granted.access_token, 'tools/list')).status).toBe(200);
+  });
+
+  it('accepts a token asked for by the endpoint address, which is what clients send', async () => {
+    const browser = new Browser(app);
+    const trip = await browser.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+    const clientId = await register(browser);
+    const { verifier, challenge } = pkce();
+
+    /*
+     * The protected resource is the MCP endpoint, so this is the address a
+     * client puts in `resource`. Binding tokens to the bare origin instead
+     * meant issuing one and then refusing it a second later.
+     */
+    const resource = `${config.PUBLIC_URL}/mcp`;
+
+    const consent = await browser.request('/oauth/authorize/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_id: clientId,
+        redirect_uri: REDIRECT,
+        scope: 'trips:read',
+        resource,
+        code_challenge: challenge,
+        trip_ids: [trip.body.id],
+      }),
+    });
+
+    const token = await browser.request('/oauth/token', {
+      method: 'POST',
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code: new URL(consent.body.redirect_to).searchParams.get('code'),
+        redirect_uri: REDIRECT,
+        client_id: clientId,
+        code_verifier: verifier,
+        resource,
+      }),
+    });
+    expect(token.status).toBe(200);
+
+    expect((await rpc(app, token.body.access_token, 'tools/list')).status).toBe(200);
+  });
+
+  it('publishes the endpoint as the resource, under both well-known paths', async () => {
+    for (const path of [
+      '/.well-known/oauth-protected-resource',
+      '/.well-known/oauth-protected-resource/mcp',
+    ]) {
+      const res = await app.request(path);
+      const body = (await res.json()) as { resource: string; authorization_servers: string[] };
+
+      expect(res.status, path).toBe(200);
+      expect(body.resource, path).toBe(`${config.PUBLIC_URL}/mcp`);
+      // The issuer is still the site: that is where the token endpoint lives.
+      expect(body.authorization_servers, path).toEqual([config.PUBLIC_URL]);
+    }
+  });
+
+  it('still refuses a token minted for somewhere else entirely', async () => {
+    const browser = new Browser(app);
+    const trip = await browser.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+    const clientId = await register(browser);
+    const { verifier, challenge } = pkce();
+
+    const consent = await browser.request('/oauth/authorize/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_id: clientId,
+        redirect_uri: REDIRECT,
+        scope: 'trips:read',
+        resource: 'https://somewhere-else.example/mcp',
+        code_challenge: challenge,
+        trip_ids: [trip.body.id],
+      }),
+    });
+
+    const token = await browser.request('/oauth/token', {
+      method: 'POST',
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code: new URL(consent.body.redirect_to).searchParams.get('code'),
+        redirect_uri: REDIRECT,
+        client_id: clientId,
+        code_verifier: verifier,
+        resource: 'https://somewhere-else.example/mcp',
+      }),
+    });
+
+    // Loosening the audience to two spellings of this server must not have
+    // loosened it to anything that is not this server.
+    expect((await rpc(app, token.body.access_token, 'tools/list')).status).toBe(401);
   });
 
   it('points clients at the consent screen, not at the endpoint behind it', async () => {

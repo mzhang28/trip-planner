@@ -14,6 +14,28 @@ const CODE_TTL_MS = 60 * 1000;
 export const SCOPES = ['trips:read', 'trips:write'] as const;
 
 /**
+ * What a token is for: the MCP endpoint, named in full.
+ *
+ * The protected resource is the endpoint rather than the site it is served
+ * from, and that is the address MCP clients put in `resource`. Publishing the
+ * bare origin instead meant issuing a token for one name and then refusing it
+ * under another.
+ */
+export const MCP_RESOURCE = `${config.PUBLIC_URL}/mcp`;
+
+/**
+ * Whether a token issued for `asked` may be spent here.
+ *
+ * Both spellings of this server are allowed: the endpoint, and the origin it
+ * sits on, which earlier metadata advertised and some clients will have stored.
+ * Neither names anything but this server, so accepting both narrows nothing —
+ * a token minted for somewhere else still matches neither.
+ */
+function resourceIsOurs(asked: string): boolean {
+  return asked === MCP_RESOURCE || asked === config.PUBLIC_URL;
+}
+
+/**
  * Loopback is allowed on any port because a desktop MCP client binds whatever
  * port is free and cannot register it in advance. Everything else has to match
  * exactly, so no redirect can be constructed that the client did not register.
@@ -123,7 +145,21 @@ export function metadataRoutes() {
   /** RFC 9728. Tells a client where to go to get a token for this server. */
   app.get('/oauth-protected-resource', (c) =>
     c.json({
-      resource: config.PUBLIC_URL,
+      resource: MCP_RESOURCE,
+      authorization_servers: [config.PUBLIC_URL],
+      scopes_supported: SCOPES,
+      bearer_methods_supported: ['header'],
+    }),
+  );
+
+  /*
+   * The same document under the path RFC 9728 gives for a resource that is not
+   * at the root. A client holding `https://host/mcp` looks here first, and only
+   * some fall back to the bare well-known path above.
+   */
+  app.get('/oauth-protected-resource/mcp', (c) =>
+    c.json({
+      resource: MCP_RESOURCE,
       authorization_servers: [config.PUBLIC_URL],
       scopes_supported: SCOPES,
       bearer_methods_supported: ['header'],
@@ -258,7 +294,7 @@ export function oauthRoutes() {
         userId: c.var.identity.userId,
         redirectUri: parsed.data.redirect_uri,
         scope,
-        resource: parsed.data.resource ?? config.PUBLIC_URL,
+        resource: parsed.data.resource ?? MCP_RESOURCE,
         codeChallenge: parsed.data.code_challenge,
         codeChallengeMethod: 'S256',
         grantedTripIds: JSON.stringify(granted),
@@ -374,7 +410,7 @@ export function oauthRoutes() {
           clientId: client_id,
           userId: record.userId,
           scope: record.scope,
-          resource: resource ?? record.resource ?? config.PUBLIC_URL,
+          resource: resource ?? record.resource ?? MCP_RESOURCE,
           grantedTripIds: record.grantedTripIds,
           familyId: `fam_${token(12)}`,
         }),
@@ -417,7 +453,7 @@ export function oauthRoutes() {
         clientId: existing.clientId,
         userId: existing.userId,
         scope: parsed.data.scope ?? existing.scope,
-        resource: parsed.data.resource ?? existing.resource ?? config.PUBLIC_URL,
+        resource: parsed.data.resource ?? existing.resource ?? MCP_RESOURCE,
         grantedTripIds: existing.grantedTripIds,
         familyId: existing.familyId,
       }),
@@ -524,7 +560,7 @@ export function verifyAccessToken(
    * The audience check. A token minted for another service and replayed here
    * must not work, which is the confused-deputy problem RFC 8707 exists for.
    */
-  if (row.resource && row.resource !== config.PUBLIC_URL) return null;
+  if (row.resource && !resourceIsOurs(row.resource)) return null;
 
   return {
     userId: row.userId,
