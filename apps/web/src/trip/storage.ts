@@ -1,11 +1,35 @@
 import * as A from '@automerge/automerge';
 import type { Doc, TripDoc } from '@trip/crdt';
 import { createStore, del, get, set } from 'idb-keyval';
+import type { TripSummary } from '../lib/api';
 
 const store = createStore('trip-planner', 'documents');
 
 const docKey = (tripId: string) => `doc:${tripId}`;
 const syncKey = (tripId: string) => `sync:${tripId}`;
+
+// One key, not one per trip: the list is read and written whole, and the point
+// of it is to answer "which trips are there" with no network at all.
+const tripListKey = 'trips-list';
+
+/**
+ * Keeps the list of trips on the device, so it is there to open a trip from
+ * when the server cannot be reached.
+ *
+ * Every per-trip document is already cached and opens offline, but the list
+ * that links to them is fetched fresh each time. Without this the offline app
+ * knows every trip yet can show none of them, and the cached documents are
+ * unreachable. Written after each successful fetch so it stays current, and it
+ * holds the same summaries the server sent -- dates and next-up included, which
+ * are a snapshot and so may lag until the next time online.
+ */
+export async function saveTripList(trips: TripSummary[]): Promise<void> {
+  await set(tripListKey, trips, store);
+}
+
+export async function loadTripList(): Promise<TripSummary[] | null> {
+  return (await get<TripSummary[]>(tripListKey, store)) ?? null;
+}
 
 export interface StoredSync {
   /** The server's sync state, opaque here and handed straight back to it. */

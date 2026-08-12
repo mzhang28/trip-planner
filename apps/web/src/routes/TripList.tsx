@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ApiError, api, deviceTimezone, type ImportedTrip, type TripSummary } from '../lib/api';
 import { useIdentity } from '../lib/useIdentity';
+import { loadTripList, saveTripList } from '../trip/storage';
 
 /**
  * What went wrong, in words about the file rather than about the server.
@@ -65,6 +66,13 @@ export function TripList() {
    * nothing while their trips sit on the server.
    */
   const [unreachable, setUnreachable] = useState(false);
+
+  /*
+   * The list on screen is the one saved on this device, because the server did
+   * not answer. The trips it links to open from IndexedDB, so it is worth
+   * showing; it is a snapshot, so it is worth saying so.
+   */
+  const [fromCache, setFromCache] = useState(false);
   const [name, setName] = useState('');
   const navigate = useNavigate();
 
@@ -74,8 +82,21 @@ export function TripList() {
       .listTrips()
       .then((res) => {
         setTrips(res.trips);
+        setFromCache(false);
+        void saveTripList(res.trips);
       })
-      .catch(() => setUnreachable(true));
+      .catch(async () => {
+        // Offline: fall back to the list saved on this device. Only when there
+        // is none -- a first run that has never reached the server -- is there
+        // nothing to show but the failure.
+        const cached = await loadTripList();
+        if (cached && cached.length > 0) {
+          setTrips(cached);
+          setFromCache(true);
+        } else {
+          setUnreachable(true);
+        }
+      });
   }, []);
 
   useEffect(load, [load]);
@@ -222,6 +243,16 @@ export function TripList() {
             <p className="mt-1 text-2xs text-ink-muted">
               Everything else came through. Attaching them again is the only way back.
             </p>
+          </div>
+        )}
+
+        {fromCache && (
+          <div
+            data-testid="trips-from-cache"
+            className="mb-8 rounded-md border border-line bg-sunken px-3 py-2 text-sm text-ink-secondary"
+          >
+            The server did not answer, so this is the list saved on this device. It may be out of
+            date, and a trip not opened here before will be empty until you are back online.
           </div>
         )}
 

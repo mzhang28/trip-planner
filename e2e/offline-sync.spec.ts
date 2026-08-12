@@ -187,6 +187,37 @@ test.describe('offline editing', () => {
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
     await expect(page.getByTestId('sync-status')).toHaveText("Saved on this device");
   });
+
+  test('the trips list opens offline from the copy saved on this device', async ({
+    page,
+    context,
+  }) => {
+    await page.goto('/');
+    const { tripId } = await newTrip(page, 'Japan, April');
+    await openTrip(page, tripId);
+    await addEvent(page, 'Fushimi Inari');
+    await expectSaved(page);
+
+    // Back to the list while still online, so the now non-empty list is fetched
+    // and saved to the device. This is the copy the offline reload falls back to.
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: /Japan, April/ })).toBeVisible();
+
+    await context.setOffline(true);
+    await page.reload();
+
+    // Without the cache this list would be empty and the trip unreachable, even
+    // though its document is right there in IndexedDB. The card is on screen,
+    // and the app says the list came from the device.
+    await expect(page.getByTestId('trips-from-cache')).toBeVisible();
+    const card = page.getByRole('link', { name: /Japan, April/ });
+    await expect(card).toBeVisible();
+
+    // And it still leads into the trip, read back out of IndexedDB with no network.
+    await card.click();
+    await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
+    await expect(page.getByTestId('sync-status')).toHaveText('Saved on this device');
+  });
 });
 
 test.describe('sharing', () => {
