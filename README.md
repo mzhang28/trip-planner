@@ -100,19 +100,26 @@ database to `data/trip-planner.db` unless configured otherwise.
 ### With Docker
 
 ```sh
-cp .env.example .env      # set PUBLIC_URL if it is not localhost:8080
+cp .env.example .env      # set PUBLIC_URL if it is not localhost:8787
 docker compose up -d --build
 ```
 
-Two containers out of one `Dockerfile`. The web one serves the built PWA on port
-8080 and forwards `/api`, `/oauth`, `/mcp` and `/.well-known` to the API beside
-it, the same four prefixes the dev server proxies. That makes both one origin,
-which is what an agent's access token is bound to — so `PUBLIC_URL` has to be the
-URL people actually open, and the API is not published on a port of its own.
+One container on port 8787, serving the app and the API together. `WEB_DIST`
+points the server at the built client, and it hands those files back for any path
+it does not answer itself — so both are one origin, which is what an agent's
+access token is bound to, and `PUBLIC_URL` has to be the URL people actually
+open. In dev nothing changes: `WEB_DIST` is unset, Vite serves the client, and it
+proxies `/api`, `/oauth`, `/mcp` and `/.well-known` back to the API.
 
 The database and the blob store share one volume, `trip-data`, mounted where both
-already point. Anything in `.env` reaches the API, so `BLOB_STORE=s3` and its
+already point. Anything in `.env` reaches the server, so `BLOB_STORE=s3` and its
 credentials belong there; the database stays in the volume either way.
+
+The same thing runs without Docker, after `pnpm build`:
+
+```sh
+WEB_DIST=apps/web/dist pnpm --filter @trip/api start
+```
 
 ### Ports
 

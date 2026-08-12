@@ -1,10 +1,8 @@
 name: trip-planner
 
 services:
-  api:
-    build:
-      context: .
-      target: api
+  app:
+    build: .
     # Set anything else, S3 credentials included, in a .env file beside this
     # one. See .env.example.
     env_file:
@@ -12,35 +10,24 @@ services:
         required: false
     environment:
       NODE_ENV: production
-      # The origin browsers and MCP clients reach the app at, which is the web
-      # service below rather than this one. Access tokens are bound to it, so it
-      # has to be the real URL: change it before putting this anywhere.
-      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8080}
+      # Fixed inside the container, so a PORT in .env cannot move the server out
+      # from under the published port and the health check below.
+      PORT: 8787
+      # The origin browsers and MCP clients reach this at. Access tokens are
+      # bound to it, so it has to be the real URL and it has to agree with
+      # APP_PORT: change both before putting this anywhere.
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8787}
+    ports:
+      - ${APP_PORT:-8787}:8787
     volumes:
       # DATABASE_PATH and BLOB_DIR default to data/trip-planner.db and
       # data/blobs under /app, so this one volume holds both.
       - trip-data:/app/data
     healthcheck:
       test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8787/api/health']
-      interval: 10s
-      timeout: 5s
-      start_period: 20s
-      retries: 3
-    restart: unless-stopped
-
-  web:
-    build:
-      context: .
-      target: web
-    ports:
-      - ${WEB_PORT:-8080}:80
-    depends_on:
-      api:
-        condition: service_healthy
-    healthcheck:
-      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1/index.html']
       interval: 30s
       timeout: 5s
+      start_period: 20s
       retries: 3
     restart: unless-stopped
 

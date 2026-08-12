@@ -1,7 +1,10 @@
+import { relative } from 'node:path';
 import { TOMBSTONE_TTL_MS } from '@trip/crdt';
 import { trips } from '@trip/schema';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { logger } from 'hono/logger';
 import { config } from './config';
 import type { AppEnv, Services } from './context';
@@ -123,5 +126,48 @@ export function createApp(services: Services) {
   app.use('/api/audit/:tripId/*', requireMembership);
   app.route('/api/audit', auditRoutes());
 
+  // Last, so a path this server answers itself is never mistaken for a file.
+  if (config.webDist) serveWebApp(app, config.webDist);
+
   return app;
+}
+
+/** The paths this server answers, which the client must not be given for. */
+const SERVER_PATHS = /^\/(api|oauth|mcp|\.well-known)(\/|$)/;
+
+/**
+ * Serves the built client beside the API, on one origin.
+ *
+ * That origin is what an agent's access token is bound to, and serving both
+ * from here means there is nothing in front to keep in agreement with it. In
+ * dev the Vite server does this instead, and proxies these paths back here.
+ */
+function serveWebApp(app: Hono<AppEnv>, dist: string) {
+  // serveStatic joins its root onto the request path and rejects an absolute
+  // one, so the configured directory is given relative to where we started.
+  const root = relative(process.cwd(), dist) || '.';
+
+  // Vite writes a content hash into every filename under /assets, so a cached
+  // copy of one is never a stale copy. Everything else is asked about again:
+  // index.html and the service worker decide when a new version is offered.
+  const onFound = (_path: string, c: Context<AppEnv>) => {
+    const immutable = c.req.path.startsWith('/assets/');
+    c.header('Cache-Control', immutable ? 'public, max-age=31536000, immutable' : 'no-cache');
+  };
+
+  // The build leaves a .gz beside anything worth compressing, and precompressed
+  // hands that over when the client accepts it rather than gzipping per request.
+  const file = serveStatic<AppEnv>({ root, precompressed: true, onFound });
+  const indexHtml = serveStatic<AppEnv>({
+    root,
+    path: 'index.html',
+    precompressed: true,
+    onFound,
+  });
+
+  app.use('*', (c, next) => (SERVER_PATHS.test(c.req.path) ? next() : file(c, next)));
+
+  // A trip URL opened directly is a route in the client, not a file on disk.
+  // Anything the API owns has already been answered or has already 404ed.
+  app.get('*', (c, next) => (SERVER_PATHS.test(c.req.path) ? next() : indexHtml(c, next)));
 }

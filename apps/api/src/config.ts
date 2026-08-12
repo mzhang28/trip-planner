@@ -14,6 +14,13 @@ const schema = z.object({
   /** Where the SQLite file lives, relative to the repository root. */
   DATABASE_PATH: z.string().default('data/trip-planner.db'),
 
+  /**
+   * The built client, relative to the repository root. When it is set this
+   * server also serves the app, which is what deploying the two as one process
+   * needs. Left unset in dev, where Vite serves the client and proxies here.
+   */
+  WEB_DIST: z.string().optional(),
+
   /** `fs` keeps attachments on disk; `s3` is configured in stage 5. */
   BLOB_STORE: z.enum(['fs', 's3']).default('fs'),
   BLOB_DIR: z.string().default('data/blobs'),
@@ -51,5 +58,6 @@ export const config = {
   ...parsed.data,
   databasePath: resolve(repoRoot, parsed.data.DATABASE_PATH),
   blobDir: resolve(repoRoot, parsed.data.BLOB_DIR),
+  webDist: parsed.data.WEB_DIST ? resolve(repoRoot, parsed.data.WEB_DIST) : undefined,
   isProduction: parsed.data.NODE_ENV === 'production',
 } as const;
