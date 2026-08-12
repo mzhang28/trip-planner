@@ -837,7 +837,7 @@ test.describe('the map and the forecast', () => {
     const anchored = '2026-09-03';
     await page.getByTestId('go-to-date').fill(anchored);
 
-    async function pin(name: string, query: string) {
+    async function pin(name: string, query: string, day = anchored) {
       await page.getByRole('textbox', { name: 'New event' }).fill(name);
       await page.getByRole('button', { name: 'Add', exact: true }).click();
       await eventRow(page, name).click();
@@ -845,7 +845,7 @@ test.describe('the map and the forecast', () => {
       // On the day the map is showing, which is the day the view is anchored
       // on -- and that is the trip's day, not necessarily today.
       await reveal(page, 'when');
-      await page.getByTestId('event-date').fill(anchored);
+      await page.getByTestId('event-date').fill(day);
 
       await reveal(page, 'place');
       await page.getByRole('combobox', { name: 'Place' }).fill(query);
@@ -865,10 +865,20 @@ test.describe('the map and the forecast', () => {
     const before = await pins.nth(0).boundingBox();
     expect((await pins.nth(1).boundingBox())!.x).toBeCloseTo(before!.x, 0);
 
+    // Focusing a card on another day also moves the map to that day.
+    await pin('Osaka lunch', 'Osaka Castle', '2026-09-04');
+    await expect(pins).toHaveCount(2);
+    await eventRow(page, 'Osaka lunch').click();
+    await expect(pins).toHaveCount(1);
+    await expect(pins.first()).toHaveAttribute('title', 'Osaka lunch');
+
     // The map used to redraw only when an id or a booking state changed, so a
     // place moved to another city left its marker where it was.
     await eventRow(page, 'Nishiki Market').click();
-    await page.getByRole('combobox', { name: 'Place' }).fill('Osaka Castle');
+    await expect(page.getByTestId('go-to-date')).toHaveValue(anchored);
+    const place = page.getByTestId('event-editor').getByRole('combobox', { name: 'Place' });
+    await place.fill('Osaka Castle');
+    await expect(place).toHaveValue('Osaka Castle');
     await expect(page.getByRole('option').first()).toBeVisible({ timeout: 15_000 });
     await page.getByRole('option').first().click();
 

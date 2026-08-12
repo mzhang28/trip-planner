@@ -898,11 +898,10 @@ export function TripView() {
                             onToggleSelected={() => toggleSelected(event.id)}
                             selectionActive={selected.size > 0}
                             isOpen={openEventId === event.id}
-                            onToggle={() =>
-                              setOpenEventId((current) =>
-                                current === event.id ? null : event.id,
-                              )
-                            }
+                            onToggle={() => {
+                              if (openEventId === event.id) setOpenEventId(null);
+                              else focusEvent(event.id);
+                            }}
                             homeTimezone={homeTimezone}
                             fieldDefs={fieldDefs}
                             readOnly={readOnly}
@@ -1000,10 +999,7 @@ export function TripView() {
                 <DayMap
                   events={mappable}
                   selectedId={highlighted}
-                  onSelect={(eventId) => {
-                    setHighlighted(eventId);
-                    setOpenEventId(eventId);
-                  }}
+                  onSelect={focusEvent}
                 />
               </aside>
             </div>
