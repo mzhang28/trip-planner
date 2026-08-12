@@ -13,7 +13,26 @@ export const users = sqliteTable('users', {
   displayName: text('display_name').notNull(),
   /** Picked at creation so a person is recognisable in a list of initials. */
   avatarColor: text('avatar_color').notNull(),
+  /**
+   * Set on the first person to arrive on an empty database, and nobody else.
+   * Whoever puts the server up is the one who gets to say who else may in.
+   */
+  adminSince: integer('admin_since'),
   createdAt: integer('created_at').notNull(),
+});
+
+/**
+ * What is true of this deployment rather than of anyone on it. Exactly one row.
+ *
+ * Registration shuts behind the first person, so a server left running on the
+ * internet is not quietly collecting accounts for anyone who finds it. The
+ * admin can open it again for as long as they need it open.
+ */
+export const instanceSettings = sqliteTable('instance_settings', {
+  /** Always 1. There is one deployment, and this is the row describing it. */
+  id: integer('id').primaryKey(),
+  /** Null while anyone arriving may have an account. */
+  registrationClosedAt: integer('registration_closed_at'),
 });
 
 /**

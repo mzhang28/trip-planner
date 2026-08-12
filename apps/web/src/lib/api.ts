@@ -119,6 +119,12 @@ export interface NewAgentClient {
 export const api = {
   listTrips: () => request<{ trips: TripSummary[] }>('/api/trips'),
 
+  setRegistrationOpen: (registrationOpen: boolean) =>
+    request<{ registrationOpen: boolean }>('/api/instance', {
+      method: 'PATCH',
+      body: JSON.stringify({ registrationOpen }),
+    }),
+
   listClients: () => request<{ clients: AgentClient[] }>('/api/clients'),
 
   createClient: (client: { name: string; redirectUris: string[]; confidential: boolean }) =>

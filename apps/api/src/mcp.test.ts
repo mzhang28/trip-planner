@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
-import { auditLog } from '@trip/schema';
+import { auditLog, users } from '@trip/schema';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import { FsBlobStore } from './blobs/FsBlobStore';
@@ -38,6 +38,20 @@ class Browser {
     const text = await res.text();
     return { status: res.status, body: text ? JSON.parse(text) : null, headers: res.headers };
   }
+}
+
+/**
+ * Reopens registration, which the first person to arrive is the only one who
+ * can do. Tests that need a second person say so here rather than assuming a
+ * stranger can turn up and be given an account.
+ */
+async function letOthersIn(admin: Browser) {
+  const result = await admin.request('/api/instance', {
+    method: 'PATCH',
+    body: JSON.stringify({ registrationOpen: true }),
+  });
+
+  expect(result.status).toBe(200);
 }
 
 async function rpc(app: App, accessToken: string, method: string, params?: unknown) {
@@ -513,6 +527,8 @@ describe('the OAuth server', () => {
       body: JSON.stringify({ name: 'Not yours', homeTimezone: 'UTC' }),
     });
 
+    await letOthersIn(owner);
+
     // A second browser is a second person. The screen they are shown must
     // describe their own trips, not whoever registered the client.
     const stranger = new Browser(app);
@@ -767,6 +783,8 @@ describe('the OAuth server', () => {
     const listed = await mine.request('/api/clients');
     expect(listed.body.clients.map((c: { clientId: string }) => c.clientId)).toEqual([clientId]);
 
+    await letOthersIn(mine);
+
     // Somebody else's list is their own, and their delete does not reach it.
     const stranger = new Browser(app);
     await stranger.request('/api/me');
@@ -808,6 +826,161 @@ describe('the OAuth server', () => {
      * would leave the token working until it expired an hour later.
      */
     expect((await rpc(app, accessToken, 'tools/list')).status).toBe(401);
+  });
+
+  it('makes the first person admin and shuts the door behind them', async () => {
+    const first = new Browser(app);
+    const me = await first.request('/api/me');
+
+    expect(me.status).toBe(200);
+    expect(me.body.admin).toBe(true);
+    expect(me.body.registrationOpen).toBe(false);
+
+    // Anyone after them is refused rather than quietly given an account.
+    const second = new Browser(app);
+    const refused = await second.request('/api/me');
+    expect(refused.status).toBe(401);
+    expect(refused.body.error).toBe('registration_closed');
+
+    await letOthersIn(first);
+
+    const third = new Browser(app);
+    const welcomed = await third.request('/api/me');
+    expect(welcomed.status).toBe(200);
+    // Only one admin: the door being open does not hand out the server.
+    expect(welcomed.body.admin).toBe(false);
+  });
+
+  it('makes the earliest person admin on a database that predates the door', async () => {
+    // Two people who arrived before any of this existed: no admin, and the
+    // settings row not yet written.
+    const before = Date.now() - 60_000;
+    db.insert(users)
+      .values([
+        { id: 'u_later', displayName: 'Later', avatarColor: '#136f5b', createdAt: before + 1000 },
+        { id: 'u_earliest', displayName: 'Earliest', avatarColor: '#b06e12', createdAt: before },
+      ])
+      .run();
+
+    // Reading the setting is what settles it, so an upgraded server does not
+    // sit open to anyone with nobody holding the key.
+    const stranger = new Browser(app);
+    expect((await stranger.request('/api/me')).status).toBe(401);
+
+    const rows = db.select().from(users).all();
+    expect(rows.find((u) => u.id === 'u_earliest')?.adminSince).toBeTruthy();
+    expect(rows.find((u) => u.id === 'u_later')?.adminSince).toBeNull();
+  });
+
+  it('lets nobody but the admin decide who may join', async () => {
+    const admin = new Browser(app);
+    await admin.request('/api/me');
+    await letOthersIn(admin);
+
+    const other = new Browser(app);
+    await other.request('/api/me');
+
+    const attempt = await other.request('/api/instance', {
+      method: 'PATCH',
+      body: JSON.stringify({ registrationOpen: false }),
+    });
+
+    expect(attempt.status).toBe(403);
+    expect(attempt.body.error).toBe('not_admin');
+  });
+
+  it('lets a share link in while the door is shut', async () => {
+    const admin = new Browser(app);
+    const trip = await admin.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+
+    const share = await admin.request(`/api/trips/${trip.body.id}/share`, {
+      method: 'POST',
+      body: JSON.stringify({ role: 'editor' }),
+    });
+
+    const guest = new Browser(app);
+    expect((await guest.request('/api/trips')).status).toBe(401);
+
+    // The link is the invitation, and redeeming it is what creates the account.
+    const redeemed = await guest.request(`/api/share/${share.body.token}`, { method: 'POST' });
+    expect(redeemed.status).toBe(200);
+    expect((await guest.request('/api/trips')).body.trips).toHaveLength(1);
+  });
+
+  it('is not let in by a share link that was revoked', async () => {
+    const admin = new Browser(app);
+    const trip = await admin.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+
+    const share = await admin.request(`/api/trips/${trip.body.id}/share`, {
+      method: 'POST',
+      body: JSON.stringify({ role: 'editor' }),
+    });
+
+    const access = await admin.request(`/api/trips/${trip.body.id}/access`);
+    const linkId = access.body.links[0].id as string;
+    await admin.request(`/api/trips/${trip.body.id}/access/links/${linkId}/revoke`, {
+      method: 'POST',
+    });
+
+    /*
+     * A dead link is not an invitation. Were the account created first and the
+     * link checked afterwards, anyone could mint themselves one by naming a
+     * token that never worked.
+     */
+    const guest = new Browser(app);
+    const refused = await guest.request(`/api/share/${share.body.token}`, { method: 'POST' });
+    expect([401, 404]).toContain(refused.status);
+  });
+
+  it('lets a hosted agent redeem its code with no session at all', async () => {
+    const { browser, tripId } = await (async () => {
+      const b = new Browser(app);
+      const t = await b.request('/api/trips', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+      });
+      return { browser: b, tripId: t.body.id as string };
+    })();
+
+    const clientId = await register(browser, ['https://agent.example/cb']);
+    const { verifier, challenge } = pkce();
+
+    const consent = await browser.request('/oauth/authorize/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_id: clientId,
+        redirect_uri: 'https://agent.example/cb',
+        scope: 'trips:read',
+        code_challenge: challenge,
+        trip_ids: [tripId],
+      }),
+    });
+
+    /*
+     * No cookie jar. The agent's own server does this half, and on a closed
+     * instance it would be turned away if the token endpoint wanted a person.
+     */
+    const token = await app.request('/oauth/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code: new URL(consent.body.redirect_to).searchParams.get('code'),
+        redirect_uri: 'https://agent.example/cb',
+        client_id: clientId,
+        code_verifier: verifier,
+      }),
+    });
+
+    expect(token.status).toBe(200);
+    const granted = (await token.json()) as { access_token: string };
+    expect((await rpc(app, granted.access_token, 'tools/list')).status).toBe(200);
   });
 
   it('points clients at the consent screen, not at the endpoint behind it', async () => {

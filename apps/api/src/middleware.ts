@@ -1,16 +1,55 @@
-import { tripMembers, trips } from '@trip/schema';
-import { and, eq } from 'drizzle-orm';
+import { shareLinks, tripMembers, trips } from '@trip/schema';
+import { and, eq, gt, isNull, or } from 'drizzle-orm';
 import { createMiddleware } from 'hono/factory';
 import { getCookie, setCookie } from 'hono/cookie';
 import { config } from './config';
 import type { AppEnv, Services } from './context';
-import { createAnonymousUser, createSession, resolveSession, SESSION_COOKIE, SESSION_TTL_MS } from './identity';
+import type { Db } from './db';
+import {
+  createAnonymousUser,
+  createSession,
+  hashToken,
+  registrationIsOpen,
+  resolveSession,
+  SESSION_COOKIE,
+  SESSION_TTL_MS,
+} from './identity';
 
 export function withServices(services: Services) {
   return createMiddleware<AppEnv>(async (c, next) => {
     c.set('services', services);
     await next();
   });
+}
+
+/**
+ * Whether this request is somebody redeeming a share link that still works.
+ *
+ * A link is an invitation, and an invitation is the one thing that gets a
+ * person an account on a closed server. It is checked here rather than left to
+ * the route, because by the time the route runs the decision to create a person
+ * has already been made.
+ */
+function holdsAnInvitation(c: { req: { method: string; path: string } }, db: Db): boolean {
+  if (c.req.method !== 'POST') return false;
+
+  const offered = /^\/api\/share\/([^/]+)$/.exec(c.req.path)?.[1];
+  if (!offered) return false;
+
+  const now = Date.now();
+  const link = db
+    .select({ id: shareLinks.id })
+    .from(shareLinks)
+    .where(
+      and(
+        eq(shareLinks.tokenHash, hashToken(offered)),
+        isNull(shareLinks.revokedAt),
+        or(isNull(shareLinks.expiresAt), gt(shareLinks.expiresAt, now)),
+      ),
+    )
+    .get();
+
+  return link !== undefined;
 }
 
 /**
@@ -29,6 +68,10 @@ export const withIdentity = createMiddleware<AppEnv>(async (c, next) => {
     c.set('identity', existing);
     await next();
     return;
+  }
+
+  if (!registrationIsOpen(db) && !holdsAnInvitation(c, db)) {
+    return c.json({ error: 'registration_closed' }, 401);
   }
 
   const identity = createAnonymousUser(db);

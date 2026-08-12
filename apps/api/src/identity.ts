@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { authCredentials, sessions, users, type TripRole } from '@trip/schema';
+import { authCredentials, instanceSettings, sessions, users, type TripRole } from '@trip/schema';
 import { and, eq, gt } from 'drizzle-orm';
 import type { Db } from './db';
 
@@ -81,9 +81,24 @@ export function createAnonymousUser(db: Db, displayName = anonymousName()): Iden
   const now = Date.now();
   const userId = `u_${token(16)}`;
 
+  /*
+   * The first person to arrive on an empty database is the admin, and their
+   * arrival shuts the door behind them. Whoever put the server up is the one
+   * who reaches it first, and nobody after them gets in without being asked.
+   */
+  const first = db.select({ id: users.id }).from(users).limit(1).get() === undefined;
+
   db.insert(users)
-    .values({ id: userId, displayName, avatarColor: pickAvatarColor(), createdAt: now })
+    .values({
+      id: userId,
+      displayName,
+      avatarColor: pickAvatarColor(),
+      adminSince: first ? now : null,
+      createdAt: now,
+    })
     .run();
+
+  if (first) closeRegistration(db, now);
 
   const deviceSecret = token();
   db.insert(authCredentials)
@@ -132,4 +147,56 @@ export function resolveSession(db: Db, raw: string | undefined): Identity | null
 
 export function renameUser(db: Db, userId: string, displayName: string): void {
   db.update(users).set({ displayName }).where(eq(users.id, userId)).run();
+}
+
+/**
+ * The one settings row, made on first read so no migration has to seed it.
+ *
+ * A database that already has people on it when this row first appears is one
+ * that predates the door existing. Its earliest user becomes the admin and it
+ * closes, which is where it would have ended up had it always worked this way —
+ * otherwise an upgraded server stays open to anyone with nobody able to shut it.
+ */
+function settings(db: Db) {
+  const existing = db.select().from(instanceSettings).where(eq(instanceSettings.id, 1)).get();
+  if (existing) return existing;
+
+  const earliest = db
+    .select({ id: users.id })
+    .from(users)
+    .orderBy(users.createdAt)
+    .limit(1)
+    .get();
+
+  const closedAt = earliest ? Date.now() : null;
+  if (earliest) db.update(users).set({ adminSince: closedAt }).where(eq(users.id, earliest.id)).run();
+
+  db.insert(instanceSettings).values({ id: 1, registrationClosedAt: closedAt }).run();
+  return { id: 1, registrationClosedAt: closedAt };
+}
+
+/** Whether somebody arriving with no session may have an account made for them. */
+export function registrationIsOpen(db: Db): boolean {
+  return settings(db).registrationClosedAt === null;
+}
+
+export function closeRegistration(db: Db, at = Date.now()): void {
+  settings(db);
+  db.update(instanceSettings)
+    .set({ registrationClosedAt: at })
+    .where(eq(instanceSettings.id, 1))
+    .run();
+}
+
+export function openRegistration(db: Db): void {
+  settings(db);
+  db.update(instanceSettings)
+    .set({ registrationClosedAt: null })
+    .where(eq(instanceSettings.id, 1))
+    .run();
+}
+
+export function isAdmin(db: Db, userId: string): boolean {
+  const row = db.select({ adminSince: users.adminSince }).from(users).where(eq(users.id, userId)).get();
+  return row?.adminSince != null;
 }

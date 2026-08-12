@@ -1,5 +1,6 @@
 export {
   authCredentials,
+  instanceSettings,
   sessions,
   shareLinks,
   tripMembers,

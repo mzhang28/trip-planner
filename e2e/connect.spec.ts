@@ -53,10 +53,17 @@ function consentUrl(clientId: string, challenge: string, scope: string, state = 
 }
 
 /*
- * The callback is a port nothing is listening on, so the browser lands on an
- * error page. The URL it was sent to is the part under test, and it survives
- * the failed load.
+ * Answers the agent's callback, which is a port nothing is listening on here.
+ *
+ * Without this the browser cannot load what it was redirected to, and a test
+ * waiting for that URL waits for a page that never arrives. The redirect itself
+ * is what is under test, so the far end only has to exist.
  */
+test.beforeEach(async ({ page }) => {
+  await page.route('http://127.0.0.1:33418/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>Connected</h1>' }),
+  );
+});
 test('picking trips on the consent screen is what the agent ends up holding', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -201,6 +208,38 @@ test('removing an agent takes it out of the list', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Remove Short lived' }).click();
   await expect(page.getByText('None yet.')).toBeVisible();
+});
+
+/*
+ * Answered in the browser rather than by shutting the real server. One server
+ * serves the whole suite, and the harness holds the only admin session on it,
+ * so closing it here would take every other test down with it. What the server
+ * does about a closed door is covered by the API tests; this is about what the
+ * person in front of it is shown.
+ */
+test('a stranger meeting a closed server is told, and a share link still opens', async ({
+  page,
+}) => {
+  await page.route('**/api/me', (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'registration_closed' }),
+    }),
+  );
+
+  await page.goto('/');
+  await expect(
+    page.getByRole('heading', { name: 'This server is not taking new people' }),
+  ).toBeVisible();
+
+  /*
+   * The join route has to render for exactly the person the door was shut on,
+   * because redeeming the link is what gives them an account. Showing them the
+   * closed screen instead would make every share link useless.
+   */
+  await page.goto('/join/a-token-that-goes-nowhere');
+  await expect(page.getByRole('heading', { name: 'This link no longer works' })).toBeVisible();
 });
 
 test('an unregistered client is refused before anything is asked', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { api } from '../lib/api';
 
 /**
@@ -11,7 +11,6 @@ import { api } from '../lib/api';
  */
 export function Join() {
   const { token } = useParams<{ token: string }>();
-  const navigate = useNavigate();
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -19,9 +18,14 @@ export function Join() {
 
     void api
       .redeemShareLink(token)
-      .then(({ tripId }) => navigate(`/t/${tripId}`, { replace: true }))
+      /*
+       * A whole page load rather than a route change. On a closed server this
+       * link is what created the account, and the identity settled once when
+       * the app started — at which point there was nobody to be.
+       */
+      .then(({ tripId }) => window.location.replace(`/t/${tripId}`))
       .catch(() => setFailed(true));
-  }, [token, navigate]);
+  }, [token]);
 
   return (
     <div className="grid h-dvh place-items-center overflow-hidden bg-page px-6 text-center text-ink">

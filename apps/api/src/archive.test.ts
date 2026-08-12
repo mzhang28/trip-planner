@@ -386,6 +386,9 @@ describe('exporting and importing over HTTP', () => {
       });
 
       expect(imported.status).toBe(201);
+      // The person the import minted on that empty server. Registration shuts
+      // behind them, so every later request has to say it is still them.
+      const importer = imported.headers.get('set-cookie')!.split(';')[0]!;
       const summary = (await imported.json()) as {
         id: string;
         name: string;
@@ -428,7 +431,9 @@ describe('exporting and importing over HTTP', () => {
       // The bytes landed, under the same name, and are readable through the
       // route the file links point at.
       expect(Buffer.from((await blobs2.get(hash))!)).toEqual(scan);
-      const download = await app2.request(`/api/blobs/${hash}`);
+      const download = await app2.request(`/api/blobs/${hash}`, {
+        headers: { cookie: importer },
+      });
       expect(Buffer.from(await download.arrayBuffer())).toEqual(scan);
 
       // The one that was on no event travels too, and keeps its name.
@@ -565,10 +570,23 @@ describe('exporting and importing over HTTP', () => {
   });
 
   it('will not export a trip the caller is not on', async () => {
-    const { id } = await newTrip();
+    const { id, cookie } = await newTrip();
 
-    // No cookie, so the server mints a different person, who is not a member.
-    const response = await app.request(`/api/trips/${id}/export`);
+    // Registration shut behind the person who made the trip, so let somebody
+    // else exist. Without this the refusal would be about the closed door
+    // rather than about membership, which is what is under test.
+    await app.request('/api/instance', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ registrationOpen: true }),
+    });
+
+    const stranger = await app.request('/api/me');
+    const theirs = stranger.headers.get('set-cookie')!.split(';')[0]!;
+
+    const response = await app.request(`/api/trips/${id}/export`, {
+      headers: { cookie: theirs },
+    });
     expect(response.status).toBe(403);
   });
 

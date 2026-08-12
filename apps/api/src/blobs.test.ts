@@ -100,30 +100,40 @@ describe('the blob store', () => {
 describe('uploading through the API', () => {
   let app: ReturnType<typeof createApp>;
   let root: string;
+  let cookie: string;
 
   beforeEach(async () => {
     const { db } = createDb(':memory:');
     runMigrations(db, resolve(import.meta.dirname, '../drizzle'));
     root = await mkdtemp(join(tmpdir(), 'trip-blobs-'));
     app = createApp({ db, docs: new DocStore(db), blobs: new FsBlobStore(root) });
+
+    // Registration shuts behind the first person to arrive, so these tests act
+    // as one person throughout rather than being a new stranger every request.
+    const me = await app.request('/api/me');
+    cookie = me.headers.get('set-cookie')!.split(';')[0]!;
   });
 
   afterEach(async () => {
     await rm(root, { recursive: true, force: true });
   });
 
+  /** Every upload here is the same person, carrying the session from above. */
+  const asMe = (path: string, init: RequestInit = {}) =>
+    app.request(path, { ...init, headers: { ...init.headers, cookie } });
+
   it('stores bytes under their own hash and reads them back', async () => {
     const bytes = randomBytes(512);
     const hash = sha256(bytes);
 
-    const put = await app.request(`/api/blobs/${hash}`, {
+    const put = await asMe(`/api/blobs/${hash}`, {
       method: 'PUT',
       body: bytes,
       headers: { 'content-type': 'application/pdf' },
     });
     expect(put.status).toBe(201);
 
-    const get = await app.request(`/api/blobs/${hash}`);
+    const get = await asMe(`/api/blobs/${hash}`);
     expect(get.status).toBe(200);
     expect(Buffer.from(await get.arrayBuffer())).toEqual(bytes);
   });
@@ -137,15 +147,15 @@ describe('uploading through the API', () => {
      * something else, and every later reader would get bytes that are not what
      * they asked for -- which is the one guarantee content addressing makes.
      */
-    const response = await app.request(`/api/blobs/${wrong}`, { method: 'PUT', body: bytes });
+    const response = await asMe(`/api/blobs/${wrong}`, { method: 'PUT', body: bytes });
     expect(response.status).toBe(400);
     expect(((await response.json()) as { error: string }).error).toBe("hash_mismatch");
 
-    expect((await app.request(`/api/blobs/${wrong}`)).status).toBe(404);
+    expect((await asMe(`/api/blobs/${wrong}`)).status).toBe(404);
   });
 
   it('refuses a key that is not a hash at all', async () => {
-    const response = await app.request('/api/blobs/../../etc/passwd', {
+    const response = await asMe('/api/blobs/../../etc/passwd', {
       method: 'PUT',
       body: randomBytes(8),
     });

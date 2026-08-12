@@ -8,7 +8,7 @@ import type { Context } from 'hono';
 import { logger } from 'hono/logger';
 import { config } from './config';
 import type { AppEnv, Services } from './context';
-import { renameUser } from './identity';
+import { closeRegistration, isAdmin, openRegistration, registrationIsOpen, renameUser } from './identity';
 import { requireMembership, requireSession, withIdentity, withServices } from './middleware';
 import { airportRoutes } from './routes/airports';
 import { archiveRoutes } from './routes/archive';
@@ -53,10 +53,43 @@ export function createApp(services: Services) {
   app.route('/mcp', mcpRoutes());
 
   app.use('/api/*', withServices(services), withIdentity);
-  app.use('/oauth/*', withServices(services), withIdentity);
 
-  /** Who the browser is currently acting as. */
-  app.get('/api/me', (c) => c.json(c.var.identity));
+  /*
+   * Only the authorize half of OAuth runs in a browser. `/oauth/token` and
+   * `/oauth/revoke` are called by the agent's own server, which has no session
+   * cookie and should never be given a person — a hosted client redeeming its
+   * code would otherwise be turned away the moment registration closed.
+   */
+  app.use('/oauth/*', withServices(services));
+  app.use('/oauth/authorize', withIdentity);
+  app.use('/oauth/authorize/*', withIdentity);
+
+  /** Who the browser is currently acting as, and what they may do to the server. */
+  app.get('/api/me', (c) =>
+    c.json({
+      ...c.var.identity,
+      admin: isAdmin(services.db, c.var.identity.userId),
+      registrationOpen: registrationIsOpen(services.db),
+    }),
+  );
+
+  /**
+   * Whether a stranger arriving may have an account made for them.
+   *
+   * Shut behind the first person to arrive. Opening it again is how somebody
+   * else gets in without a share link — which otherwise remains the only way.
+   */
+  app.patch('/api/instance', async (c) => {
+    if (!isAdmin(services.db, c.var.identity.userId)) return c.json({ error: 'not_admin' }, 403);
+
+    const body = await c.req.json().catch(() => null);
+    if (typeof body?.registrationOpen !== 'boolean') return c.json({ error: 'bad_request' }, 400);
+
+    if (body.registrationOpen) openRegistration(services.db);
+    else closeRegistration(services.db);
+
+    return c.json({ registrationOpen: body.registrationOpen });
+  });
 
   app.patch('/api/me', async (c) => {
     const body = await c.req.json().catch(() => null);

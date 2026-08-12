@@ -77,6 +77,23 @@ Every change an agent makes is recorded with who authorised it and through which
 client, and the ones that replaced a value can be put back from the trip's audit
 list.
 
+## Who may join
+
+The first person to open a new server becomes its admin, and registration shuts
+behind them. Anyone arriving after that is told the server is not taking new
+people rather than being given an account, which is what a public deployment
+needs — the app mints a person for any browser that turns up, and on the open
+internet that is everybody.
+
+A share link is the exception, and the ordinary way to bring someone in:
+following a live one creates an account for whoever holds it, open or not. The
+admin can also open registration from **Settings**, which lets people start on
+their own without a link, and shut it again afterwards.
+
+Upgrading an existing server settles the same way the first time it is asked:
+its earliest user becomes the admin and registration closes, so an instance that
+predates any of this does not sit open with nobody able to close it.
+
 ## Attachments
 
 Files go to `data/blobs` by default. To use object storage instead, set

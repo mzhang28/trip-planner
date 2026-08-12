@@ -108,6 +108,30 @@ async function run(command, args, options = {}) {
   await completed(child, options.name ?? command);
 }
 
+/**
+ * Lets the suite behave as though the server were open to anyone.
+ *
+ * Registration shuts behind the first person to arrive, and the whole suite
+ * shares one server: every test after the first would meet a closed door and
+ * be testing that instead of what it came for. This becomes the admin and then
+ * opens it, which is the same pair of requests a person would make.
+ */
+async function openRegistration(apiPort) {
+  const base = `http://127.0.0.1:${apiPort}`;
+
+  const me = await fetch(`${base}/api/me`);
+  const cookie = me.headers.get('set-cookie')?.split(';')[0];
+  if (!cookie) throw new Error('the API gave the harness no session to open registration with');
+
+  const opened = await fetch(`${base}/api/instance`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ registrationOpen: true }),
+  });
+
+  if (!opened.ok) throw new Error(`could not open registration: ${opened.status}`);
+}
+
 async function stop(child) {
   if (child.exitCode !== null || child.signalCode !== null) return;
 
@@ -163,6 +187,7 @@ try {
   consumeServerOutput(api.stdout, 'api');
   consumeServerOutput(api.stderr, 'api');
   const apiPort = await apiPortPromise;
+  await openRegistration(apiPort);
 
   await run('pnpm', ['--filter', '@trip/web', 'exec', 'node', 'scripts/build-icons.mjs'], {
     name: 'icon build',

@@ -179,6 +179,13 @@ describe('sync over HTTP', () => {
 
     const tripId = await newTrip(ada);
 
+    // Ada arrived first, so registration shut behind her. Letting others in
+    // again is what makes this a test of membership rather than of the door.
+    await ada.request('/api/instance', {
+      method: 'PATCH',
+      body: JSON.stringify({ registrationOpen: true }),
+    });
+
     const { status } = await stranger.request(`/api/sync/${tripId}`, {
       method: 'POST',
       body: JSON.stringify({ message: b64(new Uint8Array()) }),
@@ -218,10 +225,13 @@ describe('sync over HTTP', () => {
       body: JSON.stringify({ role: 'editor' }),
     });
 
+    // Bo has no account yet, and registration shut behind ada. The link is the
+    // invitation, so until bo follows it there is nothing to list.
     const before = await bo.request('/api/trips');
-    expect(before.body.trips).toHaveLength(0);
+    expect(before.status).toBe(401);
 
-    await bo.request(`/api/share/${share.body.token}`, { method: 'POST' });
+    const redeemed = await bo.request(`/api/share/${share.body.token}`, { method: 'POST' });
+    expect(redeemed.status).toBe(200);
 
     const after = await bo.request('/api/trips');
     expect(after.body.trips).toHaveLength(1);
