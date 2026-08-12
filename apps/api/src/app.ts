@@ -6,11 +6,12 @@ import { logger } from 'hono/logger';
 import { config } from './config';
 import type { AppEnv, Services } from './context';
 import { renameUser } from './identity';
-import { requireMembership, withIdentity, withServices } from './middleware';
+import { requireMembership, requireSession, withIdentity, withServices } from './middleware';
 import { airportRoutes } from './routes/airports';
 import { archiveRoutes } from './routes/archive';
 import { auditRoutes } from './routes/audit';
 import { blobRoutes } from './routes/blobs';
+import { clientRoutes } from './routes/clients';
 import { mcpRoutes } from './routes/mcp';
 import { metadataRoutes, oauthRoutes } from './routes/oauth';
 import { placeRoutes, weatherRoutes } from './routes/places';
@@ -100,6 +101,11 @@ export function createApp(services: Services) {
   */
   app.route('/api/airports', airportRoutes());
   app.route('/api/blobs', blobRoutes());
+  // Handing out credentials is not something a request that arrived without a
+  // session should be able to do, whatever person it would be given on the way.
+  app.use('/api/clients', requireSession);
+  app.use('/api/clients/*', requireSession);
+  app.route('/api/clients', clientRoutes());
   app.route('/api/places', placeRoutes());
   app.route('/api/weather', weatherRoutes());
   // Before the trip routes, so that /import is read as itself rather than as

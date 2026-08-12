@@ -68,9 +68,9 @@ describe('the remote MCP server', () => {
       body: JSON.stringify({ name: 'Japan, April', homeTimezone: 'Asia/Tokyo' }),
     });
 
-    const registered = await browser.request('/oauth/register', {
+    const registered = await browser.request('/api/clients', {
       method: 'POST',
-      body: JSON.stringify({ client_name: 'An agent', redirect_uris: [REDIRECT] }),
+      body: JSON.stringify({ name: 'An agent', redirectUris: [REDIRECT] }),
     });
     expect(registered.status).toBe(201);
 
@@ -79,7 +79,7 @@ describe('the remote MCP server', () => {
     const consent = await browser.request('/oauth/authorize/consent', {
       method: 'POST',
       body: JSON.stringify({
-        client_id: registered.body.client_id,
+        client_id: registered.body.clientId,
         redirect_uri: REDIRECT,
         scope,
         code_challenge: challenge,
@@ -96,7 +96,7 @@ describe('the remote MCP server', () => {
         grant_type: 'authorization_code',
         code,
         redirect_uri: REDIRECT,
-        client_id: registered.body.client_id,
+        client_id: registered.body.clientId,
         code_verifier: verifier,
       }),
     });
@@ -105,7 +105,7 @@ describe('the remote MCP server', () => {
     return {
       browser,
       tripId: trip.body.id as string,
-      clientId: registered.body.client_id as string,
+      clientId: registered.body.clientId as string,
       accessToken: token.body.access_token as string,
       refreshToken: token.body.refresh_token as string,
       verifier,
@@ -273,11 +273,15 @@ describe('the OAuth server', () => {
   });
 
   async function register(browser: Browser, redirectUris = [REDIRECT]) {
-    const res = await browser.request('/oauth/register', {
+    // Credentials are only handed to a browser that has been here before, so
+    // settle an identity first. The app does the same on its first paint.
+    await browser.request('/api/me');
+
+    const res = await browser.request('/api/clients', {
       method: 'POST',
-      body: JSON.stringify({ client_name: 'An agent', redirect_uris: redirectUris }),
+      body: JSON.stringify({ name: 'An agent', redirectUris }),
     });
-    return res.body.client_id as string;
+    return res.body.clientId as string;
   }
 
   async function authorize(browser: Browser, clientId: string, challenge: string, tripIds: string[]) {
@@ -469,6 +473,351 @@ describe('the OAuth server', () => {
 
     expect((await rpc(app, token.body.access_token, 'tools/list')).status).toBe(401);
   });
+
+  /** The query a client sends when it opens the consent screen in a browser. */
+  function authorizeQuery(clientId: string, challenge: string, scope = 'trips:read') {
+    return new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: REDIRECT,
+      response_type: 'code',
+      scope,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+    }).toString();
+  }
+
+  it('describes the request for the consent screen to render', async () => {
+    const browser = new Browser(app);
+    const trip = await browser.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+    const clientId = await register(browser);
+
+    const result = await browser.request(
+      `/oauth/authorize?${authorizeQuery(clientId, pkce().challenge, 'trips:read trips:write')}`,
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.body.client.name).toBe('An agent');
+    expect(result.body.client.redirectOrigin).toBe('http://127.0.0.1:33418');
+    expect(result.body.scope).toBe('trips:read trips:write');
+    expect(result.body.trips.map((t: { id: string }) => t.id)).toEqual([trip.body.id]);
+    expect(result.body.you.userId).toMatch(/^u_/);
+  });
+
+  it('offers only the trips the person signed in holds', async () => {
+    const owner = new Browser(app);
+    await owner.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Not yours', homeTimezone: 'UTC' }),
+    });
+
+    // A second browser is a second person. The screen they are shown must
+    // describe their own trips, not whoever registered the client.
+    const stranger = new Browser(app);
+    const clientId = await register(stranger);
+    const result = await stranger.request(
+      `/oauth/authorize?${authorizeQuery(clientId, pkce().challenge)}`,
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.body.trips).toEqual([]);
+  });
+
+  it('refuses a scope this server does not have', async () => {
+    const browser = new Browser(app);
+    const clientId = await register(browser);
+
+    const asked = await browser.request(
+      `/oauth/authorize?${authorizeQuery(clientId, pkce().challenge, 'trips:read trips:delete')}`,
+    );
+    expect(asked.status).toBe(400);
+    expect(asked.body.error).toBe('invalid_scope');
+
+    // And again at the point it would be written into a grant, so a client
+    // posting straight past the screen cannot smuggle one in.
+    const consented = await browser.request('/oauth/authorize/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_id: clientId,
+        redirect_uri: REDIRECT,
+        scope: 'trips:delete',
+        code_challenge: pkce().challenge,
+        trip_ids: [],
+      }),
+    });
+    expect(consented.status).toBe(400);
+    expect(consented.body.error).toBe('invalid_scope');
+  });
+
+  it('sends the client back with access_denied when the person says no', async () => {
+    const browser = new Browser(app);
+    const clientId = await register(browser);
+
+    const result = await browser.request('/oauth/authorize/deny', {
+      method: 'POST',
+      body: JSON.stringify({ client_id: clientId, redirect_uri: REDIRECT, state: 'abc' }),
+    });
+
+    expect(result.status).toBe(200);
+    const back = new URL(result.body.redirect_to);
+    expect(back.searchParams.get('error')).toBe('access_denied');
+    expect(back.searchParams.get('state')).toBe('abc');
+    expect(back.searchParams.get('code')).toBeNull();
+  });
+
+  it('will not send a refusal to a redirect the client never registered', async () => {
+    const browser = new Browser(app);
+    const clientId = await register(browser);
+
+    const result = await browser.request('/oauth/authorize/deny', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_id: clientId,
+        redirect_uri: 'https://somewhere-else.example/steal',
+      }),
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.body.error).toBe('invalid_redirect_uri');
+  });
+
+  it('makes a client that registered a secret present it', async () => {
+    const browser = new Browser(app);
+    const trip = await browser.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+
+    const registered = await browser.request('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'A server-side agent',
+        redirectUris: [REDIRECT],
+        confidential: true,
+      }),
+    });
+    const clientId = registered.body.clientId as string;
+    const secret = registered.body.clientSecret as string;
+    expect(secret).toBeTruthy();
+
+    const { verifier, challenge } = pkce();
+    const code = await authorize(browser, clientId, challenge, [trip.body.id]);
+
+    const grant = {
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: REDIRECT,
+      client_id: clientId,
+      code_verifier: verifier,
+    };
+
+    const withoutSecret = await browser.request('/oauth/token', {
+      method: 'POST',
+      body: JSON.stringify(grant),
+    });
+    expect(withoutSecret.status).toBe(401);
+    expect(withoutSecret.body.error).toBe('invalid_client');
+
+    const withSecret = await browser.request('/oauth/token', {
+      method: 'POST',
+      body: JSON.stringify({ ...grant, client_secret: secret }),
+    });
+    expect(withSecret.status).toBe(200);
+    expect(withSecret.body.access_token).toBeTruthy();
+  });
+
+  it('refuses to register a plain HTTP redirect that leaves the machine', async () => {
+    const browser = new Browser(app);
+    await browser.request('/api/me');
+
+    const remote = await browser.request('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'A hosted agent',
+        redirectUris: ['http://agent.example/callback'],
+      }),
+    });
+    expect(remote.status).toBe(400);
+
+    // The same URI over TLS is what a hosted client should be registering.
+    const secure = await browser.request('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'A hosted agent',
+        redirectUris: ['https://agent.example/callback'],
+      }),
+    });
+    expect(secure.status).toBe(201);
+  });
+
+  it('connects a hosted client that keeps a secret and an https redirect', async () => {
+    const browser = new Browser(app);
+    const trip = await browser.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+
+    const hostedRedirect = 'https://agent.example/oauth/callback';
+    const registered = await browser.request('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'A hosted agent',
+        redirectUris: [hostedRedirect],
+        confidential: true,
+      }),
+    });
+
+    const clientId = registered.body.clientId as string;
+    const { verifier, challenge } = pkce();
+
+    const consent = await browser.request('/oauth/authorize/consent', {
+      method: 'POST',
+      body: JSON.stringify({
+        client_id: clientId,
+        redirect_uri: hostedRedirect,
+        scope: 'trips:read trips:write',
+        code_challenge: challenge,
+        trip_ids: [trip.body.id],
+      }),
+    });
+    expect(consent.status).toBe(200);
+
+    const token = await browser.request('/oauth/token', {
+      method: 'POST',
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code: new URL(consent.body.redirect_to).searchParams.get('code'),
+        redirect_uri: hostedRedirect,
+        client_id: clientId,
+        client_secret: registered.body.clientSecret,
+        code_verifier: verifier,
+      }),
+    });
+    expect(token.status).toBe(200);
+
+    const listed = await rpc(app, token.body.access_token, 'tools/call', {
+      name: 'list_trips',
+      arguments: {},
+    });
+    expect(JSON.parse(listed.body.result.content[0].text).trips).toHaveLength(1);
+  });
+
+  it('will not let a hosted client swap in another host at the redirect', async () => {
+    const browser = new Browser(app);
+    await browser.request('/api/me');
+
+    const registered = await browser.request('/api/clients', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'A hosted agent',
+        redirectUris: ['https://agent.example/oauth/callback'],
+      }),
+    });
+
+    // Off-loopback URIs match exactly, so a path or host the client did not
+    // register is refused however close it looks.
+    for (const uri of [
+      'https://agent.example.evil/oauth/callback',
+      'https://agent.example/oauth/callback/../../steal',
+      'https://evil.example/oauth/callback',
+    ]) {
+      const result = await browser.request('/oauth/authorize/consent', {
+        method: 'POST',
+        body: JSON.stringify({
+          client_id: registered.body.clientId,
+          redirect_uri: uri,
+          scope: 'trips:read',
+          code_challenge: pkce().challenge,
+          trip_ids: [],
+        }),
+      });
+
+      expect(result.status, uri).toBe(400);
+      expect(result.body.error).toBe('invalid_redirect_uri');
+    }
+  });
+
+  it('will not hand credentials to a request that arrived without a session', async () => {
+    // No cookie jar: a bare POST, the way anything on the internet would reach
+    // it. `withIdentity` would otherwise mint a person and treat it as them.
+    const result = await app.request('/api/clients', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'Uninvited', redirectUris: ['https://agent.example/cb'] }),
+    });
+
+    expect(result.status).toBe(401);
+    expect(((await result.json()) as { error: string }).error).toBe('not_signed_in');
+  });
+
+  it('no longer advertises a registration endpoint for agents to use', async () => {
+    const metadata = await app.request('/.well-known/oauth-authorization-server');
+    const body = (await metadata.json()) as Record<string, unknown>;
+
+    expect(body.registration_endpoint).toBeUndefined();
+    expect(body.token_endpoint).toBeTruthy();
+  });
+
+  it('lists only the clients you made, and forgets them when you say so', async () => {
+    const mine = new Browser(app);
+    const clientId = await register(mine);
+
+    const listed = await mine.request('/api/clients');
+    expect(listed.body.clients.map((c: { clientId: string }) => c.clientId)).toEqual([clientId]);
+
+    // Somebody else's list is their own, and their delete does not reach it.
+    const stranger = new Browser(app);
+    await stranger.request('/api/me');
+    expect((await stranger.request('/api/clients')).body.clients).toEqual([]);
+    expect((await stranger.request(`/api/clients/${clientId}`, { method: 'DELETE' })).status).toBe(404);
+
+    expect((await mine.request(`/api/clients/${clientId}`, { method: 'DELETE' })).status).toBe(200);
+    expect((await mine.request('/api/clients')).body.clients).toEqual([]);
+  });
+
+  it('stops an agent working the moment its client is taken away', async () => {
+    const browser = new Browser(app);
+    const trip = await browser.request('/api/trips', {
+      method: 'POST',
+      body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
+    });
+    const clientId = await register(browser);
+    const { verifier, challenge } = pkce();
+    const code = await authorize(browser, clientId, challenge, [trip.body.id]);
+
+    const token = await browser.request('/oauth/token', {
+      method: 'POST',
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT,
+        client_id: clientId,
+        code_verifier: verifier,
+      }),
+    });
+
+    const accessToken = token.body.access_token as string;
+    expect((await rpc(app, accessToken, 'tools/list')).status).toBe(200);
+
+    expect((await browser.request(`/api/clients/${clientId}`, { method: 'DELETE' })).status).toBe(200);
+
+    /*
+     * Nothing on the MCP path reads the client table, so deleting the row alone
+     * would leave the token working until it expired an hour later.
+     */
+    expect((await rpc(app, accessToken, 'tools/list')).status).toBe(401);
+  });
+
+  it('points clients at the consent screen, not at the endpoint behind it', async () => {
+    const metadata = await app.request('/.well-known/oauth-authorization-server');
+    const body = (await metadata.json()) as Record<string, string>;
+
+    // A browser sent to /oauth/authorize is shown JSON, which is not a screen
+    // anyone can approve anything on.
+    expect(new URL(body.authorization_endpoint!).pathname).toBe('/connect');
+  });
 });
 
 describe('undoing what an agent did', () => {
@@ -488,15 +837,15 @@ describe('undoing what an agent did', () => {
       body: JSON.stringify({ name: 'Japan', homeTimezone: 'UTC' }),
     });
 
-    const registered = await browser.request('/oauth/register', {
+    const registered = await browser.request('/api/clients', {
       method: 'POST',
-      body: JSON.stringify({ client_name: 'An agent', redirect_uris: [REDIRECT] }),
+      body: JSON.stringify({ name: 'An agent', redirectUris: [REDIRECT] }),
     });
     const { verifier, challenge } = pkce();
     const consent = await browser.request('/oauth/authorize/consent', {
       method: 'POST',
       body: JSON.stringify({
-        client_id: registered.body.client_id,
+        client_id: registered.body.clientId,
         redirect_uri: REDIRECT,
         scope: 'trips:read trips:write',
         code_challenge: challenge,
@@ -509,7 +858,7 @@ describe('undoing what an agent did', () => {
         grant_type: 'authorization_code',
         code: new URL(consent.body.redirect_to).searchParams.get('code'),
         redirect_uri: REDIRECT,
-        client_id: registered.body.client_id,
+        client_id: registered.body.clientId,
         code_verifier: verifier,
       }),
     });

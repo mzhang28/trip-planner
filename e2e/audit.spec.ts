@@ -15,10 +15,10 @@ async function connectAgent(page: Page, tripId: string) {
         body: JSON.stringify(body),
       }).then((r) => r.json());
 
-    const client = (await json('/oauth/register', {
-      client_name: 'A test agent',
-      redirect_uris: ['http://127.0.0.1:33418/callback'],
-    })) as { client_id: string };
+    const client = (await json('/api/clients', {
+      name: 'A test agent',
+      redirectUris: ['http://127.0.0.1:33418/callback'],
+    })) as { clientId: string };
 
     const verifier = 'a'.repeat(64);
     const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
@@ -28,7 +28,7 @@ async function connectAgent(page: Page, tripId: string) {
       .replace(/=+$/, '');
 
     const consent = (await json('/oauth/authorize/consent', {
-      client_id: client.client_id,
+      client_id: client.clientId,
       redirect_uri: 'http://127.0.0.1:33418/callback',
       scope: 'trips:read trips:write',
       code_challenge: challenge,
@@ -39,7 +39,7 @@ async function connectAgent(page: Page, tripId: string) {
       grant_type: 'authorization_code',
       code: new URL(consent.redirect_to).searchParams.get('code'),
       redirect_uri: 'http://127.0.0.1:33418/callback',
-      client_id: client.client_id,
+      client_id: client.clientId,
       code_verifier: verifier,
     })) as { access_token: string };
 

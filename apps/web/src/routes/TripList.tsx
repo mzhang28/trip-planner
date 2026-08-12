@@ -126,7 +126,15 @@ export function TripList() {
       <header className="shrink-0 border-b border-line">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <h1 className="text-lg">Trips</h1>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <Link
+              to="/agents"
+              className="rounded-md px-2 py-1 text-sm text-ink-secondary hover:bg-sunken hover:text-ink"
+            >
+              Agents
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

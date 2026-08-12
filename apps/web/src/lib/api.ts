@@ -78,8 +78,69 @@ async function importTrip(archive: File): Promise<ImportedTrip> {
   return response.json() as Promise<ImportedTrip>;
 }
 
+/** What an agent is asking for, as the consent screen needs to describe it. */
+export interface AuthorizationRequest {
+  client: { id: string; name: string; redirectOrigin: string };
+  scope: string;
+  resource?: string;
+  trips: { id: string; name: string; role: 'viewer' | 'editor' | 'owner' }[];
+  you: { userId: string; displayName: string };
+}
+
+export interface ConsentDecision {
+  client_id: string;
+  redirect_uri: string;
+  state?: string;
+  scope: string;
+  resource?: string;
+  code_challenge: string;
+  trip_ids: string[];
+}
+
+/** An agent that has been given credentials, as the list shows it. */
+export interface AgentClient {
+  clientId: string;
+  name: string;
+  redirectUris: string[];
+  confidential: boolean;
+  createdAt: number;
+  /** Live grants, which is what taking it away would end. */
+  grants: number;
+}
+
+/** The one time the secret exists outside the agent's own configuration. */
+export interface NewAgentClient {
+  clientId: string;
+  clientSecret: string | null;
+  name: string;
+  redirectUris: string[];
+}
+
 export const api = {
   listTrips: () => request<{ trips: TripSummary[] }>('/api/trips'),
+
+  listClients: () => request<{ clients: AgentClient[] }>('/api/clients'),
+
+  createClient: (client: { name: string; redirectUris: string[]; confidential: boolean }) =>
+    request<NewAgentClient>('/api/clients', { method: 'POST', body: JSON.stringify(client) }),
+
+  deleteClient: (clientId: string) =>
+    request<{ ok: true }>(`/api/clients/${clientId}`, { method: 'DELETE' }),
+
+  readAuthorizationRequest: (query: string) =>
+    request<AuthorizationRequest>(`/oauth/authorize?${query}`),
+
+  approveAuthorization: (decision: ConsentDecision) =>
+    request<{ redirect_to: string }>('/oauth/authorize/consent', {
+      method: 'POST',
+      body: JSON.stringify(decision),
+    }),
+
+  denyAuthorization: (request_: { client_id: string; redirect_uri: string; state?: string }) =>
+    request<{ redirect_to: string }>('/oauth/authorize/deny', {
+      method: 'POST',
+      body: JSON.stringify(request_),
+    }),
 
   importTrip,
 

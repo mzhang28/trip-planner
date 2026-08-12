@@ -47,6 +47,27 @@ export const withIdentity = createMiddleware<AppEnv>(async (c, next) => {
 });
 
 /**
+ * Insists the request arrived with a session already, rather than being given
+ * one on the way in.
+ *
+ * `withIdentity` above mints a person for anyone who turns up without a cookie,
+ * which is right for opening a shared link and wrong for anything that hands
+ * out credentials: a bare POST from a script would otherwise create a user and
+ * then be treated as that user. What this asks is that a browser has been here
+ * before, which is what "somebody is signed in" amounts to in an app with no
+ * sign-in.
+ */
+export const requireSession = createMiddleware<AppEnv>(async (c, next) => {
+  const { db } = c.var.services;
+
+  if (!resolveSession(db, getCookie(c, SESSION_COOKIE))) {
+    return c.json({ error: 'not_signed_in' }, 401);
+  }
+
+  await next();
+});
+
+/**
  * Resolves what this person may do with this trip.
  *
  * Reads the membership table and never a share token. A token is one way to

@@ -47,11 +47,39 @@ function verifierMatches(verifier: string, challenge: string): boolean {
   return computed === challenge;
 }
 
-const registerSchema = z.object({
-  client_name: z.string().min(1).max(200).default('An MCP client'),
-  redirect_uris: z.array(z.string().url()).min(1).max(10),
-  token_endpoint_auth_method: z.enum(['none', 'client_secret_post', 'client_secret_basic']).default('none'),
-});
+/**
+ * The scopes in a request, or null if it asked for one that does not exist.
+ *
+ * An unknown scope is refused rather than dropped. A client that asked for
+ * something this server has never heard of has misunderstood what it is talking
+ * to, and silently handing back a smaller grant lets it believe it holds a
+ * permission it does not.
+ */
+function readScope(raw: string | undefined): string | null {
+  const asked = (raw ?? 'trips:read').split(/\s+/).filter(Boolean);
+  if (asked.length === 0) return null;
+  if (asked.some((entry) => !SCOPES.includes(entry as (typeof SCOPES)[number]))) return null;
+
+  return [...new Set(asked)].join(' ');
+}
+
+/**
+ * A redirect the code can be sent to without being readable on the way.
+ *
+ * Plain HTTP is allowed only back to the machine the browser is on, where the
+ * response never crosses a network. Anywhere else it would put the code in
+ * cleartext, and a code is all anyone needs to finish the exchange.
+ */
+export function redirectIsSafe(candidate: string): boolean {
+  try {
+    const url = new URL(candidate);
+    if (url.protocol === 'https:') return true;
+
+    return url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
+  } catch {
+    return false;
+  }
+}
 
 const consentSchema = z.object({
   client_id: z.string(),
@@ -63,6 +91,12 @@ const consentSchema = z.object({
   trip_ids: z.array(z.string()),
 });
 
+const denySchema = z.object({
+  client_id: z.string(),
+  redirect_uri: z.string(),
+  state: z.string().optional(),
+});
+
 const tokenSchema = z.discriminatedUnion('grant_type', [
   z.object({
     grant_type: z.literal('authorization_code'),
@@ -70,6 +104,7 @@ const tokenSchema = z.discriminatedUnion('grant_type', [
     redirect_uri: z.string(),
     client_id: z.string(),
     code_verifier: z.string(),
+    client_secret: z.string().optional(),
     resource: z.string().optional(),
   }),
   z.object({
@@ -77,6 +112,7 @@ const tokenSchema = z.discriminatedUnion('grant_type', [
     refresh_token: z.string(),
     client_id: z.string(),
     scope: z.string().optional(),
+    client_secret: z.string().optional(),
     resource: z.string().optional(),
   }),
 ]);
@@ -98,9 +134,20 @@ export function metadataRoutes() {
   app.get('/oauth-authorization-server', (c) =>
     c.json({
       issuer: config.PUBLIC_URL,
-      authorization_endpoint: `${config.PUBLIC_URL}/oauth/authorize`,
+      /*
+       * A page in the app, not an endpoint on this server. This is the URL a
+       * client opens in a browser, and what has to arrive there is the consent
+       * screen; `/oauth/authorize` below it answers that screen in JSON and has
+       * nothing to show a person.
+       */
+      authorization_endpoint: `${config.PUBLIC_URL}/connect`,
       token_endpoint: `${config.PUBLIC_URL}/oauth/token`,
-      registration_endpoint: `${config.PUBLIC_URL}/oauth/register`,
+      /*
+       * No `registration_endpoint`. Clients are made by a person in the app and
+       * configured with the credentials that produces, so there is nothing here
+       * an agent could register itself against; advertising one would only get
+       * a client as far as a 401.
+       */
       revocation_endpoint: `${config.PUBLIC_URL}/oauth/revoke`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token'],
@@ -117,43 +164,6 @@ export function metadataRoutes() {
 
 export function oauthRoutes() {
   const app = new Hono<AppEnv>();
-
-  app.post('/register', async (c) => {
-    const parsed = registerSchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) {
-      return c.json({ error: 'invalid_client_metadata' }, 400);
-    }
-
-    const { db } = c.var.services;
-    const clientId = `mcp_${token(16)}`;
-    const isPublic = parsed.data.token_endpoint_auth_method === 'none';
-    const secret = isPublic ? null : token();
-
-    db.insert(oauthClients)
-      .values({
-        id: `oc_${token(12)}`,
-        clientId,
-        clientSecretHash: secret ? hashToken(secret) : null,
-        clientName: parsed.data.client_name,
-        redirectUris: JSON.stringify(parsed.data.redirect_uris),
-        tokenEndpointAuthMethod: parsed.data.token_endpoint_auth_method,
-        createdAt: Date.now(),
-      })
-      .run();
-
-    return c.json(
-      {
-        client_id: clientId,
-        ...(secret ? { client_secret: secret } : {}),
-        client_name: parsed.data.client_name,
-        redirect_uris: parsed.data.redirect_uris,
-        token_endpoint_auth_method: parsed.data.token_endpoint_auth_method,
-        grant_types: ['authorization_code', 'refresh_token'],
-        response_types: ['code'],
-      },
-      201,
-    );
-  });
 
   /**
    * What the consent screen needs to describe the request.
@@ -186,6 +196,9 @@ export function oauthRoutes() {
       return c.json({ error: 'invalid_request', error_description: 'S256 PKCE is required' }, 400);
     }
 
+    const scope = readScope(query.scope);
+    if (!scope) return c.json({ error: 'invalid_scope' }, 400);
+
     const mine = db
       .select({ id: trips.id, name: trips.name, role: tripMembers.role })
       .from(tripMembers)
@@ -195,7 +208,7 @@ export function oauthRoutes() {
 
     return c.json({
       client: { id: client.clientId, name: client.clientName, redirectOrigin: new URL(redirectUri).origin },
-      scope: query.scope ?? 'trips:read',
+      scope,
       resource: query.resource,
       trips: mine,
       you: c.var.identity,
@@ -217,6 +230,9 @@ export function oauthRoutes() {
     if (!redirectAllowed(JSON.parse(client.redirectUris) as string[], parsed.data.redirect_uri)) {
       return c.json({ error: 'invalid_redirect_uri' }, 400);
     }
+
+    const scope = readScope(parsed.data.scope);
+    if (!scope) return c.json({ error: 'invalid_scope' }, 400);
 
     /*
      * Only trips this person actually holds. Without this filter a client could
@@ -241,7 +257,7 @@ export function oauthRoutes() {
         clientId: client.clientId,
         userId: c.var.identity.userId,
         redirectUri: parsed.data.redirect_uri,
-        scope: parsed.data.scope,
+        scope,
         resource: parsed.data.resource ?? config.PUBLIC_URL,
         codeChallenge: parsed.data.code_challenge,
         codeChallengeMethod: 'S256',
@@ -257,6 +273,36 @@ export function oauthRoutes() {
     return c.json({ redirect_to: location.toString() });
   });
 
+  /**
+   * Turning the request down, which the client is owed an answer about.
+   *
+   * The redirect is built here rather than in the page for the same reason the
+   * approval is: the URI has to be checked against the ones the client
+   * registered, and a browser cannot be the thing that decides that.
+   */
+  app.post('/authorize/deny', async (c) => {
+    const { db } = c.var.services;
+    const parsed = denySchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    const client = db
+      .select()
+      .from(oauthClients)
+      .where(eq(oauthClients.clientId, parsed.data.client_id))
+      .get();
+
+    if (!client) return c.json({ error: 'invalid_client' }, 400);
+    if (!redirectAllowed(JSON.parse(client.redirectUris) as string[], parsed.data.redirect_uri)) {
+      return c.json({ error: 'invalid_redirect_uri' }, 400);
+    }
+
+    const location = new URL(parsed.data.redirect_uri);
+    location.searchParams.set('error', 'access_denied');
+    if (parsed.data.state) location.searchParams.set('state', parsed.data.state);
+
+    return c.json({ redirect_to: location.toString() });
+  });
+
   app.post('/token', async (c) => {
     const { db } = c.var.services;
 
@@ -266,6 +312,34 @@ export function oauthRoutes() {
 
     const parsed = tokenSchema.safeParse(form);
     if (!parsed.success) return c.json({ error: 'invalid_request' }, 400);
+
+    /*
+     * A client that registered with a secret has to present it.
+     *
+     * Public clients are the ones MCP actually uses, and for them PKCE is what
+     * proves the caller is the same one that started the flow. But a client
+     * that was issued a secret and is never asked for it is a confidential
+     * client in name only: anyone who learns its id can spend its codes.
+     */
+    const caller = db
+      .select()
+      .from(oauthClients)
+      .where(eq(oauthClients.clientId, parsed.data.client_id))
+      .get();
+
+    if (!caller) return c.json({ error: 'invalid_client' }, 401);
+
+    if (caller.clientSecretHash) {
+      const header = c.req.header('authorization') ?? '';
+      const basic = header.toLowerCase().startsWith('basic ')
+        ? Buffer.from(header.slice(6).trim(), 'base64').toString().split(':')[1]
+        : undefined;
+
+      const presented = parsed.data.client_secret ?? basic;
+      if (!presented || hashToken(presented) !== caller.clientSecretHash) {
+        return c.json({ error: 'invalid_client' }, 401);
+      }
+    }
 
     const now = Date.now();
 

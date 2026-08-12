@@ -44,10 +44,34 @@ apps/web           the PWA
 
 ## Connecting an agent
 
-The MCP server is at `/mcp` and speaks OAuth, so any client that can register
-itself can reach it. Point one at the server's URL; it will find the metadata at
-`/.well-known/oauth-protected-resource`, register, and send you to a consent
-screen where you pick which trips it may see and whether it may write.
+The MCP server is at `/mcp` and speaks OAuth. An agent needs credentials before
+it can ask for anything, and those are made on the **Agents** page in the app.
+Give it a name and the redirect address from its own documentation, say whether
+it runs on a server, and it hands back a client id and, for a hosted agent, a
+secret shown that once. Paste both into the agent.
+
+The agent then does the rest itself. It finds the metadata at
+`/.well-known/oauth-protected-resource`, opens the consent screen at `/connect`,
+and there you pick which trips it may see and whether it may write.
+
+There is no dynamic client registration. Nothing hands out credentials to a
+caller that has not signed in, which is why the metadata advertises no
+`registration_endpoint` — a client that tried to register itself would only
+reach a 401.
+
+The URL an agent connects to has to be the one `PUBLIC_URL` names, because an
+access token is bound to that origin and refused anywhere else. Under `pnpm dev`
+the app is on port 5173, so run the API with `PUBLIC_URL=http://localhost:5173`.
+For anything reachable from the internet it has to be the public HTTPS origin.
+
+The grant is authorization code with PKCE, and nothing else: there is no implicit
+grant and no password grant, `S256` is the only challenge method accepted, and a
+code is single use. Redirect addresses must be HTTPS unless they point back at
+the machine the browser is on. Refresh tokens rotate, and presenting a rotated
+one revokes the whole family, on the reasoning that the legitimate holder already
+has a newer one. An agent that was given a secret has to present it; one without
+is held to PKCE instead. Removing an agent revokes its live tokens, so it stops
+working at once rather than when they expire.
 
 Every change an agent makes is recorded with who authorised it and through which
 client, and the ones that replaced a value can be put back from the trip's audit

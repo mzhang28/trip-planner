@@ -2,23 +2,31 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { trips, users } from './identity';
 
 /**
- * A client that registered itself, per RFC 7591.
+ * An agent that may ask for access, described in RFC 7591 terms.
  *
- * MCP clients cannot be pre-registered — nobody knows in advance which agent a
- * person will point at their trip — so registration is open and rate limited
- * rather than restricted to a list.
+ * Made by a person in the app rather than by the agent itself. A hosted client
+ * is configured once with credentials somebody pastes into it, so the case
+ * open registration exists for — an agent nobody knew about arriving on its
+ * own — is not the case being served, and leaving it open would mean an
+ * unauthenticated write endpoint facing the internet.
  */
-export const oauthClients = sqliteTable('oauth_clients', {
-  id: text('id').primaryKey(),
-  clientId: text('client_id').notNull().unique(),
-  /** Null for a public client, which uses PKCE instead of a secret. */
-  clientSecretHash: text('client_secret_hash'),
-  clientName: text('client_name').notNull(),
-  /** JSON array. Matched exactly, so an open redirect cannot be constructed. */
-  redirectUris: text('redirect_uris').notNull(),
-  tokenEndpointAuthMethod: text('token_endpoint_auth_method').notNull().$type<'none' | 'client_secret_post' | 'client_secret_basic'>(),
-  createdAt: integer('created_at').notNull(),
-});
+export const oauthClients = sqliteTable(
+  'oauth_clients',
+  {
+    id: text('id').primaryKey(),
+    clientId: text('client_id').notNull().unique(),
+    /** Null for a public client, which uses PKCE instead of a secret. */
+    clientSecretHash: text('client_secret_hash'),
+    clientName: text('client_name').notNull(),
+    /** JSON array. Matched exactly, so an open redirect cannot be constructed. */
+    redirectUris: text('redirect_uris').notNull(),
+    tokenEndpointAuthMethod: text('token_endpoint_auth_method').notNull().$type<'none' | 'client_secret_post' | 'client_secret_basic'>(),
+    /** Who made it, and so who can see it listed and take it away again. */
+    ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [index('oauth_clients_owner').on(table.ownerUserId)],
+);
 
 /**
  * An authorization code, which is single use and lives for a minute.
