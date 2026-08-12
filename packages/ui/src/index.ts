@@ -1,5 +1,6 @@
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './components/Button';
 export { Card, type CardProps } from './components/Card';
+export { ColorPicker, type ColorPickerProps } from './components/ColorPicker';
 export {
   CustomFieldInput,
   type CustomFieldInputProps,
@@ -21,7 +22,16 @@ export { TextField, type TextFieldProps } from './components/TextField';
 export { ThemeToggle, type ThemeToggleProps } from './components/ThemeToggle';
 
 export { cn } from './lib/cn';
-export { contrastBetween, contrastRatio, parseColor, relativeLuminance } from './lib/color';
+export {
+  DEFAULT_COLOR_PALETTE,
+  coloredSurfaceStyle,
+  contrastBetween,
+  contrastRatio,
+  parseColor,
+  readableTextColor,
+  relativeLuminance,
+  type DefaultColor,
+} from './lib/color';
 
 export {
   applyTheme,

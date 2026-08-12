@@ -2,14 +2,18 @@ import * as A from '@automerge/automerge';
 import { describe, expect, it } from 'vitest';
 import {
   addEvent,
+  addFieldDef,
+  addFieldOption,
   addLink,
   createTrip,
   deleteEvent,
   deleteEvents,
   liveEvents,
   mergeEvents,
+  setCityColor,
   setCustomField,
   updateEvent,
+  updateFieldOption,
   updateTripMeta,
   type Doc,
 } from './doc';
@@ -49,6 +53,41 @@ describe('trip dates', () => {
 
     doc = updateTripMeta(doc, { endsAt: undefined });
     expect((doc as TripDoc).meta.endsAt).toBeUndefined();
+  });
+});
+
+describe('choice colors', () => {
+  it('sets and clears a color without replacing the choice label', () => {
+    let doc = createTrip('Japan, April', 'Asia/Tokyo');
+    doc = addFieldDef(doc, {
+      id: 'mood',
+      label: 'Mood',
+      type: 'select',
+      order: 0,
+    });
+    doc = addFieldOption(doc, 'mood', 'quiet', { label: 'Quiet' });
+
+    doc = updateFieldOption(doc, 'mood', 'quiet', { color: '#1E3A8A' });
+    expect((doc as TripDoc).fieldDefs.mood?.options?.quiet).toEqual({
+      label: 'Quiet',
+      color: '#1E3A8A',
+    });
+
+    doc = updateFieldOption(doc, 'mood', 'quiet', { color: undefined });
+    expect((doc as TripDoc).fieldDefs.mood?.options?.quiet).toEqual({ label: 'Quiet' });
+  });
+
+  it('stores an event color separately from its shared city color', () => {
+    let doc = trip();
+    doc = updateEvent(doc, 'e1', { city: 'Kyoto', color: '#1E3A8A' }, ada);
+    doc = setCityColor(doc, 'Kyoto', '#FACC15');
+
+    expect((doc as TripDoc).events.e1?.color).toBe('#1E3A8A');
+    expect((doc as TripDoc).cityColors?.Kyoto).toBe('#FACC15');
+
+    doc = setCityColor(doc, 'Kyoto', undefined);
+    expect((doc as TripDoc).cityColors?.Kyoto).toBeUndefined();
+    expect((doc as TripDoc).events.e1?.color).toBe('#1E3A8A');
   });
 });
 

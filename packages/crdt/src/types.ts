@@ -132,6 +132,8 @@ export interface TripEvent {
   kind: EventKind;
   /** The only thing required to create an event. */
   name: string;
+  /** Optional user-assigned colour used by calendar cards. */
+  color?: string;
   /** Drives the month view's place ribbon. */
   city?: string;
   location?: Place;
@@ -185,6 +187,8 @@ export interface TripMeta {
  */
 export type TripDoc = {
   meta: TripMeta;
+  /** User-assigned colours shared by every occurrence of a city label. */
+  cityColors?: Record<string, string>;
   fieldDefs: Record<FieldDefId, FieldDef>;
   events: Record<EventId, TripEvent>;
 };

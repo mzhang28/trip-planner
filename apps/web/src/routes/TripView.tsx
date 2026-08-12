@@ -16,6 +16,7 @@ import {
   mergeEvents,
   removeAttachment,
   removeLink,
+  setCityColor,
   setCustomField,
   updateEvent,
   type CustomValue,
@@ -25,7 +26,14 @@ import {
   type TripDoc,
   type TripEvent,
 } from '@trip/crdt';
-import { Button, IconButton, SegmentedControl, TextField, ThemeToggle } from '@trip/ui';
+import {
+  Button,
+  IconButton,
+  SegmentedControl,
+  TextField,
+  ThemeToggle,
+  coloredSurfaceStyle,
+} from '@trip/ui';
 import { ChevronRight, GripVertical, Plus, Settings, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -723,6 +731,7 @@ export function TripView() {
                       type="button"
                       data-testid="unscheduled-item"
                       onClick={() => focusEvent(event.id)}
+                      style={coloredSurfaceStyle(event.color)}
                       className="max-w-40 truncate rounded-sm border border-line bg-card px-1.5 py-0.5 text-2xs text-ink hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
                     >
                       {event.name || 'Unnamed'}
@@ -743,6 +752,7 @@ export function TripView() {
               tripStart={tripRange.start}
               tripEnd={tripRange.end}
               events={events}
+              cityColors={doc?.cityColors}
               homeTimezone={homeTimezone}
               weather={weather}
               today={today}
@@ -758,6 +768,7 @@ export function TripView() {
             <MonthView
               anchor={anchor}
               events={events}
+              cityColors={doc?.cityColors}
               homeTimezone={homeTimezone}
               weather={weather}
               today={today}
@@ -885,6 +896,9 @@ export function TripView() {
                                   userId: 'me',
                                 }),
                               )
+                            }
+                            onSetCityColor={(city, color) =>
+                              store?.change((current) => setCityColor(current, city, color))
                             }
                             onAddAttachment={(id, attachment: EventAttachment) =>
                               store?.change((current) =>

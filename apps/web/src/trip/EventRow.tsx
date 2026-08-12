@@ -9,7 +9,15 @@ import type {
   TripEvent,
 } from '@trip/crdt';
 import { BOOKING_STATUSES } from '@trip/crdt';
-import { BOOKING_STATUS_LABEL, Card, StatusChip, StatusSpine, cn } from '@trip/ui';
+import {
+  BOOKING_STATUS_LABEL,
+  Card,
+  ColorPicker,
+  StatusChip,
+  StatusSpine,
+  cn,
+  coloredSurfaceStyle,
+} from '@trip/ui';
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Button, Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import { formatTime } from '../lib/time';
@@ -28,6 +36,7 @@ export interface EventRowProps {
   onAddLink: (url: string, title: string | undefined) => void;
   onRemoveLink: (linkId: string) => void;
   onSetCustomField: (fieldId: FieldDefId, value: CustomValue | undefined) => void;
+  onSetCityColor: (city: string, color: string | undefined) => void;
   onAddAttachment: (id: string, attachment: EventAttachment) => void;
   onRemoveAttachment: (id: string) => void;
   onDelete: () => void;
@@ -270,6 +279,7 @@ export function EventRow({
   onAddLink,
   onRemoveLink,
   onSetCustomField,
+  onSetCityColor,
   onAddAttachment,
   onRemoveAttachment,
   onDelete,
@@ -347,7 +357,7 @@ export function EventRow({
      * bottom edge -- which is exactly the part that is off screen.
      */
     <Card className={cn(isOpen ? 'overflow-visible' : 'overflow-hidden')}>
-      <div className="flex">
+      <div className="flex" style={coloredSurfaceStyle(event.color)}>
         <StatusSpine status={event.booking.status} />
 
         {!readOnly && (
@@ -386,6 +396,11 @@ export function EventRow({
               {time ?? '--:--'}
             </span>
             <EventKindPicker kind={event.kind} onChange={(kind) => onPatch({ kind })} />
+            <ColorPicker
+              value={event.color}
+              label={`Color for ${event.name || 'this event'}`}
+              onChange={(color) => onPatch({ color })}
+            />
             <InlineEventName
               value={event.name}
               startEditing={openForNameEdit}
@@ -444,6 +459,7 @@ export function EventRow({
           homeTimezone={homeTimezone}
           zone={zone}
           fieldDefs={fieldDefs}
+          cityColors={doc?.cityColors}
           doc={doc}
           onOpenEvent={onOpenEvent}
         />
@@ -458,6 +474,7 @@ export function EventRow({
           onAddLink={onAddLink}
           onRemoveLink={onRemoveLink}
           onSetCustomField={onSetCustomField}
+          onSetCityColor={onSetCityColor}
           onAddAttachment={onAddAttachment}
           onRemoveAttachment={onRemoveAttachment}
           onDelete={onDelete}

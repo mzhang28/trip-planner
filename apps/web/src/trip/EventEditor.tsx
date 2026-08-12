@@ -6,7 +6,7 @@ import type {
   TripDoc,
   TripEvent,
 } from '@trip/crdt';
-import { Button, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip/ui';
+import { Button, ColorPicker, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import {
@@ -40,6 +40,7 @@ export interface EventEditorProps {
   onAddLink: (url: string, title: string | undefined) => void;
   onRemoveLink: (linkId: string) => void;
   onSetCustomField: (fieldId: FieldDefId, value: CustomValue | undefined) => void;
+  onSetCityColor: (city: string, color: string | undefined) => void;
   onAddAttachment: (id: string, attachment: EventAttachment) => void;
   onRemoveAttachment: (id: string) => void;
   onDelete: () => void;
@@ -86,6 +87,7 @@ export function EventEditor({
   onAddLink,
   onRemoveLink,
   onSetCustomField,
+  onSetCityColor,
   onAddAttachment,
   onRemoveAttachment,
   onDelete,
@@ -238,13 +240,26 @@ export function EventEditor({
         label: 'City',
         filled: event.city !== undefined,
         render: () => (
-          <TextField
-            label="City"
-            defaultValue={event.city ?? ''}
-            placeholder="Kyoto"
-            description="Groups the day in month view."
-            onBlur={(e) => onPatch({ city: e.currentTarget.value.trim() || undefined })}
-          />
+          <div className="flex items-start gap-3">
+            <TextField
+              label="City"
+              className="min-w-0 flex-1"
+              defaultValue={event.city ?? ''}
+              placeholder="Kyoto"
+              description="Groups the day in month view."
+              onBlur={(e) => onPatch({ city: e.currentTarget.value.trim() || undefined })}
+            />
+            {event.city && (
+              <div className="flex flex-col items-center gap-1 pt-0.5">
+                <span className="text-xs font-medium text-ink-secondary">Color</span>
+                <ColorPicker
+                  value={doc?.cityColors?.[event.city]}
+                  label={`Color for ${event.city}`}
+                  onChange={(color) => onSetCityColor(event.city!, color)}
+                />
+              </div>
+            )}
+          </div>
         ),
       },
       {

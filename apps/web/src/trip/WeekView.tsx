@@ -1,5 +1,5 @@
 import type { TripEvent } from '@trip/crdt';
-import { StatusSpine, cn } from '@trip/ui';
+import { StatusSpine, cn, coloredSurfaceStyle } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -153,6 +153,7 @@ export interface WeekViewProps {
   tripStart: DayKey;
   tripEnd: DayKey;
   events: TripEvent[];
+  cityColors?: Record<string, string>;
   homeTimezone: string;
   weather: Map<DayKey, DailyWeather>;
   today: DayKey;
@@ -354,6 +355,7 @@ export function WeekView({
   tripStart,
   tripEnd,
   events,
+  cityColors,
   homeTimezone,
   weather,
   today,
@@ -474,6 +476,9 @@ export function WeekView({
                   return (
                     <div
                       key={day}
+                      style={coloredSurfaceStyle(
+                        segment ? cityColors?.[segment.label] : undefined,
+                      )}
                       className={cn(
                         'truncate px-1 py-0.5 text-2xs font-medium',
                         segment ? 'bg-accent-soft text-accent-text' : 'text-transparent',
@@ -573,6 +578,7 @@ export function WeekView({
                         type="button"
                         data-testid="week-untimed-event"
                         onClick={() => onOpenEvent(event.id)}
+                        style={coloredSurfaceStyle(event.color)}
                         className="flex gap-1 overflow-hidden rounded-sm border border-dashed border-line bg-card px-1 py-0.5 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
                       >
                         <StatusSpine status={event.booking.status} />
@@ -690,6 +696,7 @@ export function WeekView({
                           data-testid="week-event"
                           onClick={() => onOpenEvent(event.id)}
                           style={{
+                            ...coloredSurfaceStyle(event.color),
                             top,
                             height,
                             left: `calc(${(column / columns) * 100}% + 2px)`,
@@ -796,6 +803,7 @@ export function WeekView({
                       data-testid="week-lodging"
                       onClick={() => onOpenEvent(span.event.id)}
                       style={{
+                        ...coloredSurfaceStyle(span.event.color),
                         gridColumn: `${placed.start + 2} / span ${placed.length}`,
                         gridRow: 1,
                       }}

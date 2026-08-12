@@ -2,6 +2,7 @@ import type { CustomValue, FieldDef, OptionId } from '@trip/crdt';
 import { valueMatchesType } from '@trip/crdt';
 import { Checkbox, Label } from 'react-aria-components';
 import { cn } from '../lib/cn';
+import { readableTextColor } from '../lib/color';
 import { TextField } from './TextField';
 
 export interface CustomFieldInputProps {
@@ -194,14 +195,38 @@ export function CustomFieldInput({ def, value, onChange, isDisabled }: CustomFie
                   aria-checked={Boolean(selected[optionId])}
                   disabled={isDisabled}
                   onClick={() => toggle(optionId)}
+                  style={
+                    option.color
+                      ? {
+                          backgroundColor: option.color,
+                          borderColor: option.color,
+                          color: readableTextColor(option.color),
+                        }
+                      : undefined
+                  }
                   className={cn(
-                    'rounded-full border px-2.5 py-1 text-xs',
+                    'flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs',
                     'focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-1',
-                    selected[optionId]
-                      ? 'border-accent bg-accent-soft text-accent-text'
-                      : 'border-line-default text-ink-secondary hover:bg-sunken',
+                    option.color
+                      ? selected[optionId]
+                        ? 'ring-2 ring-current ring-offset-1 ring-offset-card'
+                        : 'hover:brightness-95'
+                      : selected[optionId]
+                        ? 'border-accent bg-accent-soft text-accent-text'
+                        : 'border-line-default text-ink-secondary hover:bg-sunken',
                   )}
                 >
+                  {selected[optionId] && (
+                    <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3" fill="none">
+                      <path
+                        d="M2.5 6.5 5 9l4.5-5.5"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
                   {option.label}
                 </button>
               ))}

@@ -1,4 +1,5 @@
 import type { TripEvent } from '@trip/crdt';
+import { parseColor, readableTextColor } from '@trip/ui';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useRef } from 'react';
@@ -20,7 +21,12 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 /** Numbered in the order the day happens, which is how the timeline reads. */
-function pinIcon(index: number, status: string, selected: boolean): L.DivIcon {
+function pinIcon(index: number, status: string, selected: boolean, color?: string): L.DivIcon {
+  // Only validated palette-shaped values enter the HTML string.
+  const custom = color && parseColor(color) ? color : undefined;
+  const background = custom ?? STATUS_COLOR[status] ?? 'var(--status-idea)';
+  const foreground = custom ? readableTextColor(custom) : 'var(--surface-card)';
+
   return L.divIcon({
     className: '',
     iconSize: [26, 26],
@@ -28,8 +34,8 @@ function pinIcon(index: number, status: string, selected: boolean): L.DivIcon {
     html: `<span style="
       display:flex;align-items:center;justify-content:center;
       width:26px;height:26px;border-radius:50%;
-      background:${STATUS_COLOR[status] ?? 'var(--status-idea)'};
-      color:var(--surface-card);
+      background:${background};
+      color:${foreground};
       font:600 12px/1 var(--font-sans);
       box-shadow:${selected ? '0 0 0 3px var(--accent)' : 'var(--depth-md)'};
     ">${index + 1}</span>`,
@@ -90,7 +96,7 @@ export function DayMap({ events, selectedId, onSelect }: DayMapProps) {
 
     pinned.forEach((event, index) => {
       const marker = L.marker([event.location!.lat!, event.location!.lng!], {
-        icon: pinIcon(index, event.booking.status, event.id === selectedId),
+        icon: pinIcon(index, event.booking.status, event.id === selectedId, event.color),
         title: event.name,
         alt: `${index + 1}. ${event.name}`,
       })
@@ -117,7 +123,7 @@ export function DayMap({ events, selectedId, onSelect }: DayMapProps) {
     pinned
       .map(
         (event, index) =>
-          `${event.id}:${index}:${event.booking.status}:${event.location!.lat}:${event.location!.lng}`,
+          `${event.id}:${index}:${event.booking.status}:${event.color ?? ''}:${event.location!.lat}:${event.location!.lng}`,
       )
       .join(),
     selectedId,

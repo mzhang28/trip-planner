@@ -1,6 +1,6 @@
-import type { FieldDef, TripDoc, TripEvent } from '@trip/crdt';
+import type { CustomValue, FieldDef, TripDoc, TripEvent } from '@trip/crdt';
 import { renderCustomValue, type FieldDefId } from '@trip/crdt';
-import { StatusChip } from '@trip/ui';
+import { StatusChip, coloredSurfaceStyle, readableTextColor } from '@trip/ui';
 import { Paperclip } from 'lucide-react';
 import { formatTime } from '../lib/time';
 import { Description } from './DescriptionEditor';
@@ -12,6 +12,7 @@ export interface EventDetailsProps {
   homeTimezone: string;
   zone: string;
   fieldDefs: FieldDef[];
+  cityColors?: Record<string, string>;
   doc: TripDoc | undefined;
   onOpenEvent: (eventId: string) => void;
 }
@@ -22,6 +23,41 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <dt className="w-28 shrink-0 text-xs text-ink-muted">{label}</dt>
       <dd className="min-w-0 flex-1 text-sm text-ink">{children}</dd>
     </div>
+  );
+}
+
+function CustomValueDisplay({ value, def }: { value: CustomValue; def: FieldDef }) {
+  if (value.kind !== 'options') return renderCustomValue(value, def);
+
+  return (
+    <span className="flex flex-wrap gap-1.5">
+      {Object.keys(value.selected).map((optionId) => {
+        const option = def.options?.[optionId];
+        if (!option) return <span key={optionId}>{optionId}</span>;
+
+        return (
+          <span
+            key={optionId}
+            style={
+              option.color
+                ? {
+                    backgroundColor: option.color,
+                    borderColor: option.color,
+                    color: readableTextColor(option.color),
+                  }
+                : undefined
+            }
+            className={
+              option.color
+                ? 'rounded-full border px-2.5 py-0.5 text-xs'
+                : 'rounded-full border border-line-default px-2.5 py-0.5 text-xs text-ink-secondary'
+            }
+          >
+            {option.label}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
@@ -39,6 +75,7 @@ export function EventDetails({
   homeTimezone,
   zone,
   fieldDefs,
+  cityColors,
   doc,
   onOpenEvent,
 }: EventDetailsProps) {
@@ -70,7 +107,16 @@ export function EventDetails({
 
       {(event.city || event.location?.label) && (
         <Row label="Where">
-          {[event.location?.label, event.city].filter(Boolean).join(' · ')}
+          {event.location?.label}
+          {event.location?.label && event.city && ' · '}
+          {event.city && (
+            <span
+              style={coloredSurfaceStyle(cityColors?.[event.city])}
+              className={cityColors?.[event.city] ? 'rounded-full px-2 py-0.5 text-xs' : undefined}
+            >
+              {event.city}
+            </span>
+          )}
           {event.location?.address && (
             <span className="block text-xs text-ink-muted">{event.location.address}</span>
           )}
@@ -143,7 +189,7 @@ export function EventDetails({
 
       {customs.map(({ def, value }) => (
         <Row key={def.id} label={def.label}>
-          {renderCustomValue(value!, def)}
+          <CustomValueDisplay value={value!} def={def} />
         </Row>
       ))}
     </dl>

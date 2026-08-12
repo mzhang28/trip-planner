@@ -6,11 +6,12 @@ import {
   removeFieldOption,
   updateTripMeta,
   updateFieldDef,
+  updateFieldOption,
   type FieldDef,
   type FieldType,
   type TripDoc,
 } from '@trip/crdt';
-import { Button, Card, TextField, ThemeToggle } from '@trip/ui';
+import { Button, Card, ColorPicker, TextField, ThemeToggle, readableTextColor } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -389,6 +390,9 @@ export function TripFields() {
                 onRemoveOption={(optionId) =>
                   store?.change((c) => removeFieldOption(c, def.id, optionId))
                 }
+                onSetOptionColor={(optionId, color) =>
+                  store?.change((c) => updateFieldOption(c, def.id, optionId, { color }))
+                }
                 onDelete={() => store?.change((c) => deleteFieldDef(c, def.id))}
               />
             ))}
@@ -418,6 +422,7 @@ function FieldRow({
   onSetCurrency,
   onAddOption,
   onRemoveOption,
+  onSetOptionColor,
   onDelete,
 }: {
   def: FieldDef;
@@ -428,6 +433,7 @@ function FieldRow({
   onSetCurrency: (currency: string | undefined) => void;
   onAddOption: (label: string) => void;
   onRemoveOption: (optionId: string) => void;
+  onSetOptionColor: (optionId: string, color: string | undefined) => void;
   onDelete: () => void;
 }) {
   const [option, setOption] = useState('');
@@ -526,9 +532,23 @@ function FieldRow({
               {Object.entries(def.options ?? {}).map(([optionId, opt]) => (
                 <li
                   key={optionId}
-                  className="flex items-center gap-1 rounded-full border border-line-default px-2 py-0.5 text-xs"
+                  style={
+                    opt.color
+                      ? {
+                          backgroundColor: opt.color,
+                          borderColor: opt.color,
+                          color: readableTextColor(opt.color),
+                        }
+                      : undefined
+                  }
+                  className="flex items-center gap-1 rounded-full border border-line-default py-0.5 pr-1 pl-2 text-xs"
                 >
                   {opt.label}
+                  <ColorPicker
+                    value={opt.color}
+                    label={`Color for ${opt.label}`}
+                    onChange={(color) => onSetOptionColor(optionId, color)}
+                  />
                   <button
                     type="button"
                     aria-label={`Remove ${opt.label}`}
@@ -542,7 +562,11 @@ function FieldRow({
                         onRemoveOption(optionId);
                       }
                     }}
-                    className="text-ink-muted hover:text-danger focus-visible:outline-focus focus-visible:outline-2"
+                    className={
+                      opt.color
+                        ? 'opacity-75 hover:opacity-100 focus-visible:outline-focus focus-visible:outline-2'
+                        : 'text-ink-muted hover:text-danger focus-visible:outline-focus focus-visible:outline-2'
+                    }
                   >
                     <Trash2 aria-hidden="true" className="size-3" />
                   </button>

@@ -63,6 +63,22 @@ export function updateTripMeta(doc: Doc, patch: Partial<TripMeta>): Doc {
   });
 }
 
+/** Assigns one shared colour to a city everywhere it appears in a trip. */
+export function setCityColor(doc: Doc, city: string, color: string | undefined): Doc {
+  return A.change(doc, (d) => {
+    const key = city.trim();
+    if (!key) return;
+
+    if (color === undefined) {
+      if (d.cityColors) delete d.cityColors[key];
+      return;
+    }
+
+    d.cityColors ??= {};
+    d.cityColors[key] = color;
+  });
+}
+
 export interface NewEvent {
   id: EventId;
   name: string;
@@ -328,6 +344,25 @@ export function addFieldOption(
     // and retyping one to text should not leave an empty options map behind.
     def.options ??= {};
     def.options[optionId] = option;
+  });
+}
+
+/** Changes one property without replacing the rest of a synced choice. */
+export function updateFieldOption(
+  doc: Doc,
+  fieldId: FieldDefId,
+  optionId: OptionId,
+  patch: Partial<FieldOption>,
+): Doc {
+  return A.change(doc, (d) => {
+    const option = d.fieldDefs[fieldId]?.options?.[optionId];
+    if (!option) return;
+
+    const target = option as unknown as Record<string, unknown>;
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined) delete target[key];
+      else target[key] = value;
+    }
   });
 }
 

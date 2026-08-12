@@ -1,4 +1,4 @@
-import { cn } from '@trip/ui';
+import { cn, coloredSurfaceStyle } from '@trip/ui';
 import { Search } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { SearchResult } from './search';
@@ -192,7 +192,15 @@ export function SearchBar({
                   position === active && 'bg-accent-soft',
                 )}
               >
-                <span className="flex min-w-0 items-center gap-1.5 text-sm text-ink">
+                <span
+                  style={
+                    result.kind === 'event' ? coloredSurfaceStyle(result.event.color) : undefined
+                  }
+                  className={cn(
+                    'flex min-w-0 items-center gap-1.5 text-sm text-ink',
+                    result.kind === 'event' && result.event.color && 'rounded-sm px-1.5 py-0.5',
+                  )}
+                >
                   {result.kind === 'event' && (
                     <EventKindIcon
                       kind={result.event.kind}

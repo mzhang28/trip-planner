@@ -117,6 +117,50 @@ test.describe('putting an event on a chosen day', () => {
   });
 });
 
+test.describe('custom colors', () => {
+  test('event and city colors use the shared palette across calendar views', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByRole('textbox', { name: 'New event' }).fill('Night train');
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await eventRow(page, 'Night train').click();
+
+    await page.getByRole('button', { name: 'Color for Night train, no color' }).click();
+    const eventPalette = page.getByRole('dialog', { name: 'Color for Night train' });
+    await expect(eventPalette.getByRole('button')).toHaveCount(33);
+    await eventPalette.getByRole('button', { name: 'Navy' }).click();
+
+    await reveal(page, 'when');
+    await page.getByTestId('event-date').fill('2026-09-03');
+    await reveal(page, 'city');
+    const city = page.getByRole('textbox', { name: 'City' });
+    await city.fill('Kyoto');
+    await city.blur();
+
+    await page.getByRole('button', { name: 'Color for Kyoto, no color' }).click();
+    await page
+      .getByRole('dialog', { name: 'Color for Kyoto' })
+      .getByRole('button', { name: 'Sunflower' })
+      .click();
+
+    await page.getByTestId('close-editor').click();
+    await page.getByTestId('go-to-date').fill('2026-09-03');
+    await page
+      .getByRole('radiogroup', { name: 'Calendar view' })
+      .getByText('Month', { exact: true })
+      .click();
+
+    const cityRibbon = page.getByText('Kyoto', { exact: true }).first();
+    await expect(cityRibbon).toHaveCSS('background-color', 'rgb(250, 204, 21)');
+    await expect(cityRibbon).toHaveCSS('color', 'rgb(17, 24, 39)');
+
+    const event = page.getByText('Night train', { exact: true });
+    await expect(event.locator('..')).toHaveCSS('background-color', 'rgb(30, 58, 138)');
+    await expect(event).toHaveCSS('color', 'rgb(255, 255, 255)');
+  });
+});
+
 test.describe('what a viewer can do', () => {
   async function shareAsViewer(page: Page, tripId: string) {
     return page.evaluate(async (id) => {

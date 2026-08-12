@@ -1,5 +1,5 @@
 import type { TripEvent } from '@trip/crdt';
-import { Button, cn } from '@trip/ui';
+import { Button, cn, coloredSurfaceStyle } from '@trip/ui';
 import { Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { EventKindIcon } from './EventKind';
@@ -154,6 +154,7 @@ export function MergePreview({
           {all.map((event) => (
             <label
               key={event.id}
+              style={coloredSurfaceStyle(event.color)}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sunken"
             >
               <input

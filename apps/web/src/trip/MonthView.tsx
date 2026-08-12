@@ -1,5 +1,5 @@
 import type { TripEvent } from '@trip/crdt';
-import { StatusSpine, cn } from '@trip/ui';
+import { StatusSpine, cn, coloredSurfaceStyle } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
 import type { DayKey } from '../lib/calendar';
 import { citySegments, eventsByDay, monthGrid, monthOf } from '../lib/calendar';
@@ -11,6 +11,7 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export interface MonthViewProps {
   anchor: DayKey;
   events: TripEvent[];
+  cityColors?: Record<string, string>;
   homeTimezone: string;
   weather: Map<DayKey, DailyWeather>;
   today: DayKey;
@@ -95,6 +96,7 @@ function DayCell({
 export function MonthView({
   anchor,
   events,
+  cityColors,
   homeTimezone,
   weather,
   today,
@@ -134,6 +136,9 @@ export function MonthView({
                 return (
                   <div
                     key={day}
+                    style={coloredSurfaceStyle(
+                      segment ? cityColors?.[segment.label] : undefined,
+                    )}
                     className={cn(
                       'truncate px-1.5 py-0.5 text-2xs font-medium',
                       segment ? 'bg-accent-soft text-accent-text' : 'bg-card',
@@ -213,7 +218,11 @@ export function MonthView({
                         {dayEvents.slice(0, 2).map((event) => (
                           <span
                             key={event.id}
-                            className="flex min-w-0 items-center gap-1 text-2xs text-ink"
+                            style={coloredSurfaceStyle(event.color)}
+                            className={cn(
+                              'flex min-w-0 items-center gap-1 text-2xs text-ink',
+                              event.color && 'rounded-sm px-1 py-0.5',
+                            )}
                           >
                             <StatusSpine status={event.booking.status} className="h-2.5 w-0.5" />
                             <EventKindIcon
