@@ -127,5 +127,7 @@ function apiProxy() {
     '/oauth': forward,
     '/mcp': forward,
     '/.well-known': forward,
+    // Signed download links, which an agent is handed and follows itself.
+    '/files': forward,
   };
 }

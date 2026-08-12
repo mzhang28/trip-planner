@@ -73,6 +73,11 @@ has a newer one. An agent that was given a secret has to present it; one without
 is held to PKCE instead. Removing an agent revokes its live tokens, so it stops
 working at once rather than when they expire.
 
+Attachments come back with the events they are on, and `list_files` gives the
+whole trip's. Each carries a signed link at `/files/<hash>` that an agent can
+fetch on its own, since it holds no session and no bearer token to spend. A link
+covers one file, lasts a day, and is refused if anything about it is altered.
+
 Every change an agent makes is recorded with who authorised it and through which
 client, and the ones that replaced a value can be put back from the trip's audit
 list.

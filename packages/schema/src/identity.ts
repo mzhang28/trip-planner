@@ -33,6 +33,14 @@ export const instanceSettings = sqliteTable('instance_settings', {
   id: integer('id').primaryKey(),
   /** Null while anyone arriving may have an account. */
   registrationClosedAt: integer('registration_closed_at'),
+  /**
+   * Signs the download links handed to agents, which carry their own
+   * authorisation because whatever follows one holds no session.
+   *
+   * Kept rather than derived so links survive a restart, and here rather than
+   * in the environment so a deployment needs nothing configured to work.
+   */
+  fileLinkSecret: text('file_link_secret'),
 });
 
 /**

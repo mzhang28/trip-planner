@@ -11,11 +11,13 @@ import {
   updateEvent,
   type TripDoc,
   type TripEvent,
+  type TripFile,
 } from '@trip/crdt';
 import { auditLog, events, tripMembers, trips } from '@trip/schema';
 import { and, eq, like } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Services } from '../context';
+import { fileLink } from '../fileLinks';
 import { canEdit, token } from '../identity';
 import type { AccessContext } from '../routes/oauth';
 
@@ -63,7 +65,22 @@ function authorize(ctx: ToolContext, tripId: string, write: boolean) {
   return membership.role;
 }
 
-function summarise(event: TripEvent): Record<string, unknown> {
+/**
+ * A file as an agent can use it: what it is, and where to go and read it.
+ *
+ * The address is signed and absolute. Whatever follows it holds no session,
+ * so a path into `/api` would only ever answer it with a refusal.
+ */
+function describeFile(ctx: ToolContext, file: TripFile): Record<string, unknown> {
+  return {
+    filename: file.filename,
+    mime: file.mime,
+    size: file.size,
+    url: fileLink(ctx.services.db, file.blobHash, file.mime),
+  };
+}
+
+function summarise(ctx: ToolContext, event: TripEvent): Record<string, unknown> {
   const bookingStatus = normalizeBookingStatus(event.booking.status);
 
   return {
@@ -82,6 +99,7 @@ function summarise(event: TripEvent): Record<string, unknown> {
       status: bookingStatus === 'booked' ? 'confirmed' : 'flexible',
     },
     links: Object.values(event.links).map((link) => ({ url: link.url, title: link.title })),
+    files: Object.values(event.attachments).map((file) => describeFile(ctx, file)),
   };
 }
 
@@ -131,6 +149,11 @@ export const TOOL_DEFINITIONS = [
   { name: 'set_booking_status', description: 'Mark an event as flexible or confirmed.' },
   { name: 'add_link', description: 'Attach a web address to an event.' },
   { name: 'list_field_defs', description: "The trip's custom fields." },
+  {
+    name: 'list_files',
+    description:
+      "Files on a trip: tickets, confirmations, scans. Each carries a link you can fetch to read it.",
+  },
 ] as const;
 
 export const toolSchemas = {
@@ -169,6 +192,7 @@ export const toolSchemas = {
     title: z.string().optional(),
   }),
   list_field_defs: z.object({ tripId: z.string() }),
+  list_files: z.object({ tripId: z.string() }),
 } as const;
 
 export type ToolName = keyof typeof toolSchemas;
@@ -201,7 +225,7 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
         })
         .sort((x, y) => (x.startsAt ?? Infinity) - (y.startsAt ?? Infinity));
 
-      return { events: all.map(summarise) };
+      return { events: all.map((event) => summarise(ctx, event)) };
     }
 
     case 'get_event': {
@@ -212,7 +236,7 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       const event = doc?.events[a.eventId];
       if (!event || event.deletedAt !== undefined) throw new Error('No such event');
 
-      return { event: { ...summarise(event), customFields: event.customFields } };
+      return { event: { ...summarise(ctx, event), customFields: event.customFields } };
     }
 
     case 'search_events': {
@@ -367,6 +391,40 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
 
       const doc = docs.load(a.tripId) as TripDoc | null;
       return { fields: liveFieldDefs(doc ?? undefined) };
+    }
+
+    case 'list_files': {
+      const a = args as z.infer<typeof toolSchemas.list_files>;
+      authorize(ctx, a.tripId, false);
+
+      const doc = docs.load(a.tripId) as TripDoc | null;
+
+      /*
+       * The library and the attachments together, keyed by hash so a file on
+       * three events is one entry. A document made before the library existed
+       * has nothing in `files` and everything on its events, so reading only
+       * one of the two would show an older trip as having no files at all.
+       */
+      const found = new Map<string, { file: TripFile; onEvents: string[] }>();
+
+      for (const [hash, file] of Object.entries(doc?.files ?? {})) {
+        found.set(hash, { file, onEvents: [] });
+      }
+
+      for (const event of liveEvents(doc ?? undefined)) {
+        for (const attachment of Object.values(event.attachments)) {
+          const seen = found.get(attachment.blobHash);
+          if (seen) seen.onEvents.push(event.name);
+          else found.set(attachment.blobHash, { file: attachment, onEvents: [event.name] });
+        }
+      }
+
+      return {
+        files: [...found.values()].map(({ file, onEvents }) => ({
+          ...describeFile(ctx, file),
+          onEvents,
+        })),
+      };
     }
   }
 }

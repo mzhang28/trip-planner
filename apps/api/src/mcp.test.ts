@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
+import * as A from '@automerge/automerge';
+import { addAttachment } from '@trip/crdt';
 import { auditLog, users } from '@trip/schema';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
@@ -67,11 +69,15 @@ async function rpc(app: App, accessToken: string, method: string, params?: unkno
 describe('the remote MCP server', () => {
   let app: App;
   let db: Db;
+  let docs: DocStore;
+  let blobs: FsBlobStore;
 
   beforeEach(() => {
     ({ db } = createDb(':memory:'));
     runMigrations(db, resolve(import.meta.dirname, '../drizzle'));
-    app = createApp({ db, docs: new DocStore(db), blobs: new FsBlobStore('/tmp/trip-mcp-blobs') });
+    docs = new DocStore(db);
+    blobs = new FsBlobStore('/tmp/trip-mcp-blobs');
+    app = createApp({ db, docs, blobs });
   });
 
   /** Registers, consents, and exchanges a code — the whole flow a client runs. */
@@ -258,6 +264,108 @@ describe('the remote MCP server', () => {
     // Only the touched field is captured, so undoing this cannot revert
     // something somebody else changed in the meantime.
     expect(before).toEqual({ city: 'Kyoto' });
+  });
+
+  it('lists a trip\'s files, and the link it hands back fetches the bytes', async () => {
+    const { accessToken, tripId } = await connect();
+
+    // A file the way the app stores one: bytes under their own hash, and an
+    // attachment on an event pointing at it.
+    const bytes = new TextEncoder().encode('BOOKING REF: ABC123');
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    await blobs.put(hash, bytes, 'application/pdf');
+
+    const created = await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Hotel Granvia' },
+    });
+    const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
+
+    const before = docs.load(tripId)!;
+    const after = addAttachment(
+      before,
+      eventId,
+      'a_1',
+      { blobHash: hash, filename: 'confirmation.pdf', mime: 'application/pdf', size: bytes.length, addedAt: Date.now() },
+      { userId: 'u1', now: Date.now() },
+    );
+    docs.commit(tripId, after, A.getChanges(before, after), 'u1');
+
+    const listed = await rpc(app, accessToken, 'tools/call', {
+      name: 'list_files',
+      arguments: { tripId },
+    });
+    const { files } = JSON.parse(listed.body.result.content[0].text) as {
+      files: { filename: string; mime: string; size: number; url: string; onEvents: string[] }[];
+    };
+
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatchObject({
+      filename: 'confirmation.pdf',
+      mime: 'application/pdf',
+      onEvents: ['Hotel Granvia'],
+    });
+
+    /*
+     * Followed with no session and no bearer token, which is all an agent has.
+     * A link that only worked for a browser already signed in would be no use
+     * to the one thing being handed it.
+     */
+    const url = new URL(files[0]!.url);
+    const fetched = await app.request(url.pathname + url.search);
+
+    expect(fetched.status).toBe(200);
+    expect(await fetched.text()).toBe('BOOKING REF: ABC123');
+  });
+
+  it('puts a file on the event it is attached to', async () => {
+    const { accessToken, tripId } = await connect();
+
+    const bytes = new TextEncoder().encode('ticket');
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    await blobs.put(hash, bytes, 'application/pdf');
+
+    const created = await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Shinkansen' },
+    });
+    const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
+
+    const before = docs.load(tripId)!;
+    const after = addAttachment(
+      before,
+      eventId,
+      'a_1',
+      { blobHash: hash, filename: 'ticket.pdf', mime: 'application/pdf', size: bytes.length, addedAt: Date.now() },
+      { userId: 'u1', now: Date.now() },
+    );
+    docs.commit(tripId, after, A.getChanges(before, after), 'u1');
+
+    const got = await rpc(app, accessToken, 'tools/call', {
+      name: 'get_event',
+      arguments: { tripId, eventId },
+    });
+
+    const { event } = JSON.parse(got.body.result.content[0].text) as {
+      event: { files: { filename: string }[] };
+    };
+    expect(event.files.map((f) => f.filename)).toEqual(['ticket.pdf']);
+  });
+
+  it('refuses a download link that was tampered with or has run out', async () => {
+    const bytes = new TextEncoder().encode('secret');
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    await blobs.put(hash, bytes, 'text/plain');
+
+    // No signature at all, a made-up one, and one whose time has passed.
+    for (const query of [
+      '',
+      `?expires=${Date.now() + 60_000}&sig=not-a-real-signature`,
+      `?expires=${Date.now() - 1}&sig=whatever`,
+    ]) {
+      const res = await app.request(`/files/${hash}${query}`);
+      expect(res.status, query || '(no signature)').toBe(403);
+    }
   });
 
   it('serves the itinerary as markdown', async () => {

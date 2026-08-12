@@ -171,8 +171,9 @@ function settings(db: Db) {
   const closedAt = earliest ? Date.now() : null;
   if (earliest) db.update(users).set({ adminSince: closedAt }).where(eq(users.id, earliest.id)).run();
 
-  db.insert(instanceSettings).values({ id: 1, registrationClosedAt: closedAt }).run();
-  return { id: 1, registrationClosedAt: closedAt };
+  const row = { id: 1, registrationClosedAt: closedAt, fileLinkSecret: null };
+  db.insert(instanceSettings).values(row).run();
+  return row;
 }
 
 /** Whether somebody arriving with no session may have an account made for them. */
@@ -194,6 +195,17 @@ export function openRegistration(db: Db): void {
     .set({ registrationClosedAt: null })
     .where(eq(instanceSettings.id, 1))
     .run();
+}
+
+/** The key that signs download links, made the first time one is needed. */
+export function fileLinkSecret(db: Db): string {
+  const existing = settings(db).fileLinkSecret;
+  if (existing) return existing;
+
+  const secret = token();
+  db.update(instanceSettings).set({ fileLinkSecret: secret }).where(eq(instanceSettings.id, 1)).run();
+
+  return secret;
 }
 
 export function isAdmin(db: Db, userId: string): boolean {

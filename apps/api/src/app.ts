@@ -15,6 +15,7 @@ import { archiveRoutes } from './routes/archive';
 import { auditRoutes } from './routes/audit';
 import { blobRoutes } from './routes/blobs';
 import { clientRoutes } from './routes/clients';
+import { fileRoutes } from './routes/files';
 import { mcpRoutes } from './routes/mcp';
 import { metadataRoutes, oauthRoutes } from './routes/oauth';
 import { placeRoutes, weatherRoutes } from './routes/places';
@@ -73,6 +74,11 @@ export function createApp(services: Services) {
   // stays outside the middleware that mints a person for anyone who asks.
   app.use('/mcp', withServices(services));
   app.route('/mcp', mcpRoutes());
+
+  // A signed file link carries its own permission, so this stays clear of the
+  // middleware that insists on a person. Nothing following one has a session.
+  app.use('/files/*', withServices(services));
+  app.route('/files', fileRoutes());
 
   app.use('/api/*', withServices(services), withIdentity);
 
@@ -188,7 +194,7 @@ export function createApp(services: Services) {
 }
 
 /** The paths this server answers, which the client must not be given for. */
-const SERVER_PATHS = /^\/(api|oauth|mcp|\.well-known)(\/|$)/;
+const SERVER_PATHS = /^\/(api|oauth|mcp|files|\.well-known)(\/|$)/;
 
 /**
  * Serves the built client beside the API, on one origin.

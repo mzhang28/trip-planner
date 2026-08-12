@@ -1,0 +1,1 @@
+ALTER TABLE `instance_settings` ADD `file_link_secret` text;
