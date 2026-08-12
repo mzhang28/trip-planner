@@ -793,6 +793,48 @@ test.describe('a flight', () => {
 });
 
 test.describe('the map and the forecast', () => {
+  test('coordinates copied from Google Maps can pin a hand-written place', async ({ page }) => {
+    await page.route('**/api/places/search*', (route) =>
+      route.fulfill({ json: { places: [] } }),
+    );
+
+    await page.goto('/');
+    await newTrip(page);
+    await addNewEvent(page, 'Byodo-in');
+    await eventRow(page, 'Byodo-in').click();
+    await reveal(page, 'place');
+
+    const place = page.getByRole('combobox', { name: 'Place' });
+    await place.fill('Byodo-in Temple');
+    await page.getByRole('button', { name: 'Add coordinates' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Coordinates' });
+    const coordinates = dialog.getByRole('textbox', { name: 'Latitude, longitude' });
+
+    await coordinates.fill('91, 135.80448560871287');
+    await dialog.getByRole('button', { name: 'Save coordinates' }).click();
+    await expect(dialog.getByText('Latitude must be between -90 and 90.')).toBeVisible();
+
+    await coordinates.fill('34.891549790773766, 135.80448560871287');
+    await dialog.getByRole('button', { name: 'Save coordinates' }).click();
+
+    await expect(
+      page.getByRole('button', {
+        name: 'Coordinates: 34.891549790773766, 135.80448560871287',
+      }),
+    ).toBeVisible();
+    await expect(page.getByText('Pinned at 34.8915, 135.8045')).toBeVisible();
+
+    // The pair is part of the event, not state held only by the popover.
+    await page.getByTestId('close-editor').click();
+    await eventRow(page, 'Byodo-in').click();
+    await expect(
+      page.getByRole('button', {
+        name: 'Coordinates: 34.891549790773766, 135.80448560871287',
+      }),
+    ).toBeVisible();
+  });
+
   test('moving a pinned place moves its pin', async ({ page }) => {
     /*
      * The geocoder is stubbed. What is being tested is what the map does with

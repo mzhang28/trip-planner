@@ -1,6 +1,7 @@
 import type { Place } from '@trip/crdt';
 import { cn } from '@trip/ui';
 import { useEffect, useId, useRef, useState } from 'react';
+import { CoordinatesPicker } from './CoordinatesPicker';
 
 interface PlaceResult {
   label: string;
@@ -129,7 +130,7 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
     onChange(text ? { label: text } : undefined);
   }
 
-  const pinned = value?.lat !== undefined;
+  const pinned = value?.lat !== undefined && value.lng !== undefined;
   const edited = query.trim() !== (value?.label ?? '');
   const showing = open && lookup.state !== 'idle';
 
@@ -149,49 +150,70 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
           Place
         </label>
 
-        <input
-          id={id}
-          type="text"
-          role="combobox"
-          value={query}
-          placeholder="Fushimi Inari Taisha"
-          aria-expanded={showing}
-          aria-controls={showing ? `${id}-list` : undefined}
-          aria-activedescendant={
-            showing && places.length > 0 ? `${id}-option-${active}` : undefined
-          }
-          aria-autocomplete="list"
-          aria-describedby={`${id}-hint`}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            stayOpen();
-          }}
-          onFocus={stayOpen}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') {
-              e.preventDefault();
-              stayOpen();
-              setActive((current) => Math.min(current + 1, places.length - 1));
-            } else if (e.key === 'ArrowUp') {
-              e.preventDefault();
-              setActive((current) => Math.max(current - 1, 0));
-            } else if (e.key === 'Enter' && showing && places.length > 0) {
-              e.preventDefault();
-              choose(places[active]);
-            } else if (e.key === 'Escape') {
-              setOpen(false);
-            }
-          }}
-          onBlur={() => {
-            closing.current = setTimeout(() => setOpen(false), 150);
-            commitTypedText();
-          }}
+        <div
           className={cn(
-            'h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-ink',
-            'placeholder:text-ink-placeholder',
-            'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+            'flex h-9 items-center rounded-md border border-line-input bg-card pr-1 pl-2.5',
+            'focus-within:border-accent focus-within:outline-focus focus-within:outline-2 focus-within:-outline-offset-1',
           )}
-        />
+        >
+          <input
+            id={id}
+            type="text"
+            role="combobox"
+            value={query}
+            placeholder="Fushimi Inari Taisha"
+            aria-expanded={showing}
+            aria-controls={showing ? `${id}-list` : undefined}
+            aria-activedescendant={
+              showing && places.length > 0 ? `${id}-option-${active}` : undefined
+            }
+            aria-autocomplete="list"
+            aria-describedby={`${id}-hint`}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              stayOpen();
+            }}
+            onFocus={stayOpen}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                stayOpen();
+                setActive((current) => Math.min(current + 1, places.length - 1));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActive((current) => Math.max(current - 1, 0));
+              } else if (e.key === 'Enter' && showing && places.length > 0) {
+                e.preventDefault();
+                choose(places[active]);
+              } else if (e.key === 'Escape') {
+                setOpen(false);
+              }
+            }}
+            onBlur={() => {
+              closing.current = setTimeout(() => setOpen(false), 150);
+              commitTypedText();
+            }}
+            className="h-full min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-placeholder"
+          />
+
+          <CoordinatesPicker
+            lat={value?.lat}
+            lng={value?.lng}
+            onChange={(lat, lng) =>
+              onChange({
+                ...value,
+                label: query.trim() || value?.label || `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+                lat,
+                lng,
+              })
+            }
+            onClear={() => {
+              if (!value) return;
+              const { lat: _lat, lng: _lng, ...withoutCoordinates } = value;
+              onChange(withoutCoordinates);
+            }}
+          />
+        </div>
 
         <span id={`${id}-hint`} className="text-2xs text-ink-muted">
           {/*
