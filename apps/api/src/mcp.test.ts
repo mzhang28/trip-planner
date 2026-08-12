@@ -274,6 +274,73 @@ describe('the remote MCP server', () => {
     expect(read.body.result.contents[0].text).toContain('# Japan, April');
     expect(read.body.result.contents[0].text).toContain('Fushimi Inari');
   });
+
+  it('writes itinerary times in the zone they happen in, on the local day', async () => {
+    const { accessToken, tripId } = await connect();
+
+    /*
+     * One in the morning in Tokyo on the 15th is four in the afternoon UTC on
+     * the 14th. Read as UTC it lands under the wrong heading at the wrong hour,
+     * which is the whole of what this checks.
+     */
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Night bus', startsAt: '2026-08-15T01:00:00+09:00' },
+    });
+
+    const read = await rpc(app, accessToken, 'resources/read', {
+      uri: `trip://${tripId}/itinerary`,
+    });
+    const text = read.body.result.contents[0].text as string;
+
+    expect(text).toContain('## 2026-08-15');
+    expect(text).toContain('**2026-08-15T01:00:00+09:00** Night bus');
+    expect(text).not.toContain('## 2026-08-14');
+  });
+
+  it('files an event under its own zone rather than the trip home one', async () => {
+    const { accessToken, tripId } = await connect();
+
+    // The trip is planned from Tokyo, but this leg happens in Lisbon.
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: {
+        tripId,
+        name: 'Tram 28',
+        startsAt: '2026-08-14T09:00:00+01:00',
+        timezone: 'Europe/Lisbon',
+      },
+    });
+
+    const read = await rpc(app, accessToken, 'resources/read', {
+      uri: `trip://${tripId}/itinerary`,
+    });
+
+    expect(read.body.result.contents[0].text).toContain('**2026-08-14T09:00:00+01:00** Tram 28');
+  });
+
+  it('still names the moment when an event carries a zone no calendar knows', async () => {
+    const { accessToken, tripId } = await connect();
+
+    const created = await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Somewhere', startsAt: '2026-08-14T09:00:00Z' },
+    });
+    const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
+
+    // Nothing validates a zone on the way in, and a resource that throws is
+    // worse than one that falls back to naming the instant in UTC.
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'update_event',
+      arguments: { tripId, eventId, timezone: 'Mars/Olympus_Mons' },
+    });
+
+    const read = await rpc(app, accessToken, 'resources/read', {
+      uri: `trip://${tripId}/itinerary`,
+    });
+
+    expect(read.body.result.contents[0].text).toContain('**2026-08-14T09:00:00+00:00** Somewhere');
+  });
 });
 
 describe('the OAuth server', () => {

@@ -371,15 +371,61 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
   }
 }
 
-/** The trip as markdown, which is what an agent is usually asked to produce. */
-export function renderItinerary(doc: TripDoc, tripName: string): string {
+/**
+ * An instant written in the zone it happens in, as ISO 8601 with the offset.
+ *
+ * The offset is carried rather than implied. `2026-08-14T19:00:00+09:00` says
+ * both the wall clock the traveller reads and the moment it names, and it is
+ * the same form the tools above accept, so what a model reads here it can hand
+ * straight back without converting anything.
+ */
+function isoInZone(at: number, timeZone: string): string {
+  let parts: Intl.DateTimeFormatPart[];
+
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'longOffset',
+    }).formatToParts(at);
+  } catch {
+    // Nothing validates the zone on the way in, so an event can carry a name
+    // no calendar knows. UTC at least names the right moment.
+    return new Date(at).toISOString().replace(/\.\d+Z$/, '+00:00');
+  }
+
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  // "GMT+09:00" for a zone with an offset, and a bare "GMT" at zero.
+  const offset = value('timeZoneName').replace('GMT', '') || '+00:00';
+
+  return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}:${value('second')}${offset}`;
+}
+
+/**
+ * The trip as markdown, which is what an agent is usually asked to produce.
+ *
+ * Days are the ones the traveller is living through, so an event is filed under
+ * its own zone rather than under UTC. A dinner at seven in Tokyo belongs to that
+ * evening; read in UTC it moves to ten in the morning and, often enough, to the
+ * day before.
+ */
+export function renderItinerary(doc: TripDoc, tripName: string, homeTimezone: string): string {
   const byDay = new Map<string, TripEvent[]>();
+  const zoneOf = (event: TripEvent) => event.timezone || homeTimezone;
 
   for (const event of liveEvents(doc)) {
     const day =
       event.startsAt === undefined
         ? 'Not scheduled'
-        : new Date(event.startsAt).toISOString().slice(0, 10);
+        : isoInZone(event.startsAt, zoneOf(event)).slice(0, 10);
 
     byDay.set(day, [...(byDay.get(day) ?? []), event]);
   }
@@ -391,8 +437,9 @@ export function renderItinerary(doc: TripDoc, tripName: string): string {
     for (const event of dayEvents.sort((a, b) => (a.startsAt ?? 0) - (b.startsAt ?? 0))) {
       const time =
         event.startsAt === undefined
-          ? '--:--'
-          : new Date(event.startsAt).toISOString().slice(11, 16);
+          ? 'No time yet'
+          : isoInZone(event.startsAt, zoneOf(event));
+
       const status = normalizeBookingStatus(event.booking.status);
       lines.push(`- **${time}** ${event.name} — ${BOOKING_STATUS_LABEL[status]}`);
       if (event.location?.label) lines.push(`  - ${event.location.label}`);

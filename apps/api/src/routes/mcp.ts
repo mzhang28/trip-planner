@@ -147,7 +147,7 @@ async function handle(
           {
             uri,
             mimeType: 'text/markdown',
-            text: renderItinerary(doc as never, trip.name),
+            text: renderItinerary(doc as never, trip.name, trip.homeTimezone),
           },
         ],
       });
