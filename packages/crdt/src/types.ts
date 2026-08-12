@@ -62,6 +62,15 @@ export interface EventTodo {
   addedAt: Instant;
 }
 
+/**
+ * The parts of a flight that are not already on the event.
+ *
+ * There are no times here. A flight departs at the event's `startsAt` and lands
+ * `durationMinutes` later, which is what the calendar, the editor, and the
+ * boarding-pass strip all read. Storing the two instants again would let a
+ * record disagree with itself, and the copy nothing keeps current is the one
+ * that ends up being read.
+ */
 export interface FlightDetails {
   airline?: string;
   number?: string;
@@ -71,9 +80,8 @@ export interface FlightDetails {
   /** City at each end. Airport selection fills these, and they remain editable. */
   fromCity?: string;
   toCity?: string;
-  departsAt?: Instant;
+  /** Zone of each airport, so a ticket's local clock survives a zone change. */
   departsTz?: string;
-  arrivesAt?: Instant;
   arrivesTz?: string;
   seat?: string;
   terminal?: string;

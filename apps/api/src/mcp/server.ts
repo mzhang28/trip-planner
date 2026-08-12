@@ -9,6 +9,7 @@ import {
   liveFieldDefs,
   normalizeBookingStatus,
   updateEvent,
+  type FlightDetails,
   type TripDoc,
   type TripEvent,
   type TripFile,
@@ -36,6 +37,28 @@ const instant = z.union([z.number().int(), z.string()]).transform((value, ctx) =
     return z.NEVER;
   }
   return parsed;
+});
+
+/**
+ * A flight's own fields, all optional, none of them times.
+ *
+ * When it departs is the event's `startsAt` and how long it flies is
+ * `durationMinutes`, both of which this tool already sets. Accepting a
+ * `departsAt` here too would give a caller two ways to say the same thing and
+ * no way to be told which one the app reads.
+ */
+const flightPatch = z.object({
+  airline: z.string().optional(),
+  number: z.string().optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  fromCity: z.string().optional(),
+  toCity: z.string().optional(),
+  departsTz: z.string().optional(),
+  arrivesTz: z.string().optional(),
+  seat: z.string().optional(),
+  terminal: z.string().optional(),
+  gate: z.string().optional(),
 });
 
 export interface ToolContext {
@@ -80,6 +103,31 @@ function describeFile(ctx: ToolContext, file: TripFile): Record<string, unknown>
   };
 }
 
+/**
+ * The flight's own fields, named one by one.
+ *
+ * A document written before flights lost their `departsAt` and `arrivesAt` still
+ * carries those keys, and nothing has kept them current since. Returning the
+ * stored object whole handed a reader two arrival times that disagreed, and the
+ * wrong one looked every bit as authoritative as the right one. Naming the
+ * fields means an old key cannot travel back out of here.
+ */
+function describeFlight(flight: FlightDetails): Record<string, unknown> {
+  return {
+    airline: flight.airline,
+    number: flight.number,
+    from: flight.from,
+    to: flight.to,
+    fromCity: flight.fromCity,
+    toCity: flight.toCity,
+    departsTz: flight.departsTz,
+    arrivesTz: flight.arrivesTz,
+    seat: flight.seat,
+    terminal: flight.terminal,
+    gate: flight.gate,
+  };
+}
+
 function summarise(ctx: ToolContext, event: TripEvent): Record<string, unknown> {
   const bookingStatus = normalizeBookingStatus(event.booking.status);
 
@@ -90,9 +138,19 @@ function summarise(ctx: ToolContext, event: TripEvent): Record<string, unknown> 
     city: event.city,
     place: event.location?.label,
     startsAt: event.startsAt,
+    /*
+     * Worked out here rather than left to the reader. It is the same sum the
+     * calendar draws with -- a flight lands at it, a stay is given up at it --
+     * and stating it costs one field, where leaving it out invites arithmetic
+     * across a date line by anyone who wants to know when the event is over.
+     */
+    endsAt:
+      event.startsAt === undefined || event.durationMinutes === undefined
+        ? undefined
+        : event.startsAt + event.durationMinutes * 60_000,
     timezone: event.timezone,
     durationMinutes: event.durationMinutes,
-    flight: event.flight,
+    flight: event.flight && describeFlight(event.flight),
     transit: event.transit,
     booking: {
       ...event.booking,
@@ -144,7 +202,11 @@ export const TOOL_DEFINITIONS = [
   { name: 'get_event', description: 'Everything about one event.' },
   { name: 'search_events', description: 'Find events by any of their text, including custom fields.' },
   { name: 'create_event', description: 'Add an event. Only a name is required.' },
-  { name: 'update_event', description: 'Change fields on an event.' },
+  {
+    name: 'update_event',
+    description:
+      'Change fields on an event. A flight leaves at startsAt and lands durationMinutes later; its airline, number, airports, and zones go under flight.',
+  },
   { name: 'delete_event', description: 'Remove an event.' },
   { name: 'set_booking_status', description: 'Mark an event as flexible or confirmed.' },
   { name: 'add_link', description: 'Attach a web address to an event.' },
@@ -177,6 +239,7 @@ export const toolSchemas = {
     startsAt: instant.optional(),
     timezone: z.string().optional(),
     durationMinutes: z.number().int().positive().optional(),
+    flight: flightPatch.optional(),
   }),
   delete_event: z.object({ tripId: z.string(), eventId: z.string() }),
   set_booking_status: z.object({
@@ -302,6 +365,19 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       const patch: Record<string, unknown> = {};
       for (const key of ['name', 'city', 'startsAt', 'timezone', 'durationMinutes'] as const) {
         if (a[key] !== undefined) patch[key] = a[key];
+      }
+
+      /*
+       * Merged onto the flight already there, because a patch key is written
+       * whole: sending `{ flight: { seat: '12A' } }` by itself would take the
+       * airline and the number down with it.
+       *
+       * Only the fields `describeFlight` names survive the merge, so a document
+       * still carrying the retired `departsAt` is rid of it the first time
+       * anything touches its flight.
+       */
+      if (a.flight !== undefined) {
+        patch.flight = { ...describeFlight(existing.flight ?? {}), ...a.flight };
       }
 
       if (Object.keys(patch).length === 0) return { ok: true, changed: 0 };
