@@ -1,5 +1,4 @@
 import type {
-  BookingStatus,
   CustomValue,
   EventAttachment,
   FieldDef,
@@ -7,7 +6,6 @@ import type {
   TripDoc,
   TripEvent,
 } from '@trip/crdt';
-import { BOOKING_STATUSES } from '@trip/crdt';
 import { Button, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
@@ -22,15 +20,10 @@ import { CheckedField } from './CheckedField';
 import { TimeField } from './TimeField';
 import { Attachments } from './Attachments';
 import { DescriptionEditor } from './DescriptionEditor';
-import { EVENT_KIND_OPTIONS, EventKindIcon } from './EventKind';
+import { EventKindIcon } from './EventKind';
 import { FieldPalette, type PaletteChip } from './FieldPalette';
 import { FlightFields } from './FlightFields';
 import { PlacePicker } from './PlacePicker';
-
-const STATUS_OPTIONS = BOOKING_STATUSES.map((status) => ({
-  value: status,
-  label: { idea: 'Idea', in_progress: 'Holding', booked: 'Booked' }[status],
-}));
 
 const TRANSIT_MODES = [
   { value: 'walk', label: 'Walk' },
@@ -117,24 +110,6 @@ export function EventEditor({
 
   const sections = useMemo<Section[]>(() => {
     const list: Section[] = [
-      {
-        key: 'kind',
-        label: 'Kind',
-        // Kind belongs to every event, including the default kind. It is not
-        // optional metadata that should disappear behind the field palette.
-        filled: true,
-        render: () => (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-ink-secondary">Kind</span>
-            <SegmentedControl
-              label="What this is"
-              options={EVENT_KIND_OPTIONS}
-              value={event.kind}
-              onChange={(kind) => onPatch({ kind })}
-            />
-          </div>
-        ),
-      },
       {
         key: 'when',
         label: 'Date',
@@ -278,24 +253,6 @@ export function EventEditor({
         filled: event.location !== undefined,
         render: () => (
           <PlacePicker value={event.location} onChange={(location) => onPatch({ location })} />
-        ),
-      },
-      {
-        key: 'booking',
-        label: 'Booking',
-        filled: event.booking.status !== 'idea',
-        render: () => (
-          <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-ink-secondary">Booking</span>
-            <SegmentedControl
-              label="Booking status"
-              options={STATUS_OPTIONS}
-              value={event.booking.status}
-              onChange={(status: BookingStatus) =>
-                onPatch({ booking: { ...event.booking, status } })
-              }
-            />
-          </div>
         ),
       },
       {
@@ -684,32 +641,6 @@ export function EventEditor({
       data-testid="event-editor"
       className="flex flex-col gap-5 border-t border-line px-3 py-4"
     >
-      <CheckedField
-        label="Name"
-        value={event.name}
-        placeholder="What is it?"
-        /*
-         * An event made by picking a day on the calendar has no name yet, and
-         * naming it is the only thing left to do -- so the cursor is already
-         * there rather than one click away.
-         */
-        autoFocus={event.name === ''}
-        onCommit={(raw) => {
-          /*
-           * Emptying a name was refused without a word, and the old name came
-           * back when the editor closed. An event that has never been named is
-           * a different thing -- the calendar makes those on purpose -- so
-           * nothing is said about one of those.
-           */
-          if (raw === '' && event.name !== '') {
-            return 'An event needs a name. Delete it below if you no longer want it.';
-          }
-
-          if (raw !== event.name) onPatch({ name: raw });
-          return null;
-        }}
-      />
-
       {shown.map((section) => (
         <div key={section.key} data-testid={`field-${section.key}`}>
           {section.render()}

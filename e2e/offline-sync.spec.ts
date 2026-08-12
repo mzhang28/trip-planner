@@ -144,10 +144,10 @@ test.describe('offline editing', () => {
     await page.getByRole('textbox', { name: 'Time' }).blur();
 
     await eventRow(otherPage, 'Fushimi Inari').click();
-    await revealField(otherPage, 'booking');
+    await otherPage.getByTestId('booking-status-button').click();
     await otherPage
-      .getByRole('radiogroup', { name: 'Booking status' })
-      .getByText('Booked', { exact: true })
+      .getByRole('dialog', { name: 'Booking status' })
+      .getByRole('button', { name: 'Booked and ready' })
       .click();
 
     await page.context().setOffline(false);
@@ -299,7 +299,7 @@ test.describe('moving events', () => {
     await page.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
     await page.getByRole('textbox', { name: 'Time' }).fill('09:00');
     await page.getByRole('textbox', { name: 'Time' }).blur();
-    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+    await page.getByTestId('close-editor').click();
     await expectSaved(page);
 
     const before = await page.locator('main section h2').first().textContent();

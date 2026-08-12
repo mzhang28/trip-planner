@@ -73,7 +73,7 @@ async function addEvent(page: Page, name: string, city: string, time: string, da
 
   // Close whichever card is open. The event has moved to another day by now,
   // so it is not necessarily the one that was clicked to open it.
-  await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+  await page.getByTestId('close-editor').click();
   await expect(page.getByTestId('event-editor')).toHaveCount(0);
 }
 
@@ -254,8 +254,8 @@ test.describe('flights and the map', () => {
     await eventRow(page, 'Flight to Osaka').click();
 
     const editor = page.getByTestId('event-editor');
-    await revealField(page, 'kind');
-    await editor.getByRole('radiogroup', { name: 'What this is' }).getByText('Flight').click();
+    await page.getByTestId('event-kind-button').click();
+    await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Flight' }).click();
     await expect(
       eventRow(page, 'Flight to Osaka').getByRole('img', { name: 'Flight' }),
     ).toBeVisible();
@@ -394,7 +394,7 @@ test.describe('getting between events', () => {
 
     await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).fill('45');
     await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).blur();
-    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+    await page.getByTestId('close-editor').click();
 
     const leg = page.getByTestId('transit-leg');
     await expect(leg).toContainText('45 min');
@@ -413,7 +413,7 @@ test.describe('getting between events', () => {
     await revealField(page, 'transit');
     await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).fill('20');
     await editor.getByTestId('field-transit').getByRole('textbox', { name: 'How long' }).blur();
-    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+    await page.getByTestId('close-editor').click();
 
     const leg = page.getByTestId('transit-leg');
     await expect(leg).toContainText('20 min');
@@ -475,13 +475,29 @@ test.describe('filling an event in gradually', () => {
 
     const editor = page.getByTestId('event-editor');
 
-    // Kind belongs to every entry rather than being optional metadata. The
-    // general-purpose default is called Event and is visible beside its name.
-    await expect(editor.getByRole('textbox', { name: 'Name' })).toBeVisible();
-    await expect(editor.getByTestId('field-kind')).toBeVisible();
-    await expect(
-      editor.getByRole('radiogroup', { name: 'What this is' }).getByRole('radio', { name: 'Event' }),
-    ).toBeChecked();
+    // Name and kind live in the compact header instead of being repeated as
+    // full-width editor fields.
+    await expect(page.getByTestId('event-name')).toHaveText('Fushimi Inari');
+    await expect(page.getByRole('textbox', { name: 'Name' })).toHaveCount(0);
+    await page.getByTestId('event-name').dblclick();
+    await expect(page.getByRole('textbox', { name: 'Name' })).toBeVisible();
+    await page.getByRole('textbox', { name: 'Name' }).press('Escape');
+    await expect(editor.getByTestId('field-kind')).toHaveCount(0);
+    await expect(page.getByTestId('event-kind-button')).toHaveAccessibleName(
+      'Change kind, currently Event',
+    );
+    await expect(editor.getByTestId('field-booking')).toHaveCount(0);
+    await expect(page.getByTestId('booking-status-button')).toHaveAccessibleName(
+      'Change booking status, currently Idea',
+    );
+    await page.getByTestId('booking-status-button').click();
+    await page
+      .getByRole('dialog', { name: 'Booking status' })
+      .getByRole('button', { name: 'In progress' })
+      .click();
+    await expect(page.getByTestId('booking-status-button')).toHaveAccessibleName(
+      'Change booking status, currently In progress',
+    );
     await expect(eventRow(page, 'Fushimi Inari').getByRole('img', { name: 'Event' })).toBeVisible();
     await expect(editor.getByTestId('field-city')).toHaveCount(0);
     await expect(editor.getByTestId('field-when')).toHaveCount(0);
@@ -541,7 +557,7 @@ test.describe('making an event from the calendar', () => {
     await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
     await expect(page.getByTestId('event-editor')).toBeVisible();
 
-    const name = page.getByTestId('event-editor').getByRole('textbox', { name: 'Name' });
+    const name = page.getByRole('textbox', { name: 'Name' });
     await expect(name).toBeFocused();
 
     await name.fill('Decided later');

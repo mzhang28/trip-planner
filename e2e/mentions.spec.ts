@@ -63,11 +63,12 @@ test.describe('pointing at the rest of the trip', () => {
 
     // Renaming what it points at renames the mention, because the id is the
     // reference and the label is only a copy.
-    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+    await page.getByTestId('close-editor').click();
     await eventRow(page, 'Nishiki Market').click();
-    await page.getByTestId('event-editor').getByRole('textbox', { name: 'Name' }).fill('Nishiki, morning');
-    await page.getByTestId('event-editor').getByRole('textbox', { name: 'Name' }).blur();
-    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+    await page.getByTestId('event-name').dblclick();
+    await page.getByRole('textbox', { name: 'Name' }).fill('Nishiki, morning');
+    await page.getByRole('textbox', { name: 'Name' }).blur();
+    await page.getByTestId('close-editor').click();
 
     await eventRow(page, 'Fushimi Inari').click();
     await expect(page.getByTestId('mention')).toHaveText('Nishiki, morning');
@@ -86,7 +87,7 @@ test.describe('pointing at the rest of the trip', () => {
     await description.press('Enter');
     await expect(page.getByTestId('mention')).toBeVisible();
 
-    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+    await page.getByTestId('close-editor').click();
     await eventRow(page, 'Nishiki Market').click();
     await page.getByTestId('event-editor').getByRole('button', { name: 'Delete event' }).click();
 
@@ -109,7 +110,7 @@ test.describe('pointing at the rest of the trip', () => {
     await expect(page.getByRole('option', { name: /Nishiki Market/ })).toBeVisible();
     await description.press('Enter');
     await description.blur();
-    await page.locator('[data-testid="event"][aria-expanded="true"]').click();
+    await page.getByTestId('close-editor').click();
 
     const search = page.getByRole('combobox', { name: 'Search this trip' }).first();
     await search.fill('Eat at Nishiki');
