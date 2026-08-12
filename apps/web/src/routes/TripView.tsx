@@ -754,7 +754,13 @@ export function TripView() {
         />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-hidden">
+        {/*
+          A column, so the tray of undated events and the calendar divide the
+          height between them. Stacked as blocks the calendar still asked for
+          all of it, and the tray pushed the bottom of the week -- where the
+          hotels are -- past the edge that clips.
+        */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           {/*
             Everything still waiting for a day. The week and the month are
@@ -765,7 +771,7 @@ export function TripView() {
           {view !== 'day' && undated.length > 0 && (
             <div
               data-testid="unscheduled-tray"
-              className="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-1.5"
+              className="mb-2 flex shrink-0 flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-1.5"
             >
               <span className="text-2xs text-ink-muted">
                 {undated.length} with no date yet
@@ -833,7 +839,7 @@ export function TripView() {
           )}
 
           {view === 'day' && (
-            <div className="flex h-full min-h-0 flex-col gap-4 lg:flex-row">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
               <div
                 ref={dayListRef}
                 data-testid="day-list-scroll"

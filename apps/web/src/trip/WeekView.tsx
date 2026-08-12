@@ -561,7 +561,7 @@ export function WeekView({
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col overflow-hidden"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
       role="group"
       aria-label="Week view"
       // A drag that ends outside the grid is abandoned rather than left armed.

@@ -116,7 +116,7 @@ export function MonthView({
   const citiesByDay = cityDaySegments(events, tripDays, homeTimezone);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="grid shrink-0 grid-cols-7 gap-px pb-1">
         {WEEKDAYS.map((label) => (
           <div key={label} className="px-1 text-2xs font-medium text-ink-muted">
