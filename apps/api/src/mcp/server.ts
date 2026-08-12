@@ -72,6 +72,8 @@ function summarise(event: TripEvent): Record<string, unknown> {
     startsAt: event.startsAt,
     timezone: event.timezone,
     durationMinutes: event.durationMinutes,
+    flight: event.flight,
+    transit: event.transit,
     booking: event.booking,
     links: Object.values(event.links).map((link) => ({ url: link.url, title: link.title })),
   };
@@ -133,7 +135,7 @@ export const toolSchemas = {
   create_event: z.object({
     tripId: z.string(),
     name: z.string().min(1),
-    kind: z.enum(['activity', 'lodging', 'flight', 'note']).optional(),
+    kind: z.enum(['activity', 'lodging', 'flight', 'transit', 'note']).optional(),
     city: z.string().optional(),
     startsAt: instant.optional(),
     timezone: z.string().optional(),

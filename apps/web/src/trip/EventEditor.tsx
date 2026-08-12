@@ -24,6 +24,7 @@ import { EventKindIcon } from './EventKind';
 import { FieldPalette, type PaletteChip } from './FieldPalette';
 import { FlightFields } from './FlightFields';
 import { PlacePicker } from './PlacePicker';
+import { TransitFields } from './TransitFields';
 
 const TRANSIT_MODES = [
   { value: 'walk', label: 'Walk' },
@@ -454,22 +455,21 @@ export function EventEditor({
       },
     ];
 
-    if (event.kind === 'flight' || event.kind === 'lodging') {
-      // These editors own their schedule. Showing the generic versions as
-      // well creates two controls for the same startsAt/duration values and
-      // lets them drift apart. A flight also owns both of its places; a stay
-      // keeps the ordinary Place field for its hotel.
+    if (event.kind === 'flight' || event.kind === 'lodging' || event.kind === 'transit') {
+      // A stay and flight own their schedule, so the generic controls would
+      // drift from them. Flights and transit also own both route endpoints;
+      // one generic City or Place field cannot describe those two places.
       const owned = new Set([
-        'when',
-        'duration',
-        ...(event.kind === 'flight' ? ['place'] : []),
+        ...(event.kind === 'transit' ? [] : ['when', 'duration']),
+        ...(event.kind === 'flight' ? ['city', 'place'] : []),
+        ...(event.kind === 'transit' ? ['city', 'place', 'transit'] : []),
       ]);
       for (let index = list.length - 1; index >= 0; index -= 1) {
         if (owned.has(list[index]!.key)) list.splice(index, 1);
       }
     }
 
-    // A stay and a flight carry their own things, and only ever those.
+    // A stay, flight, and transit event carry their own structured fields.
     if (event.kind === 'lodging') {
       list.push({
         key: 'lodging',
@@ -580,7 +580,25 @@ export function EventEditor({
           <FlightFields
             event={event}
             homeTimezone={homeTimezone}
+            cityColors={doc?.cityColors}
             onPatch={(patch) => onPatch(patch)}
+            onSetCityColor={onSetCityColor}
+          />
+        ),
+      });
+    }
+
+    if (event.kind === 'transit') {
+      list.push({
+        key: 'route',
+        label: 'Route',
+        filled: true,
+        render: () => (
+          <TransitFields
+            event={event}
+            cityColors={doc?.cityColors}
+            onPatch={(patch) => onPatch(patch)}
+            onSetCityColor={onSetCityColor}
           />
         ),
       });

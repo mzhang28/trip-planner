@@ -87,9 +87,13 @@ export function eventSearchText(
     event.flight?.number,
     event.flight?.from,
     event.flight?.to,
+    event.flight?.fromCity,
+    event.flight?.toCity,
     event.flight?.seat,
     event.flight?.terminal,
     event.flight?.gate,
+    event.transit?.fromCity,
+    event.transit?.toCity,
     event.lodging?.address,
   ];
 

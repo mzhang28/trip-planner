@@ -219,6 +219,65 @@ describe('city coverage within a day', () => {
       { label: 'Osaka', fromMinute: 0, toMinute: 24 * 60 },
     ]);
   });
+
+  it('uses both ends of transit to cover the journey and the time around it', () => {
+    const segments = cityDaySegments(
+      [
+        event({
+          kind: 'transit',
+          startsAt: at('2026-08-12', 9),
+          durationMinutes: 180,
+          transit: { mode: 'transit', fromCity: 'Kyoto', toCity: 'Osaka' },
+        }),
+        // This needs no duplicate city: the arrival carries through it and
+        // through the otherwise-empty time after it.
+        event({ startsAt: at('2026-08-13', 18) }),
+      ],
+      days,
+      TOKYO,
+    );
+
+    expect(segments.get('2026-08-11')).toEqual([
+      { label: 'Kyoto', fromMinute: 0, toMinute: 24 * 60 },
+    ]);
+    expect(segments.get('2026-08-12')).toEqual([
+      { label: 'Kyoto', fromMinute: 0, toMinute: 12 * 60 },
+      { label: 'Osaka', fromMinute: 12 * 60, toMinute: 24 * 60 },
+    ]);
+    expect(segments.get('2026-08-13')).toEqual([
+      { label: 'Osaka', fromMinute: 0, toMinute: 24 * 60 },
+    ]);
+  });
+
+  it('uses flight departure and arrival cities as separate boundaries', () => {
+    const departs = at('2026-08-12', 17);
+    const arrives = Date.parse('2026-08-12T21:00:00+01:00');
+    const segments = cityDaySegments(
+      [
+        event({
+          kind: 'flight',
+          startsAt: departs,
+          durationMinutes: (arrives - departs) / 60_000,
+          flight: {
+            fromCity: 'Tokyo',
+            toCity: 'London',
+            departsTz: TOKYO,
+            arrivesTz: 'Europe/London',
+          },
+        }),
+      ],
+      days,
+      TOKYO,
+    );
+
+    expect(segments.get('2026-08-12')).toEqual([
+      { label: 'Tokyo', fromMinute: 0, toMinute: 21 * 60 },
+      { label: 'London', fromMinute: 21 * 60, toMinute: 24 * 60 },
+    ]);
+    expect(segments.get('2026-08-13')).toEqual([
+      { label: 'London', fromMinute: 0, toMinute: 24 * 60 },
+    ]);
+  });
 });
 
 describe('lodging spans', () => {

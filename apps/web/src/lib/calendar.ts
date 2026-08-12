@@ -201,30 +201,108 @@ interface CityTransition {
   minute: number;
   label: string;
   startsAt: number;
+  /** A journey's origin also tells us where the otherwise-unknown lead-in was. */
+  carriesBackward?: boolean;
 }
 
-/** The event's wall-clock minute in the place where it happens. */
-function eventMinute(event: TripEvent, homeTimezone: string): number {
-  if (event.startsAt === undefined || event.timeUndecided) return 0;
-
+/** An instant's wall-clock minute in the place where that boundary happens. */
+function instantMinute(at: number, timeZone: string): number {
   const parts = new Intl.DateTimeFormat('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
-    timeZone: event.timezone ?? homeTimezone,
-  }).formatToParts(event.startsAt);
+    timeZone,
+  }).formatToParts(at);
   const part = (type: 'hour' | 'minute') =>
     Number(parts.find((candidate) => candidate.type === type)?.value ?? 0);
 
   return part('hour') * 60 + part('minute');
 }
 
+function cityTransition(
+  at: number,
+  timeZone: string,
+  label: string | undefined,
+  options: { timeUndecided?: boolean; carriesBackward?: boolean } = {},
+): CityTransition | null {
+  if (!label) return null;
+
+  return {
+    day: dayKey(at, timeZone),
+    minute: options.timeUndecided ? 0 : instantMinute(at, timeZone),
+    label,
+    startsAt: at,
+    carriesBackward: options.carriesBackward,
+  };
+}
+
+/**
+ * Every known change of city, including both ends of a journey.
+ *
+ * Ordinary events establish their own city at their start. A flight or transit
+ * event establishes its origin at departure and its destination at arrival.
+ */
+function cityTransitions(events: TripEvent[], homeTimezone: string): CityTransition[] {
+  const transitions: CityTransition[] = [];
+
+  for (const event of events) {
+    if (event.startsAt === undefined) continue;
+
+    const departureZone =
+      event.kind === 'flight'
+        ? event.flight?.departsTz ?? event.timezone ?? homeTimezone
+        : event.timezone ?? homeTimezone;
+    const fromCity =
+      event.kind === 'flight'
+        ? event.flight?.fromCity ?? event.city
+        : event.kind === 'transit'
+          ? event.transit?.fromCity ?? event.city
+          : event.city;
+    const toCity =
+      event.kind === 'flight'
+        ? event.flight?.toCity
+        : event.kind === 'transit'
+          ? event.transit?.toCity
+          : undefined;
+    const isJourney = event.kind === 'flight' || event.kind === 'transit';
+
+    const departure = cityTransition(event.startsAt, departureZone, fromCity, {
+      timeUndecided: event.timeUndecided,
+      carriesBackward: isJourney,
+    });
+    if (departure) transitions.push(departure);
+
+    // Without a known start time and length, choosing an arrival boundary
+    // would invent how much of the day belongs to either endpoint.
+    if (
+      !isJourney ||
+      !toCity ||
+      event.timeUndecided ||
+      event.durationMinutes === undefined ||
+      event.durationMinutes <= 0
+    ) {
+      continue;
+    }
+
+    const arrivesAt = event.startsAt + event.durationMinutes * 60_000;
+    const arrivalZone =
+      event.kind === 'flight' ? event.flight?.arrivesTz ?? departureZone : departureZone;
+    const arrival = cityTransition(arrivesAt, arrivalZone, toCity);
+    if (arrival) transitions.push(arrival);
+  }
+
+  return transitions.sort(
+    (a, b) => a.day.localeCompare(b.day) || a.minute - b.minute || a.startsAt - b.startsAt,
+  );
+}
+
 /**
  * The cities occupying each day, split at the exact time a new city begins.
  *
- * A named city carries through later days until another timed event names a
- * different one. On the first named day, the first city covers midnight up to
- * any later transition because there is no earlier known location to show.
+ * A named city carries through later events and the gaps between them. Journey
+ * origins also carry backward until the preceding known boundary, while their
+ * destinations take over at arrival. On the first named day, the first city
+ * covers midnight up to any later transition.
  */
 export function cityDaySegments(
   events: TripEvent[],
@@ -234,24 +312,17 @@ export function cityDaySegments(
   const result = new Map<DayKey, CityDaySegment[]>();
   if (days.length === 0) return result;
 
-  const transitions: CityTransition[] = events
-    .filter(
-      (event): event is TripEvent & { city: string; startsAt: number } =>
-        Boolean(event.city) && event.startsAt !== undefined,
-    )
-    .map((event) => ({
-      day: eventDay(event, homeTimezone)!,
-      minute: eventMinute(event, homeTimezone),
-      label: event.city,
-      startsAt: event.startsAt,
-    }))
-    .sort(
-      (a, b) =>
-        a.day.localeCompare(b.day) || a.minute - b.minute || a.startsAt - b.startsAt,
-    );
+  const transitions = cityTransitions(events, homeTimezone);
 
   let carried: string | null = null;
   let transitionIndex = 0;
+
+  if (
+    transitions[0]?.carriesBackward &&
+    transitions[0].day >= days[0]!
+  ) {
+    carried = transitions[0].label;
+  }
 
   while (
     transitionIndex < transitions.length &&

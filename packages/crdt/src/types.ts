@@ -10,7 +10,7 @@ export type UserId = string;
 /** Epoch milliseconds. Every instant in the document is one of these. */
 export type Instant = number;
 
-export type EventKind = 'activity' | 'lodging' | 'flight' | 'note';
+export type EventKind = 'activity' | 'lodging' | 'flight' | 'transit' | 'note';
 
 export type TransitMode = 'walk' | 'transit' | 'drive' | 'fly';
 
@@ -55,6 +55,9 @@ export interface FlightDetails {
   /** IATA codes. */
   from?: string;
   to?: string;
+  /** City at each end. Airport selection fills these, and they remain editable. */
+  fromCity?: string;
+  toCity?: string;
   departsAt?: Instant;
   departsTz?: string;
   arrivesAt?: Instant;
@@ -62,6 +65,13 @@ export interface FlightDetails {
   seat?: string;
   terminal?: string;
   gate?: string;
+}
+
+/** A journey that is an itinerary event in its own right. */
+export interface TransitDetails {
+  mode: TransitMode;
+  fromCity?: string;
+  toCity?: string;
 }
 
 export interface LodgingDetails {
@@ -162,6 +172,7 @@ export interface TripEvent {
   attachments: Record<AttachmentId, EventAttachment>;
   customFields: Record<FieldDefId, CustomValue>;
   flight?: FlightDetails;
+  transit?: TransitDetails;
   lodging?: LodgingDetails;
   /**
    * Set instead of removing the key, so a peer that was offline during the

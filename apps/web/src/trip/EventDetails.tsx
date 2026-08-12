@@ -6,6 +6,7 @@ import { formatTime } from '../lib/time';
 import { Description } from './DescriptionEditor';
 import { FlightSummary } from './FlightFields';
 import { describeTransit } from '../lib/transit';
+import { TransitSummary } from './TransitFields';
 
 export interface EventDetailsProps {
   event: TripEvent;
@@ -132,6 +133,12 @@ export function EventDetails({
       {event.kind === 'flight' && (
         <Row label="Flight">
           <FlightSummary event={event} homeTimezone={homeTimezone} />
+        </Row>
+      )}
+
+      {event.kind === 'transit' && (
+        <Row label="Route">
+          <TransitSummary event={event} />
         </Row>
       )}
 

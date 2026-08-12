@@ -5,6 +5,7 @@ import { Plane, PlaneLanding, PlaneTakeoff } from 'lucide-react';
 import { formatTime, setDay, setTimeOfDay, toDateInput } from '../lib/time';
 import { AirportPicker } from './AirportPicker';
 import { TimeField } from './TimeField';
+import { RouteCityField } from './TransitFields';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -46,7 +47,9 @@ function DayField({
 export interface FlightFieldsProps {
   event: TripEvent;
   homeTimezone: string;
+  cityColors?: Record<string, string>;
   onPatch: (patch: Partial<TripEvent>) => void;
+  onSetCityColor: (city: string, color: string | undefined) => void;
 }
 
 /**
@@ -56,7 +59,13 @@ export interface FlightFieldsProps {
  * Keeping one timeline is essential: calendar placement, transit checks, and
  * the boarding-pass summary must not be able to disagree about one flight.
  */
-export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps) {
+export function FlightFields({
+  event,
+  homeTimezone,
+  cityColors,
+  onPatch,
+  onSetCityColor,
+}: FlightFieldsProps) {
   // Why an arrival date was refused. The time field says its own piece; a date
   // control has nowhere to put a message.
   const [arrivalProblem, setArrivalProblem] = useState<string | null>(null);
@@ -234,12 +243,28 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
           <AirportPicker
             label="Leaving from"
             code={flight.from}
+            city={flight.fromCity}
             timezone={departsTz}
-            onChange={({ code, timezone }) => {
-              if (timezone) setDepartureZone(timezone, { from: code });
-              else patchFlight({ from: code });
+            onChange={({ code, timezone, city }) => {
+              const endpoint = { from: code, ...(city ? { fromCity: city } : {}) };
+              if (timezone) setDepartureZone(timezone, endpoint);
+              else patchFlight(endpoint);
             }}
           />
+
+          <div className="mt-3">
+            <RouteCityField
+              label="Departure city"
+              value={flight.fromCity ?? event.city}
+              color={cityColors?.[flight.fromCity ?? event.city ?? '']}
+              placeholder="Tokyo"
+              onChange={(fromCity) => patchFlight({ fromCity })}
+              onSetColor={(color) => {
+                const city = flight.fromCity ?? event.city;
+                if (city) onSetCityColor(city, color);
+              }}
+            />
+          </div>
 
           <div className="mt-3 grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-2">
             <DayField
@@ -280,12 +305,25 @@ export function FlightFields({ event, homeTimezone, onPatch }: FlightFieldsProps
           <AirportPicker
             label="Arriving at"
             code={flight.to}
+            city={flight.toCity}
             timezone={arrivesTz}
-            onChange={({ code, timezone }) => {
-              if (timezone) setArrivalZone(timezone, { to: code });
-              else patchFlight({ to: code });
+            onChange={({ code, timezone, city }) => {
+              const endpoint = { to: code, ...(city ? { toCity: city } : {}) };
+              if (timezone) setArrivalZone(timezone, endpoint);
+              else patchFlight(endpoint);
             }}
           />
+
+          <div className="mt-3">
+            <RouteCityField
+              label="Arrival city"
+              value={flight.toCity}
+              color={cityColors?.[flight.toCity ?? '']}
+              placeholder="London"
+              onChange={(toCity) => patchFlight({ toCity })}
+              onSetColor={(color) => flight.toCity && onSetCityColor(flight.toCity, color)}
+            />
+          </div>
 
           <div className="mt-3 grid grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] gap-2">
             <DayField
@@ -365,7 +403,7 @@ function moveWallClock(at: number, fromZone: string, toZone: string): number | n
  */
 export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeTimezone: string }) {
   const flight = event.flight;
-  if (!flight?.from && !flight?.to) return null;
+  if (!flight?.from && !flight?.to && !flight?.fromCity && !flight?.toCity) return null;
 
   const departsTz = flight.departsTz ?? event.timezone ?? homeTimezone;
   const arrivesTz = flight.arrivesTz ?? departsTz;
@@ -386,7 +424,12 @@ export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeT
       data-testid="flight-summary"
       className="tabular flex items-center gap-3 rounded-md border border-line bg-sunken px-3 py-2 text-xs"
     >
-      <span className="font-medium text-ink">{flight.from ?? '???'}</span>
+      <span className="flex min-w-0 flex-col">
+        <span className="font-medium text-ink">{flight.from ?? '???'}</span>
+        {(flight.fromCity ?? event.city) && (
+          <span className="truncate text-2xs text-ink-muted">{flight.fromCity ?? event.city}</span>
+        )}
+      </span>
       <span className="text-ink-muted">
         {departsAt ? formatTime(departsAt, departsTz) : '--:--'}
       </span>
@@ -397,7 +440,12 @@ export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeT
       <span className="text-ink-muted">
         {arrivesAt ? formatTime(arrivesAt, arrivesTz) : '--:--'}
       </span>
-      <span className="font-medium text-ink">{flight.to ?? '???'}</span>
+      <span className="flex min-w-0 flex-col text-right">
+        <span className="font-medium text-ink">{flight.to ?? '???'}</span>
+        {flight.toCity && (
+          <span className="truncate text-2xs text-ink-muted">{flight.toCity}</span>
+        )}
+      </span>
 
       {shift !== null && shift !== 0 && (
         <span className="text-2xs text-ink-muted">

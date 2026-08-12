@@ -382,6 +382,7 @@ test.describe('flights and the map', () => {
     await expect(
       editor.getByRole('button', { name: 'Departure time zone: Asia/Tokyo' }),
     ).toBeVisible();
+    await expect(editor.getByRole('textbox', { name: 'Departure city' })).toHaveValue('Tokyo');
 
     // The zone rests inside the time control as a short name. Its popover can
     // still find the full IANA zone from a familiar abbreviation.
@@ -400,6 +401,7 @@ test.describe('flights and the map', () => {
     await expect(
       editor.getByRole('button', { name: 'Arrival time zone: Europe/London' }),
     ).toBeVisible();
+    await expect(editor.getByRole('textbox', { name: 'Arrival city' })).toHaveValue('London');
     await editor.getByRole('textbox', { name: /Arrives/ }).fill('21:30');
     await editor.getByRole('textbox', { name: /Arrives/ }).blur();
 
@@ -415,6 +417,70 @@ test.describe('flights and the map', () => {
 
     // Tokyo is eight hours ahead of London, so the clocks go back.
     await expect(summary).toContainText(/clocks back 8h/);
+  });
+
+  test('transit endpoints determine the cities before departure and after arrival', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await newTrip(page, 'Kansai by train');
+    await setTripDates(page, '2026-08-10', '2026-08-16');
+
+    await addNewEvent(page, 'Kyoto to Osaka');
+    await eventRow(page, 'Kyoto to Osaka').click();
+    await page.getByTestId('event-kind-button').click();
+    await page
+      .getByRole('dialog', { name: 'Event kind' })
+      .getByRole('button', { name: 'Transit' })
+      .click();
+
+    let editor = page.getByTestId('event-editor');
+    await expect(eventRow(page, 'Kyoto to Osaka').getByRole('img', { name: 'Transit' })).toBeVisible();
+    await expect(editor.getByTestId('field-route')).toBeVisible();
+    await editor.getByRole('textbox', { name: 'Starting city' }).fill('Kyoto');
+    await editor.getByRole('textbox', { name: 'Starting city' }).blur();
+    await editor.getByRole('textbox', { name: 'Ending city' }).fill('Osaka');
+    await editor.getByRole('textbox', { name: 'Ending city' }).blur();
+
+    await revealField(page, 'when');
+    await editor.getByTestId('event-date').fill(ON);
+    editor = page.getByTestId('event-editor');
+    await editor.getByRole('textbox', { name: 'Time' }).fill('09:00');
+    await editor.getByRole('textbox', { name: 'Time' }).blur();
+    await revealField(page, 'duration');
+    await editor.getByRole('textbox', { name: 'How long' }).fill('180');
+    await editor.getByRole('textbox', { name: 'How long' }).blur();
+    await page.getByTestId('close-editor').click();
+
+    await switchTo(page, 'Week');
+    const weekTravelDay = page.locator('[data-week-city-day="2026-08-12"]');
+    await expect(
+      weekTravelDay.locator('[data-testid="week-city-band"][data-city="Kyoto"]'),
+    ).toHaveAttribute('data-to-minute', '720');
+    await expect(
+      weekTravelDay.locator('[data-testid="week-city-band"][data-city="Osaka"]'),
+    ).toHaveAttribute('data-from-minute', '720');
+
+    await switchTo(page, 'Month');
+
+    await expect(
+      page
+        .getByTestId('day-2026-08-11')
+        .locator('[data-testid="city-time-band"][data-city="Kyoto"]'),
+    ).toHaveCount(1);
+
+    const travelDay = page.getByTestId(`day-${ON}`);
+    await expect(
+      travelDay.locator('[data-testid="city-time-band"][data-city="Kyoto"]'),
+    ).toHaveAttribute('data-to-minute', '720');
+    await expect(
+      travelDay.locator('[data-testid="city-time-band"][data-city="Osaka"]'),
+    ).toHaveAttribute('data-from-minute', '720');
+    await expect(
+      page
+        .getByTestId('day-2026-08-13')
+        .locator('[data-testid="city-time-band"][data-city="Osaka"]'),
+    ).toHaveCount(1);
   });
 
   test('the map stays out of the way until something has a place', async ({ page }) => {

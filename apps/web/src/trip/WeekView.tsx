@@ -5,8 +5,9 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DayKey } from '../lib/calendar';
 import {
+  addDays,
   clampDay,
-  citySegments,
+  cityDaySegments,
   daysInRange,
   eventsByDay,
   lodgingSpans,
@@ -432,13 +433,13 @@ export function WeekView({
     onCreateAt(creating.day, name, creating.start, creating.end);
     setCreating(null);
   }
-  const byDay = eventsByDay(events, homeTimezone);
   const calendarByDay = eventsByDay(
     events.filter((event) => event.kind !== 'lodging'),
     homeTimezone,
   );
   const displayZone = useDisplayZone();
-  const cities = citySegments(byDay, days);
+  const citiesByDay = cityDaySegments(events, days, homeTimezone);
+  const hasCities = Array.from(citiesByDay.values()).some((bands) => bands.length > 0);
   const beds = lodgingSpans(events, homeTimezone).filter((span) => spanWithin(span, days));
 
   // Split off the ones on a day but not at an hour. They belong to the day and
@@ -466,27 +467,46 @@ export function WeekView({
         <div className="flex h-full w-max min-w-full flex-col">
           {/* City and date rows do not move when the timetable scrolls vertically. */}
           <div className="shrink-0">
-            {cities.length > 0 && (
+            {hasCities && (
               <div className="grid gap-px pb-1" style={{ gridTemplateColumns }}>
                 <div className="sticky left-0 z-20 bg-page" />
                 {days.map((day) => {
-                  const segment = cities.find((run) => day >= run.from && day <= run.to);
-                  const isStart = segment?.from === day;
+                  const bands = citiesByDay.get(day) ?? [];
+                  const previousCity = citiesByDay.get(addDays(day, -1))?.at(-1)?.label;
 
                   return (
                     <div
                       key={day}
-                      style={coloredSurfaceStyle(
-                        segment ? cityColors?.[segment.label] : undefined,
-                      )}
-                      className={cn(
-                        'truncate px-1 py-0.5 text-2xs font-medium',
-                        segment ? 'bg-accent-soft text-accent-text' : 'text-transparent',
-                        segment && day === segment.from && 'rounded-l-full',
-                        segment && day === segment.to && 'rounded-r-full',
-                      )}
+                      data-week-city-day={day}
+                      className="flex min-h-5 min-w-0 overflow-hidden rounded-sm text-2xs font-medium"
                     >
-                      {isStart ? segment.label : ' '}
+                      {bands.map((band) => {
+                        const namesThisBand =
+                          band.fromMinute > 0 || day === tripStart || previousCity !== band.label;
+
+                        return (
+                          <div
+                            key={`${band.label}:${band.fromMinute}`}
+                            data-testid="week-city-band"
+                            data-city={band.label}
+                            data-from-minute={band.fromMinute}
+                            data-to-minute={band.toMinute}
+                            style={{
+                              flexBasis: 0,
+                              flexGrow: band.toMinute - band.fromMinute,
+                              ...coloredSurfaceStyle(cityColors?.[band.label]),
+                            }}
+                            className={cn(
+                              'min-w-0 truncate px-1 py-0.5',
+                              cityColors?.[band.label]
+                                ? undefined
+                                : 'bg-accent-soft text-accent-text',
+                            )}
+                          >
+                            {namesThisBand ? band.label : '\u00a0'}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}

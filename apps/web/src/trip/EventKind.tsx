@@ -1,5 +1,12 @@
 import type { EventKind } from '@trip/crdt';
-import { BedDouble, CalendarDays, Plane, StickyNote, type LucideIcon } from 'lucide-react';
+import {
+  BedDouble,
+  BusFront,
+  CalendarDays,
+  Plane,
+  StickyNote,
+  type LucideIcon,
+} from 'lucide-react';
 
 /**
  * `activity` is the backward-compatible document value. In the interface it is
@@ -9,17 +16,19 @@ export const EVENT_KIND_LABEL: Record<EventKind, string> = {
   activity: 'Event',
   lodging: 'Stay',
   flight: 'Flight',
+  transit: 'Transit',
   note: 'Note',
 };
 
 export const EVENT_KIND_OPTIONS = (
-  ['activity', 'lodging', 'flight', 'note'] as const
+  ['activity', 'lodging', 'flight', 'transit', 'note'] as const
 ).map((value) => ({ value, label: EVENT_KIND_LABEL[value] }));
 
 const EVENT_KIND_ICON: Record<EventKind, LucideIcon> = {
   activity: CalendarDays,
   lodging: BedDouble,
   flight: Plane,
+  transit: BusFront,
   note: StickyNote,
 };
 

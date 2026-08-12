@@ -66,6 +66,7 @@ export type {
   OptionId,
   Place,
   TransitLeg,
+  TransitDetails,
   TransitMode,
   TripDoc,
   TripEvent,

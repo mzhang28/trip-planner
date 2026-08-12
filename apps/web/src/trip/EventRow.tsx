@@ -26,6 +26,7 @@ import { EventDetails } from './EventDetails';
 import { EventEditor } from './EventEditor';
 import { EVENT_KIND_LABEL, EVENT_KIND_OPTIONS, EventKindIcon } from './EventKind';
 import { FlightSummary } from './FlightFields';
+import { TransitSummary } from './TransitFields';
 
 export interface EventRowProps {
   event: TripEvent;
@@ -303,7 +304,11 @@ export function EventRow({
 
   const linkCount = Object.keys(event.links).length;
   const summary = [
-    event.city,
+    event.kind === 'flight'
+      ? event.flight?.fromCity ?? event.city
+      : event.kind === 'transit'
+        ? event.transit?.fromCity
+        : event.city,
     event.location?.label,
     linkCount > 0 ? `${linkCount} link${linkCount === 1 ? '' : 's'}` : undefined,
   ].filter(Boolean);
@@ -450,6 +455,12 @@ export function EventRow({
       {event.kind === 'flight' && (
         <div className="px-3 pb-2">
           <FlightSummary event={event} homeTimezone={homeTimezone} />
+        </div>
+      )}
+
+      {event.kind === 'transit' && (
+        <div className="px-3 pb-2">
+          <TransitSummary event={event} />
         </div>
       )}
 

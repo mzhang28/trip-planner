@@ -15,6 +15,7 @@ export interface AirportResult {
 interface AirportSelection {
   code: string | undefined;
   timezone?: string;
+  city?: string;
 }
 
 type Lookup =
@@ -26,12 +27,14 @@ type Lookup =
 export interface AirportPickerProps {
   label: string;
   code: string | undefined;
+  /** The saved endpoint city, so an older airport-only route can be completed. */
+  city?: string;
   timezone: string;
   onChange: (selection: AirportSelection) => void;
 }
 
 /** Search OpenFlights by IATA, airport, or city and keep manual IATA entry. */
-export function AirportPicker({ label, code, timezone, onChange }: AirportPickerProps) {
+export function AirportPicker({ label, code, city, timezone, onChange }: AirportPickerProps) {
   const [query, setQuery] = useState(code ?? '');
   const [lookup, setLookup] = useState<Lookup>({ state: 'idle' });
   const [known, setKnown] = useState<AirportResult | null>(null);
@@ -80,8 +83,12 @@ export function AirportPicker({ label, code, timezone, onChange }: AirportPicker
 
           setKnown(exact);
           setOpen(false);
-          if (exact.code !== code || exact.timezone !== timezone) {
-            onChangeRef.current({ code: exact.code, timezone: exact.timezone });
+          if (exact.code !== code || exact.timezone !== timezone || exact.city !== city) {
+            onChangeRef.current({
+              code: exact.code,
+              timezone: exact.timezone,
+              city: exact.city || undefined,
+            });
           }
         })
         .catch(() => {
@@ -90,7 +97,7 @@ export function AirportPicker({ label, code, timezone, onChange }: AirportPicker
     }, 180);
 
     return () => clearTimeout(timer);
-  }, [query, code, timezone]);
+  }, [query, code, city, timezone]);
 
   const airports = lookup.state === 'found' ? lookup.airports : [];
   const showing = open && query.trim().length >= 2;
@@ -101,7 +108,11 @@ export function AirportPicker({ label, code, timezone, onChange }: AirportPicker
     setKnown(airport);
     setQuery(airport.code);
     setOpen(false);
-    onChange({ code: airport.code, timezone: airport.timezone });
+    onChange({
+      code: airport.code,
+      timezone: airport.timezone,
+      city: airport.city || undefined,
+    });
   }
 
   function commit() {
