@@ -87,16 +87,17 @@ async function addEvent(page: Page, name: string, city: string, time: string, da
  */
 async function revealField(page: Page, key: string) {
   const editor = page.getByTestId('event-editor');
+  if ((await editor.getByTestId(`field-${key}`).count()) > 0) return;
+
   const chip = editor.getByTestId(`add-field-${key}`);
+  const more = editor.getByTestId('expand-palette');
 
-  if ((await chip.count()) === 0) {
-    const more = editor.getByTestId('expand-palette');
-    if ((await more.count()) > 0) await more.click();
-  }
+  // Waited for rather than counted: the palette renders a tick after the card
+  // opens, and counting an element that is not there yet reads as absent.
+  await expect(chip.or(more).first()).toBeVisible();
 
-  if ((await editor.getByTestId(`field-${key}`).count()) === 0) {
-    await editor.getByTestId(`add-field-${key}`).click();
-  }
+  if ((await chip.count()) === 0) await more.click();
+  await chip.click();
 }
 
 async function switchTo(page: Page, view: 'Day' | 'Week' | 'Month') {

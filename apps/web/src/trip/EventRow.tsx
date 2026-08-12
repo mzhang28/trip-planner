@@ -324,11 +324,19 @@ export function EventRow({
       openTimer.current = null;
     }
 
-    setOpenForNameEdit(
+    const onTheName =
       click.detail === 2 &&
-        (click.target as HTMLElement).closest('[data-testid="event-name"]') !== null,
-    );
-    onToggle();
+      (click.target as HTMLElement).closest('[data-testid="event-name"]') !== null;
+
+    setOpenForNameEdit(onTheName);
+
+    /*
+     * A double click on the name means "edit this", never "close this". It used
+     * to toggle as well, so a card that was already open shut underneath the
+     * name field it had just been asked to show -- and with the first click's
+     * timer still to fire, the card went on opening and closing after that.
+     */
+    if (!(onTheName && isOpen)) onToggle();
   }
 
   return (
