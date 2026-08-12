@@ -212,6 +212,8 @@ export function TripView() {
    * -- Earlier and Later appeared to do nothing to the thing being read.
    */
   const dayListRef = useRef<HTMLDivElement>(null);
+  /** An event chosen before the day view has mounted its list. */
+  const pendingEventScrollRef = useRef<string | null>(null);
 
   /** The last deletion, while it can still be taken back. */
   const [undoable, setUndoable] = useState<{ ids: string[]; message: string } | null>(null);
@@ -347,6 +349,30 @@ export function TripView() {
      */
     list.scrollTop += section.getBoundingClientRect().top - list.getBoundingClientRect().top;
   }, [anchor, view, days.length]);
+
+  /*
+   * A week or month click changes views before its event exists in the DOM.
+   * Wait for the open editor to be laid out, then centre it inside the list's
+   * own scrollport. Using the list directly keeps the app header fixed.
+   */
+  useEffect(() => {
+    const eventId = pendingEventScrollRef.current;
+    if (view !== 'day' || !eventId || openEventId !== eventId) return;
+
+    const frame = requestAnimationFrame(() => {
+      const list = dayListRef.current;
+      const target = document.getElementById(`event-${eventId}`);
+      if (!list || !target || !list.contains(target)) return;
+
+      const listBox = list.getBoundingClientRect();
+      const targetBox = target.getBoundingClientRect();
+      const space = Math.max(12, (listBox.height - Math.min(targetBox.height, listBox.height)) / 2);
+      list.scrollTop += targetBox.top - listBox.top - space;
+      pendingEventScrollRef.current = null;
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [view, openEventId, days.length]);
 
   /** Everything with no day yet, which the week and month cannot draw. */
   const undated = useMemo(
@@ -492,10 +518,14 @@ export function TripView() {
   }
 
   function focusEvent(eventId: string) {
+    const event = events.find((candidate) => candidate.id === eventId);
+    const day = event ? eventDay(event, homeTimezone) : null;
+
+    pendingEventScrollRef.current = eventId;
+    if (day) moveAnchor(day);
     setView('day');
     setHighlighted(eventId);
     setOpenEventId(eventId);
-    document.getElementById(`event-${eventId}`)?.scrollIntoView({ block: 'center' });
   }
 
   function toggleSelected(eventId: string) {
@@ -788,6 +818,7 @@ export function TripView() {
                 moveAnchor(day);
                 setView('day');
               }}
+              onOpenEvent={focusEvent}
               onCreateOn={(day) => createOn(day)}
             />
           )}

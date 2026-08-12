@@ -19,6 +19,7 @@ export interface MonthViewProps {
   today: DayKey;
   readOnly: boolean;
   onOpenDay: (day: DayKey) => void;
+  onOpenEvent: (eventId: string) => void;
   /** Makes an event on that day, with nothing filled in but the day. */
   onCreateOn: (day: DayKey) => void;
 }
@@ -106,6 +107,7 @@ export function MonthView({
   today,
   readOnly,
   onOpenDay,
+  onOpenEvent,
   onCreateOn,
 }: MonthViewProps) {
   const days = fourWeekGrid(anchor);
@@ -215,11 +217,7 @@ export function MonthView({
                     </span>
 
                     {dayEvents.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onOpenDay(day)}
-                        className="relative z-10 mt-auto flex w-full flex-col items-stretch gap-px px-1 pb-1 text-left focus-visible:outline-focus focus-visible:outline-2"
-                      >
+                      <div className="relative z-10 mt-auto flex w-full flex-col items-stretch gap-px px-1 pb-1 text-left">
                         {/*
                           Two names and a count, not a count alone. "2 things"
                           made every day of a month look the same, so the month
@@ -227,11 +225,14 @@ export function MonthView({
                           happening, roughly, and when.
                         */}
                         {dayEvents.slice(0, 2).map((event) => (
-                          <span
+                          <button
+                            type="button"
                             key={event.id}
+                            data-testid="month-event"
+                            onClick={() => onOpenEvent(event.id)}
                             style={coloredSurfaceStyle(event.color)}
                             className={cn(
-                              'flex min-w-0 items-center gap-1 text-2xs text-ink',
+                              'flex min-w-0 items-center gap-1 text-left text-2xs text-ink focus-visible:outline-focus focus-visible:outline-2',
                               event.color && 'rounded-sm px-1 py-0.5',
                             )}
                           >
@@ -248,15 +249,19 @@ export function MonthView({
                             >
                               {event.name || 'Unnamed'}
                             </span>
-                          </span>
+                          </button>
                         ))}
 
                         {dayEvents.length > 2 && (
-                          <span className="text-2xs text-ink-muted">
+                          <button
+                            type="button"
+                            onClick={() => onOpenDay(day)}
+                            className="text-left text-2xs text-ink-muted focus-visible:outline-focus focus-visible:outline-2"
+                          >
                             +{dayEvents.length - 2} more
-                          </span>
+                          </button>
                         )}
-                      </button>
+                      </div>
                     )}
             </DayCell>
           );

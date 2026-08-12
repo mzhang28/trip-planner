@@ -229,9 +229,48 @@ test.describe('week and month views', () => {
 
     await cell.getByText('Fushimi Inari').click();
 
-    // Clicking a day drops back into the day view, on that day.
+    // Clicking an event drops back into the day view with that event open.
     await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+  });
+
+  test('events opened from month and week are scrolled into editing view', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 600 });
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+
+    for (let index = 0; index < 6; index += 1) {
+      await addEvent(
+        page,
+        `Earlier plan ${index + 1}`,
+        'Kyoto',
+        `${String(9 + index).padStart(2, '0')}:00`,
+        '2026-08-10',
+      );
+    }
+    await addEvent(page, 'Tokyo dinner', 'Tokyo', '18:00');
+
+    async function expectOpenedAndScrolled() {
+      const list = page.getByTestId('day-list-scroll');
+      const editor = page.getByTestId('event-editor');
+      await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+      await expect(editor).toBeVisible();
+      await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+
+      const [listBox, editorBox] = await Promise.all([list.boundingBox(), editor.boundingBox()]);
+      if (!listBox || !editorBox) throw new Error('no focused event bounds');
+      expect(editorBox.y).toBeGreaterThanOrEqual(listBox.y);
+      expect(editorBox.y).toBeLessThan(listBox.y + listBox.height);
+    }
+
+    await switchTo(page, 'Month');
+    await page.getByTestId('month-event').filter({ hasText: 'Tokyo dinner' }).click();
+    await expectOpenedAndScrolled();
+
+    await switchTo(page, 'Week');
+    await page.getByTestId('week-event').filter({ hasText: 'Tokyo dinner' }).click();
+    await expectOpenedAndScrolled();
   });
 
   test(
