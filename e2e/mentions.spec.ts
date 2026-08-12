@@ -65,7 +65,9 @@ test.describe('pointing at the rest of the trip', () => {
     // reference and the label is only a copy.
     await page.getByTestId('close-editor').click();
     await eventRow(page, 'Nishiki Market').click();
-    await page.getByTestId('event-name').dblclick();
+
+    // Scoped to the card being renamed: every card carries its own name.
+    await eventRow(page, 'Nishiki Market').getByTestId('event-name').dblclick();
     await page.getByRole('textbox', { name: 'Name' }).fill('Nishiki, morning');
     await page.getByRole('textbox', { name: 'Name' }).blur();
     await page.getByTestId('close-editor').click();

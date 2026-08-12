@@ -533,10 +533,10 @@ test.describe('filling an event in gradually', () => {
 
     // Laying every field out at once is the wall this exists to avoid.
     await expect(expand).toBeVisible();
-    await expect(editor.getByTestId('add-field-confirmation')).toHaveCount(0);
+    await expect(editor.getByTestId('add-field-transit')).toHaveCount(0);
 
     await expand.click();
-    await expect(editor.getByTestId('add-field-confirmation')).toBeVisible();
+    await expect(editor.getByTestId('add-field-transit')).toBeVisible();
   });
 
   test('a field that has something in it is there without being asked for', async ({ page }) => {

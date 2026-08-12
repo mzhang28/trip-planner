@@ -21,14 +21,26 @@ function eventRow(page: Page, name: string) {
   return page.getByTestId('event').filter({ hasText: name });
 }
 
+/**
+ * Brings a field on screen, wherever it is offered from.
+ *
+ * A field is already there once it holds something, behind its chip if it
+ * does not, and behind the chip the palette folds the rest away under. Some
+ * live on the card header instead and are never in the palette at all.
+ */
 async function reveal(page: Page, key: string) {
   const editor = page.getByTestId('event-editor');
   if ((await editor.getByTestId(`field-${key}`).count()) > 0) return;
 
-  if ((await editor.getByTestId(`add-field-${key}`).count()) === 0) {
-    await editor.getByTestId('expand-palette').click();
-  }
-  await editor.getByTestId(`add-field-${key}`).click();
+  const chip = editor.getByTestId(`add-field-${key}`);
+  const expand = editor.getByTestId('expand-palette');
+
+  // Waited for rather than counted: the palette renders a tick after the card
+  // opens, and counting an element that is not there yet reads as absent.
+  await expect(chip.or(expand).first()).toBeVisible();
+
+  if ((await chip.count()) === 0) await expand.click();
+  await chip.click();
 }
 
 test.describe('putting an event on a chosen day', () => {
@@ -613,7 +625,7 @@ test.describe('reaching things with a finger', () => {
 
     // Enough fields open that the editor is taller than the screen, which is
     // the state the complaint is about.
-    for (const field of ['when', 'duration', 'city', 'place', 'booking', 'links']) {
+    for (const field of ['when', 'duration', 'city', 'place', 'confirmation', 'links']) {
       await reveal(page, field);
     }
 
