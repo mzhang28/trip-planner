@@ -1,2 +1,3 @@
 # Written by scripts/build-icons.mjs from icon.svg on every build.
 public/icon-*.png
+public/apple-touch-icon.png

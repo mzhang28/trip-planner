@@ -19,6 +19,9 @@ mkdirSync(out, { recursive: true });
 
 // 192 and 512 are what the manifest asks for. The maskable one is padded,
 // because a platform that crops to a circle would otherwise cut the bars off.
+// The 180 is for iOS: Safari reads apple-touch-icon, not the manifest. It is
+// flattened onto the icon's own background so the corners the SVG rounds off
+// are filled, since iOS rounds the square itself and would show black there.
 await Promise.all([
   sharp(source).resize(192, 192).png().toFile(resolve(out, 'icon-192.png')),
   sharp(source).resize(512, 512).png().toFile(resolve(out, 'icon-512.png')),
@@ -27,6 +30,11 @@ await Promise.all([
     .extend({ top: 51, bottom: 51, left: 51, right: 51, background: '#12161c' })
     .png()
     .toFile(resolve(out, 'icon-maskable-512.png')),
+  sharp(source)
+    .resize(180, 180)
+    .flatten({ background: '#12161c' })
+    .png()
+    .toFile(resolve(out, 'apple-touch-icon.png')),
 ]);
 
 console.log('icons written');

@@ -6,6 +6,18 @@
     <title>Trip Planner</title>
     <meta name="description" content="Plan a trip together, with or without a signal." />
 
+    <!-- iOS home-screen icon: Safari reads this, not the manifest. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!--
+      Colors the browser chrome to match the page background per theme. The
+      manifest's theme_color covers Android's installed app; these tags are what
+      iOS Safari and the first paint read. Values track --surface-page in
+      @trip/ui (grey-100 light, grey-850 dark).
+    -->
+    <meta name="theme-color" content="#e7eaee" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1a2029" media="(prefers-color-scheme: dark)" />
+
     <!--
       Sets the theme before the first paint. It is inline and blocking on
       purpose: loaded as a module it would run after the page had already
