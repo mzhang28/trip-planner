@@ -39,8 +39,17 @@ const schema = z.object({
    * URL clients actually use, not one inferred per request — inferring it from
    * the Host header would let a caller mint tokens for an audience of their
    * choosing.
+   *
+   * A trailing slash is dropped. Everything below builds paths onto this, so
+   * one left on sends clients to `//connect`; worse, it is compared as a string
+   * against the resource a client asks for, and a client that writes the
+   * address canonically would find its own token refused.
    */
-  PUBLIC_URL: z.string().url().default('http://localhost:8787'),
+  PUBLIC_URL: z
+    .string()
+    .url()
+    .default('http://localhost:8787')
+    .transform((value) => value.replace(/\/+$/, '')),
 
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
