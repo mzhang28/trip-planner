@@ -1,5 +1,5 @@
 import * as A from '@automerge/automerge';
-import type { Doc, TripDoc } from '@trip/crdt';
+import { normalizeBookingStatuses, type Doc, type TripDoc } from '@trip/crdt';
 import {
   forgetDoc,
   forgetRecovery,
@@ -69,7 +69,11 @@ export class TripStore {
 
   static async open(tripId: string): Promise<TripStore> {
     const [stored, sync] = await Promise.all([loadDoc(tripId), loadSync(tripId)]);
-    const store = new TripStore(tripId, stored ?? A.init<TripDoc>(), sync);
+    const loaded = stored ?? A.init<TripDoc>();
+    const normalized = normalizeBookingStatuses(loaded);
+    if (normalized !== loaded) await saveDoc(tripId, normalized);
+
+    const store = new TripStore(tripId, normalized, sync);
 
     // A copy set aside in an earlier session is still worth offering back.
     const recovery = await loadRecovery(tripId);
@@ -245,11 +249,13 @@ export class TripStore {
 
         if (body.message) {
           const before = this.#doc;
-          [this.#doc, this.#localState] = A.receiveSyncMessage(
+          const [received, nextLocalState] = A.receiveSyncMessage(
             this.#doc,
             this.#localState,
             un64(body.message),
           );
+          this.#doc = normalizeBookingStatuses(received);
+          this.#localState = nextLocalState;
 
           if (A.getChanges(before, this.#doc).length > 0) {
             await saveDoc(this.tripId, this.#doc);
@@ -319,7 +325,7 @@ export class TripStore {
     const recovery = await loadRecovery(this.tripId);
     if (!recovery) return;
 
-    this.#doc = A.merge(this.#doc, A.load<TripDoc>(recovery.doc));
+    this.#doc = normalizeBookingStatuses(A.merge(this.#doc, A.load<TripDoc>(recovery.doc)));
     this.#recoverable = undefined;
 
     await saveDoc(this.tripId, this.#doc);

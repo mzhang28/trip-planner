@@ -9,30 +9,21 @@
    * the same treatment on its map pin.
    *
    * Each status gets its own pattern as well as its own colour. Someone who
-   * cannot tell the green from the amber can still tell a solid bar from a
-   * hatched one, which is the difference between the spine carrying the status
-   * and merely decorating it.
+   * cannot see the colour difference can still tell a solid bar from a broken
+   * one, which is the difference between the spine carrying the status and
+   * merely decorating it.
    */
   .status-spine {
     border-radius: var(--radius-full);
     background-repeat: repeat;
   }
 
-  /* Booked and ready: unbroken. */
+  /* Confirmed: unbroken. */
   .status-spine[data-status='booked'] {
     background-color: var(--status-booked);
   }
 
-  /* In progress: hatched, like a held reservation stamped across. */
-  .status-spine[data-status='in_progress'] {
-    background-image: repeating-linear-gradient(
-      135deg,
-      var(--status-pending) 0 2px,
-      transparent 2px 5px
-    );
-  }
-
-  /* Just an idea: broken, the way a route is drawn before it is fixed. */
+  /* Flexible: broken, the way a route is drawn before it is fixed. */
   .status-spine[data-status='idea'] {
     background-image: repeating-linear-gradient(
       to bottom,
@@ -42,14 +33,6 @@
   }
 
   /* Horizontal runs use the same patterns turned through 90 degrees. */
-  .status-spine[data-orientation='horizontal'][data-status='in_progress'] {
-    background-image: repeating-linear-gradient(
-      45deg,
-      var(--status-pending) 0 2px,
-      transparent 2px 5px
-    );
-  }
-
   .status-spine[data-orientation='horizontal'][data-status='idea'] {
     background-image: repeating-linear-gradient(
       to right,

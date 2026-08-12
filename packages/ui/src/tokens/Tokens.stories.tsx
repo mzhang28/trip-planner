@@ -81,13 +81,14 @@ const SEMANTIC_GROUPS: Array<{ title: string; names: string[] }> = [
       'status-booked',
       'status-booked-text',
       'status-booked-soft',
-      'status-pending',
-      'status-pending-text',
-      'status-pending-soft',
       'status-idea',
       'status-idea-text',
       'status-idea-soft',
     ],
+  },
+  {
+    title: 'Attention and offline state',
+    names: ['status-pending', 'status-pending-text', 'status-pending-soft'],
   },
   {
     title: 'Accent and interaction',

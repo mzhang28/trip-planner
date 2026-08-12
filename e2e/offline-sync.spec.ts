@@ -143,11 +143,10 @@ test.describe('offline editing', () => {
     await page.getByRole('textbox', { name: 'Time' }).fill('05:30');
     await page.getByRole('textbox', { name: 'Time' }).blur();
 
-    await eventRow(otherPage, 'Fushimi Inari').click();
     await otherPage.getByTestId('booking-status-button').click();
     await otherPage
       .getByRole('dialog', { name: 'Booking status' })
-      .getByRole('button', { name: 'Booked and ready' })
+      .getByRole('button', { name: 'Confirmed' })
       .click();
 
     await page.context().setOffline(false);
@@ -164,9 +163,10 @@ test.describe('offline editing', () => {
 
     // Neither edit was lost: the time from one, the status from the other.
     for (const target of [page, otherPage]) {
-      const row = eventRow(target, 'Fushimi Inari');
-      await expect(row).toContainText('05:30');
-      await expect(row).toContainText('Booked');
+      await expect(eventRow(target, 'Fushimi Inari')).toContainText('05:30');
+      await expect(target.getByTestId('booking-status-button')).toHaveAccessibleName(
+        'Change booking status, currently Confirmed',
+      );
     }
 
     await other.close();

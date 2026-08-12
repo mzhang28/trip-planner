@@ -1,13 +1,14 @@
 import * as A from '@automerge/automerge';
 import {
+  BOOKING_STATUS_LABEL,
   addEvent,
   addLink,
   deleteEvent,
   eventSearchText,
   liveEvents,
   liveFieldDefs,
+  normalizeBookingStatus,
   updateEvent,
-  type BookingStatus,
   type TripDoc,
   type TripEvent,
 } from '@trip/crdt';
@@ -63,6 +64,8 @@ function authorize(ctx: ToolContext, tripId: string, write: boolean) {
 }
 
 function summarise(event: TripEvent): Record<string, unknown> {
+  const bookingStatus = normalizeBookingStatus(event.booking.status);
+
   return {
     id: event.id,
     kind: event.kind,
@@ -74,7 +77,10 @@ function summarise(event: TripEvent): Record<string, unknown> {
     durationMinutes: event.durationMinutes,
     flight: event.flight,
     transit: event.transit,
-    booking: event.booking,
+    booking: {
+      ...event.booking,
+      status: bookingStatus === 'booked' ? 'confirmed' : 'flexible',
+    },
     links: Object.values(event.links).map((link) => ({ url: link.url, title: link.title })),
   };
 }
@@ -122,7 +128,7 @@ export const TOOL_DEFINITIONS = [
   { name: 'create_event', description: 'Add an event. Only a name is required.' },
   { name: 'update_event', description: 'Change fields on an event.' },
   { name: 'delete_event', description: 'Remove an event.' },
-  { name: 'set_booking_status', description: 'Mark an event as an idea, holding, or booked.' },
+  { name: 'set_booking_status', description: 'Mark an event as flexible or confirmed.' },
   { name: 'add_link', description: 'Attach a web address to an event.' },
   { name: 'list_field_defs', description: "The trip's custom fields." },
 ] as const;
@@ -153,7 +159,7 @@ export const toolSchemas = {
   set_booking_status: z.object({
     tripId: z.string(),
     eventId: z.string(),
-    status: z.enum(['idea', 'in_progress', 'booked']),
+    status: z.enum(['flexible', 'confirmed']),
     note: z.string().optional(),
   }),
   add_link: z.object({
@@ -318,17 +324,25 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       if (!existing) throw new Error('No such event');
 
       const before = { booking: { ...existing.booking } };
+      const status = a.status === 'confirmed' ? 'booked' : 'idea';
 
       withDoc(ctx, a.tripId, (d) =>
         updateEvent(
           d as never,
           a.eventId,
-          { booking: { ...existing.booking, status: a.status as BookingStatus, note: a.note } },
+          { booking: { ...existing.booking, status, note: a.note } },
           { userId: ctx.access.userId },
         ) as never,
       );
 
-      record(ctx, a.tripId, name, a, before, `Marked “${existing.name}” as ${a.status}`);
+      record(
+        ctx,
+        a.tripId,
+        name,
+        a,
+        before,
+        `Marked “${existing.name}” as ${BOOKING_STATUS_LABEL[status]}`,
+      );
       return { ok: true };
     }
 
@@ -379,7 +393,8 @@ export function renderItinerary(doc: TripDoc, tripName: string): string {
         event.startsAt === undefined
           ? '--:--'
           : new Date(event.startsAt).toISOString().slice(11, 16);
-      lines.push(`- **${time}** ${event.name} — ${event.booking.status}`);
+      const status = normalizeBookingStatus(event.booking.status);
+      lines.push(`- **${time}** ${event.name} — ${BOOKING_STATUS_LABEL[status]}`);
       if (event.location?.label) lines.push(`  - ${event.location.label}`);
     }
     lines.push('');

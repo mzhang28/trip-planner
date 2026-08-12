@@ -626,7 +626,7 @@ test.describe('filling an event in gradually', () => {
     );
     await expect(editor.getByTestId('field-booking')).toHaveCount(0);
     await expect(page.getByTestId('booking-status-button')).toHaveAccessibleName(
-      'Change booking status, currently Idea',
+      'Change booking status, currently Flexible',
     );
     await expect(eventRow(page, 'Fushimi Inari').getByRole('img', { name: 'Event' })).toBeVisible();
     await expect(editor.getByTestId('field-city')).toHaveCount(0);
@@ -638,6 +638,31 @@ test.describe('filling an event in gradually', () => {
     // Its chip goes once it is on the event, so nothing is offered twice.
     await expect(editor.getByTestId('add-field-city')).toHaveCount(0);
   });
+
+  test(
+    'a collapsed event can change between Flexible and Confirmed',
+    { tag: '@responsive' },
+    async ({ page }) => {
+      await page.goto('/');
+      await newTrip(page, 'Japan, April');
+      await addNewEvent(page, 'Fushimi Inari');
+
+      await expect(page.getByTestId('event-editor')).toHaveCount(0);
+      const picker = page.getByTestId('booking-status-button');
+      await expect(picker).toHaveAccessibleName('Change booking status, currently Flexible');
+      await picker.click();
+
+      const dialog = page.getByRole('dialog', { name: 'Booking status' });
+      await expect(dialog.getByRole('button')).toHaveCount(2);
+      await expect(dialog.getByRole('button', { name: 'Flexible' })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Confirmed' }).click();
+
+      await expect(page.getByTestId('event-editor')).toHaveCount(0);
+      await expect(page.getByTestId('booking-status-button')).toHaveAccessibleName(
+        'Change booking status, currently Confirmed',
+      );
+    },
+  );
 
   test('the palette folds the long tail away behind a count', async ({ page }) => {
     await page.goto('/');

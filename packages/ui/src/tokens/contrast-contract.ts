@@ -66,42 +66,42 @@ export const CONTRAST_CONTRACT: ContrastPair[] = [
     usage: 'tooltip and toast text',
   },
 
-  // Status labels, which are words and so held to the text threshold.
+  // Status and feedback labels, which are words and so held to the text threshold.
   {
     foreground: 'status-booked-text',
     background: 'surface-card',
     minRatio: TEXT,
-    usage: '"Booked" on a card',
+    usage: '"Confirmed" on a card',
   },
   {
     foreground: 'status-booked-text',
     background: 'status-booked-soft',
     minRatio: TEXT,
-    usage: '"Booked" inside its chip',
+    usage: '"Confirmed" inside its chip',
   },
   {
     foreground: 'status-pending-text',
     background: 'surface-card',
     minRatio: TEXT,
-    usage: '"In progress" on a card',
+    usage: 'offline and warning text on a card',
   },
   {
     foreground: 'status-pending-text',
     background: 'status-pending-soft',
     minRatio: TEXT,
-    usage: '"In progress" inside its chip',
+    usage: 'offline and warning text inside a notice',
   },
   {
     foreground: 'status-idea-text',
     background: 'surface-card',
     minRatio: TEXT,
-    usage: '"Idea" on a card',
+    usage: '"Flexible" on a card',
   },
   {
     foreground: 'status-idea-text',
     background: 'status-idea-soft',
     minRatio: TEXT,
-    usage: '"Idea" inside its chip',
+    usage: '"Flexible" inside its chip',
   },
 
   // Status marks: the card spine and the map pin, which carry the same meaning
@@ -110,37 +110,37 @@ export const CONTRAST_CONTRACT: ContrastPair[] = [
     foreground: 'status-booked',
     background: 'surface-card',
     minRatio: GRAPHIC,
-    usage: 'booked spine and pin',
+    usage: 'confirmed spine and pin',
   },
   {
     foreground: 'status-booked',
     background: 'surface-page',
     minRatio: GRAPHIC,
-    usage: 'booked pin on the map',
+    usage: 'confirmed pin on the map',
   },
   {
     foreground: 'status-pending',
     background: 'surface-card',
     minRatio: GRAPHIC,
-    usage: 'in-progress spine and pin',
+    usage: 'warning border and indicator',
   },
   {
     foreground: 'status-pending',
     background: 'surface-page',
     minRatio: GRAPHIC,
-    usage: 'in-progress pin on the map',
+    usage: 'warning indicator on the page',
   },
   {
     foreground: 'status-idea',
     background: 'surface-card',
     minRatio: GRAPHIC,
-    usage: 'idea spine and pin',
+    usage: 'flexible spine and pin',
   },
   {
     foreground: 'status-idea',
     background: 'surface-page',
     minRatio: GRAPHIC,
-    usage: 'idea pin on the map',
+    usage: 'flexible pin on the map',
   },
 
   // Accent and interaction.

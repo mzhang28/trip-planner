@@ -1,5 +1,5 @@
 import * as A from '@automerge/automerge';
-import { higherStatus } from './status';
+import { higherStatus, normalizeBookingStatus } from './status';
 import type {
   AttachmentId,
   CustomValue,
@@ -40,6 +40,20 @@ export function createTrip(name: string, homeTimezone: string): Doc {
     files: {},
     fieldDefs: {},
     events: {},
+  });
+}
+
+/**
+ * Rewrites the removed `in_progress` value from older replicas as Flexible.
+ * Keeping this as an Automerge change lets the correction sync back to every
+ * device instead of making each interface hide the stale value independently.
+ */
+export function normalizeBookingStatuses(doc: Doc): Doc {
+  return A.change(doc, (d) => {
+    for (const event of Object.values(d.events ?? {})) {
+      const normalized = normalizeBookingStatus(event.booking.status);
+      if (event.booking.status !== normalized) event.booking.status = normalized;
+    }
   });
 }
 
@@ -94,7 +108,7 @@ export interface NewEvent {
  *
  * Everything else is optional by design: someone remembering a place over
  * dinner should be able to get it down before they lose it, and fill in when
- * and whether it is booked once they know.
+ * and whether it is confirmed once they know.
  */
 export function addEvent(doc: Doc, event: NewEvent, author: Author): Doc {
   return A.change(doc, (d) => {
@@ -570,8 +584,8 @@ export function liveFieldDefs(doc: TripDoc | undefined): FieldDef[] {
  * with twelve choices in it is slower than doing the merge by hand. What it
  * keeps is what someone merging two versions of the same plan would keep: the
  * earliest start, the primary's name and place, a span covering all of them,
- * everything that was attached to any of them, and the most settled status --
- * a booked half and an idea half together are a booking.
+ * everything that was attached to any of them, and the most fixed status --
+ * a Confirmed event and a Flexible event together are Confirmed.
  *
  * The others are tombstoned rather than removed, so a peer that was offline
  * learns they went away instead of merging them back.

@@ -16,7 +16,6 @@ export interface DayMapProps {
  */
 const STATUS_COLOR: Record<string, string> = {
   booked: 'var(--status-booked)',
-  in_progress: 'var(--status-pending)',
   idea: 'var(--status-idea)',
 };
 

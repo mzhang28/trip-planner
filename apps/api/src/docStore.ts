@@ -1,5 +1,12 @@
 import * as A from '@automerge/automerge';
-import { createTrip, eventSearchText, type Doc, type TripDoc } from '@trip/crdt';
+import {
+  createTrip,
+  eventSearchText,
+  normalizeBookingStatus,
+  normalizeBookingStatuses,
+  type Doc,
+  type TripDoc,
+} from '@trip/crdt';
 import { eventLinks, events, tripChanges, tripDocs } from '@trip/schema';
 import { eq } from 'drizzle-orm';
 import type { Db, Executor } from './db';
@@ -50,6 +57,14 @@ export class DocStore {
 
     if (pending.length > 0) {
       doc = A.applyChanges(doc, pending.map((p) => new Uint8Array(p.change)))[0];
+    }
+
+    const beforeNormalization = doc;
+    doc = normalizeBookingStatuses(doc);
+    const normalizationChanges = A.getChanges(beforeNormalization, doc);
+    if (normalizationChanges.length > 0) {
+      this.commit(tripId, doc, normalizationChanges, 'system');
+      return doc;
     }
 
     this.#cache.set(tripId, doc);
@@ -155,7 +170,7 @@ export class DocStore {
         startsAt: event.startsAt ?? null,
         timezone: event.timezone ?? null,
         durationMinutes: event.durationMinutes ?? null,
-        bookingStatus: event.booking.status,
+        bookingStatus: normalizeBookingStatus(event.booking.status),
         bookingNote: event.booking.note ?? null,
         confirmationCode: event.booking.confirmationCode ?? null,
         description: event.description ?? null,

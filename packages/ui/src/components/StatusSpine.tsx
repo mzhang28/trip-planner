@@ -8,7 +8,7 @@ export interface StatusSpineProps {
 }
 
 /**
- * The mark that says how settled a booking is.
+ * The mark that says whether an event is flexible or confirmed.
  *
  * Purely decorative to a screen reader: the status is already announced in
  * words by the chip beside it, and repeating it here would make every card read

@@ -1,8 +1,10 @@
 export {
   BOOKING_STATUSES,
+  BOOKING_STATUS_LABEL,
   BOOKING_STATUS_RANK,
   higherStatus,
   isBookingStatus,
+  normalizeBookingStatus,
   type BookingStatus,
 } from './status';
 
@@ -21,6 +23,7 @@ export {
   liveEvents,
   liveFieldDefs,
   mergeEvents,
+  normalizeBookingStatuses,
   removeLink,
   removeTodo,
   restoreEvent,

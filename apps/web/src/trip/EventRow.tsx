@@ -161,9 +161,11 @@ function EventKindPicker({
 function BookingStatusPicker({
   status,
   onChange,
+  className,
 }: {
   status: BookingStatus;
   onChange: (status: BookingStatus) => void;
+  className?: string;
 }) {
   return (
     <DialogTrigger>
@@ -171,11 +173,12 @@ function BookingStatusPicker({
         data-testid="booking-status-button"
         aria-label={`Change booking status, currently ${BOOKING_STATUS_LABEL[status]}`}
         className={cn(
-          'mt-1 cursor-pointer rounded-sm',
+          'cursor-pointer rounded-sm',
           'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-2',
+          className,
         )}
       >
-        <StatusChip status={status} short className="pointer-events-none" />
+        <StatusChip status={status} className="pointer-events-none" />
       </Button>
 
       <Popover
@@ -457,42 +460,55 @@ export function EventRow({
             <BookingStatusPicker
               status={event.booking.status}
               onChange={(status) => onPatch({ booking: { ...event.booking, status } })}
+              className="mt-1"
             />
           </div>
         ) : (
-          <Button
-            data-testid="event"
-            onClick={openFromClick}
-            aria-expanded={isOpen}
-            className={cn(
-              'flex flex-1 items-center gap-3 px-3 py-2.5 text-left',
-              'data-hovered:bg-sunken data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-2',
-            )}
-          >
-            <span className="tabular w-11 shrink-0 text-xs text-ink-muted">{time ?? '--:--'}</span>
-
-            <span className="min-w-0 flex-1">
-              {/* An event made by picking a day is real before it is named. */}
-              <span className="flex min-w-0 items-center gap-1.5">
-                <EventKindIcon kind={event.kind} className="size-3.5 shrink-0 text-ink-muted" />
-                <span
-                  data-testid="event-name"
-                  className={cn(
-                    'truncate text-sm font-medium',
-                    event.name ? 'text-ink' : 'text-ink-placeholder italic',
-                  )}
-                >
-                  {event.name || 'Unnamed'}
-                </span>
-                <EventContentIndicators event={event} />
-              </span>
-              {summary.length > 0 && (
-                <span className="block truncate text-2xs text-ink-muted">{summary.join(' · ')}</span>
+          <div className="flex min-w-0 flex-1">
+            <Button
+              data-testid="event"
+              onClick={openFromClick}
+              aria-expanded={isOpen}
+              className={cn(
+                'flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left',
+                'data-hovered:bg-sunken data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-2',
               )}
-            </span>
+            >
+              <span className="tabular w-11 shrink-0 text-xs text-ink-muted">{time ?? '--:--'}</span>
 
-            <StatusChip status={event.booking.status} short />
-          </Button>
+              <span className="min-w-0 flex-1">
+                {/* An event made by picking a day is real before it is named. */}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <EventKindIcon kind={event.kind} className="size-3.5 shrink-0 text-ink-muted" />
+                  <span
+                    data-testid="event-name"
+                    className={cn(
+                      'truncate text-sm font-medium',
+                      event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                    )}
+                  >
+                    {event.name || 'Unnamed'}
+                  </span>
+                  <EventContentIndicators event={event} />
+                </span>
+                {summary.length > 0 && (
+                  <span className="block truncate text-2xs text-ink-muted">
+                    {summary.join(' · ')}
+                  </span>
+                )}
+              </span>
+            </Button>
+
+            {!readOnly ? (
+              <BookingStatusPicker
+                status={event.booking.status}
+                onChange={(status) => onPatch({ booking: { ...event.booking, status } })}
+                className="mr-3 self-center"
+              />
+            ) : (
+              <StatusChip status={event.booking.status} className="mr-3 self-center" />
+            )}
+          </div>
         )}
       </div>
 

@@ -40,7 +40,7 @@
   --green-900: #0a2e26;
   --green-950: #06201a;
 
-  /* Amber: a booking in progress, held, or waiting on someone */
+  /* Amber: offline work, validation, or something that needs attention */
   --amber-50: #fcf5e8;
   --amber-100: #f7e7c9;
   --amber-200: #edd0a0;

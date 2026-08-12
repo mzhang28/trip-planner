@@ -13,6 +13,7 @@ import {
   deleteEvents,
   liveEvents,
   mergeEvents,
+  normalizeBookingStatuses,
   referencedBlobs,
   removeTodo,
   setCityColor,
@@ -49,6 +50,18 @@ function trip(): Doc {
   doc = addEvent(doc, { id: 'e1', name: 'Fushimi Inari' }, ada);
   return doc;
 }
+
+describe('booking status', () => {
+  it('turns the removed intermediate state into Flexible', () => {
+    const legacy = A.change(trip(), (draft) => {
+      (draft.events.e1!.booking as { status: string }).status = 'in_progress';
+    });
+
+    const normalized = normalizeBookingStatuses(legacy);
+
+    expect((normalized as TripDoc).events.e1!.booking.status).toBe('idea');
+  });
+});
 
 describe('trip file library', () => {
   const file = {
@@ -393,14 +406,14 @@ describe('merging events', () => {
     expect(merged.durationMinutes).toBe(240);
   });
 
-  it('takes the most settled status', () => {
+  it('takes the most fixed status', () => {
     let doc = pair();
     doc = updateEvent(doc, 'a', { booking: { status: 'idea' } }, ada);
     doc = updateEvent(doc, 'b', { booking: { status: 'booked' } }, ada);
 
     doc = mergeEvents(doc, 'a', ['b'], { ...ada, now });
 
-    // A booked half and an idea half together are a booking.
+    // A Confirmed half and a Flexible half together are Confirmed.
     expect((doc as TripDoc).events.a!.booking.status).toBe('booked');
   });
 

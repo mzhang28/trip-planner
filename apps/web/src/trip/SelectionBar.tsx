@@ -146,7 +146,8 @@ export function MergePreview({
         <h2 className="mb-1 text-lg">Merge {all.length} events</h2>
         <p className="mb-4 text-sm text-ink-secondary">
           They become one event. It keeps the earliest start, a span covering all of them, every
-          link and file, and the most settled booking status. Pick which one gives the name.
+          link and file, and is Confirmed if any of them is Confirmed. Pick which one gives the
+          name.
         </p>
 
         <fieldset className="mb-4 flex flex-col gap-1">

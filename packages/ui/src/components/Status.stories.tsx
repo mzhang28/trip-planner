@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'How settled a booking is, shown three ways: a spine down the edge of a card, a dot inside a chip, and a pin on the map. Each status has its own pattern as well as its own colour, so the three read the same to someone who cannot tell the green from the amber.',
+          'Whether an event is flexible or confirmed, shown three ways: a spine down the edge of a card, a dot inside a chip, and a pin on the map. Each state has its own pattern as well as its own colour.',
       },
     },
   },
@@ -36,22 +36,10 @@ export const Spines: Story = {
 
 export const Chips: Story = {
   render: () => (
-    <div className="flex flex-col items-start gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {BOOKING_STATUSES.map((status) => (
-          <StatusChip key={status} status={status} />
-        ))}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {BOOKING_STATUSES.map((status) => (
-          <StatusChip key={status} status={status} short />
-        ))}
-      </div>
-      <p className="max-w-md text-sm text-ink-secondary">
-        The short labels are for a column too narrow for the full ones. Holding says more than
-        Pending about what is actually true: someone is sitting on a reservation that is not yet
-        paid for.
-      </p>
+    <div className="flex flex-wrap items-center gap-2">
+      {BOOKING_STATUSES.map((status) => (
+        <StatusChip key={status} status={status} />
+      ))}
     </div>
   ),
 };
@@ -62,7 +50,6 @@ export const OnCards: Story = {
     <div className="flex max-w-md flex-col gap-2">
       {[
         { name: 'Fushimi Inari at dawn', time: '05:30', status: 'booked' as const },
-        { name: 'Nishiki Market lunch', time: '12:00', status: 'in_progress' as const },
         { name: 'Pottery studio, maybe', time: '15:00', status: 'idea' as const },
       ].map((event) => (
         <Card key={event.name} className="flex overflow-hidden">
@@ -72,7 +59,7 @@ export const OnCards: Story = {
               <div className="truncate text-sm font-medium text-ink">{event.name}</div>
               <div className="tabular text-2xs text-ink-muted">{event.time}</div>
             </div>
-            <StatusChip status={event.status} short />
+            <StatusChip status={event.status} />
           </div>
         </Card>
       ))}
@@ -84,13 +71,12 @@ export const WithoutColour: Story = {
   render: () => (
     <div className="max-w-md">
       <p className="mb-4 text-sm text-ink-secondary">
-        The same three cards with colour removed. The status still reads, which is the test the
+        The same two cards with colour removed. The status still reads, which is the test the
         pattern exists to pass.
       </p>
       <div className="flex flex-col gap-2" style={{ filter: 'grayscale(1)' }}>
         {[
           { name: 'Fushimi Inari at dawn', status: 'booked' as const },
-          { name: 'Nishiki Market lunch', status: 'in_progress' as const },
           { name: 'Pottery studio, maybe', status: 'idea' as const },
         ].map((event) => (
           <Card key={event.name} className="flex overflow-hidden">

@@ -31,7 +31,7 @@ export interface TransitLeg {
 
 export interface Booking {
   status: BookingStatus;
-  /** Why it is not settled yet, or what is still outstanding. */
+  /** Extra booking detail or context. */
   note?: string;
   confirmationCode?: string;
 }

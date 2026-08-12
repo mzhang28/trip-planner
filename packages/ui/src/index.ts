@@ -13,7 +13,6 @@ export {
 } from './components/SegmentedControl';
 export {
   BOOKING_STATUS_LABEL,
-  BOOKING_STATUS_SHORT_LABEL,
   StatusChip,
   type StatusChipProps,
 } from './components/StatusChip';
