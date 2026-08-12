@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { addNewEvent } from './helpers';
 
 /**
  * Creates a trip and returns an editor link for it.
@@ -41,8 +42,7 @@ async function newTrip(page: Page, name: string) {
 }
 
 async function addEvent(page: Page, name: string) {
-  await page.getByRole('textbox', { name: 'New event' }).fill(name);
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await addNewEvent(page, name);
   await expect(eventRow(page, name)).toBeVisible();
 }
 
@@ -212,7 +212,7 @@ test.describe('sharing', () => {
 
     await expect(eventRow(otherPage, 'Fushimi Inari')).toBeVisible();
     // No way in to change anything: no add box and the row does not open.
-    await expect(otherPage.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
+    await expect(otherPage.getByRole('button', { name: 'Add event' })).toHaveCount(0);
 
     // The card opens, into details rather than the editor. Read-only hides the
     // controls, not the content.

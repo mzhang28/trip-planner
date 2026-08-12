@@ -30,7 +30,6 @@ import {
   Button,
   IconButton,
   SegmentedControl,
-  TextField,
   ThemeToggle,
   coloredSurfaceStyle,
 } from '@trip/ui';
@@ -195,7 +194,6 @@ export function TripView() {
   const [access, setAccess] = useState<'asking' | 'open' | 'missing' | 'refused' | 'unreachable'>(
     'asking',
   );
-  const [draft, setDraft] = useState('');
   const [sharing, setSharing] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [openEventId, setOpenEventId] = useState<string | null>(null);
@@ -219,7 +217,6 @@ export function TripView() {
   const [undoable, setUndoable] = useState<{ ids: string[]; message: string } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mergePrimary, setMergePrimary] = useState<string | null>(null);
-  const addBoxRef = useRef<HTMLDivElement>(null);
 
   /**
    * Asks the server whether this trip is open to this person.
@@ -396,15 +393,17 @@ export function TripView() {
     useSensor(KeyboardSensor),
   );
 
-  const create = useCallback(() => {
-    const name = draft.trim();
-    if (!name || !store) return;
+  /** Starts a global, unscheduled event and opens its name for editing. */
+  function create() {
+    if (!store || readOnly) return;
+    const id = `e_${randomId()}`;
 
-    store.change((current) =>
-      addEvent(current, { id: `e_${randomId()}`, name }, { userId: 'me' }),
-    );
-    setDraft('');
-  }, [draft, store]);
+    store.change((current) => addEvent(current, { id, name: '' }, { userId: 'me' }));
+    pendingEventScrollRef.current = id;
+    setView('day');
+    setHighlighted(id);
+    setOpenEventId(id);
+  }
 
   function onDragEnd({ active, over }: DragEndEvent) {
     if (!over || !store) return;
@@ -583,7 +582,7 @@ export function TripView() {
 
   function runCommand(command: CommandId) {
     if (command === 'new-event') {
-      addBoxRef.current?.querySelector('input')?.focus();
+      create();
     } else if (command === 'today') {
       goToDay(Date.now());
     } else if (command === 'share') {
@@ -660,6 +659,12 @@ export function TripView() {
                 setView(nextView);
               }}
             />
+            {!readOnly && (
+              <Button size="sm" variant="primary" onPress={create}>
+                <Plus aria-hidden="true" className="size-4" />
+                Add event
+              </Button>
+            )}
             <HeaderActions
               canShare={trip?.role === 'owner'}
               zonePreference={zonePreference}
@@ -704,26 +709,6 @@ export function TripView() {
             </p>
             <Button size="sm" onPress={() => retryAccess()}>
               Try again
-            </Button>
-          </div>
-        )}
-
-        {!readOnly && (
-          <div ref={addBoxRef} className="mb-6 flex items-end gap-2">
-            <TextField
-              label="New event"
-              labelHidden
-              className="flex-1"
-              placeholder="Add something — a name is enough"
-              value={draft}
-              onChange={setDraft}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') create();
-              }}
-            />
-            <Button variant="primary" onPress={create} isDisabled={draft.trim() === ''}>
-              <Plus className="size-4" />
-              Add
             </Button>
           </div>
         )}

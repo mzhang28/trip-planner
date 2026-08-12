@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { addNewEvent } from './helpers';
 
 async function newTrip(page: Page) {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -22,8 +23,7 @@ function eventRow(page: Page, name: string) {
 }
 
 async function addEvent(page: Page, name: string) {
-  await page.getByRole('textbox', { name: 'New event' }).fill(name);
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await addNewEvent(page, name);
   await expect(eventRow(page, name)).toBeVisible();
 }
 

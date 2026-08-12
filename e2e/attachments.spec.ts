@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { addNewEvent } from './helpers';
 
 async function newTrip(page: Page) {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -18,8 +19,7 @@ async function newTrip(page: Page) {
 }
 
 async function addEvent(page: Page, name: string) {
-  await page.getByRole('textbox', { name: 'New event' }).fill(name);
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await addNewEvent(page, name);
   await page.getByTestId('event').filter({ hasText: name }).click();
   await expect(page.getByTestId('event-editor')).toBeVisible();
 

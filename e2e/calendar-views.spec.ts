@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { addNewEvent } from './helpers';
 
 /*
  * The hours the week timetable shows out of the box. A column covers exactly
@@ -33,8 +34,7 @@ function eventRow(page: Page, name: string) {
 const ON = '2026-08-12';
 
 async function addEvent(page: Page, name: string, city: string, time: string, day = ON) {
-  await page.getByRole('textbox', { name: 'New event' }).fill(name);
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await addNewEvent(page, name);
   await expect(eventRow(page, name)).toBeVisible();
 
   await eventRow(page, name).click();
@@ -348,8 +348,7 @@ test.describe('flights and the map', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Flight to Osaka');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Flight to Osaka');
     await eventRow(page, 'Flight to Osaka').click();
 
     const editor = page.getByTestId('event-editor');
@@ -424,8 +423,7 @@ test.describe('selecting several events', () => {
     await newTrip(page, 'Japan, April');
 
     for (const name of ['Fushimi Inari', 'Nishiki Market', 'Dotonbori']) {
-      await page.getByRole('textbox', { name: 'New event' }).fill(name);
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await addNewEvent(page, name);
       await expect(eventRow(page, name)).toBeVisible();
     }
 
@@ -446,8 +444,7 @@ test.describe('selecting several events', () => {
     await newTrip(page, 'Japan, April');
 
     for (const name of ['Market, morning', 'Market, afternoon']) {
-      await page.getByRole('textbox', { name: 'New event' }).fill(name);
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await addNewEvent(page, name);
       await expect(eventRow(page, name)).toBeVisible();
     }
 
@@ -510,8 +507,7 @@ test.describe('filling an event in gradually', () => {
     await newTrip(page, 'Japan, April');
 
     for (let index = 1; index <= 18; index += 1) {
-      await page.getByRole('textbox', { name: 'New event' }).fill(`Event ${index}`);
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await addNewEvent(page, `Event ${index}`);
     }
 
     const list = page.getByTestId('day-list-scroll');
@@ -535,8 +531,7 @@ test.describe('filling an event in gradually', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
     await eventRow(page, 'Fushimi Inari').click();
 
     const editor = page.getByTestId('event-editor');
@@ -571,8 +566,7 @@ test.describe('filling an event in gradually', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
     await eventRow(page, 'Fushimi Inari').click();
 
     const editor = page.getByTestId('event-editor');

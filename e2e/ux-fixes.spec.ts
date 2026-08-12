@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { addNewEvent } from './helpers';
 
 async function newTrip(page: Page, name = 'Japan, April') {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -48,8 +49,7 @@ test.describe('putting an event on a chosen day', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Morning temple');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Morning temple');
     await eventRow(page, 'Morning temple').click();
     await reveal(page, 'when');
 
@@ -99,8 +99,7 @@ test.describe('putting an event on a chosen day', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Morning temple');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Morning temple');
     await eventRow(page, 'Morning temple').click();
     await reveal(page, 'when');
 
@@ -122,8 +121,7 @@ test.describe('custom colors', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Night train');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Night train');
     await eventRow(page, 'Night train').click();
 
     await page.getByRole('button', { name: 'Color for Night train, no color' }).click();
@@ -181,8 +179,7 @@ test.describe('what a viewer can do', () => {
     await page.goto('/');
     const tripId = await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Ryokan');
     await eventRow(page, 'Ryokan').click();
     await reveal(page, 'confirmation');
     await page.getByRole('textbox', { name: 'Confirmation code' }).fill('7K2QLM');
@@ -266,7 +263,7 @@ test.describe('sharing', () => {
     // On the trip, and reading it: an assertion that only counts what is
     // absent would also pass on the page that says you cannot open this.
     await expect(guest.getByRole('heading', { name: 'Japan, April' })).toBeVisible();
-    await expect(guest.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Add event' })).toHaveCount(0);
 
     await panel.getByRole('button', { name: 'Revoke' }).click();
     await expect(panel.getByText(/A link that can read/)).toHaveCount(0);
@@ -291,8 +288,7 @@ test.describe('what a field does with input it cannot use', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Tea ceremony');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Tea ceremony');
     await eventRow(page, 'Tea ceremony').click();
     await reveal(page, 'duration');
 
@@ -320,8 +316,7 @@ test.describe('what a field does with input it cannot use', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Tea ceremony');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Tea ceremony');
     await eventRow(page, 'Tea ceremony').click();
     await reveal(page, 'when');
 
@@ -341,8 +336,7 @@ test.describe('searching', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
 
     const search = page.getByRole('combobox', { name: 'Search this trip' });
     await search.fill('Fushimi');
@@ -359,8 +353,7 @@ test.describe('searching', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
 
     const search = page.getByRole('combobox', { name: 'Search this trip' });
     await search.fill('Fushimi');
@@ -382,8 +375,7 @@ test.describe('a day decided before an hour', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Ryokan');
     await eventRow(page, 'Ryokan').click();
     await reveal(page, 'when');
 
@@ -410,8 +402,7 @@ test.describe('a day decided before an hour', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Ryokan');
     await eventRow(page, 'Ryokan').click();
     await reveal(page, 'when');
 
@@ -431,8 +422,7 @@ test.describe('a day decided before an hour', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Ryokan');
     await eventRow(page, 'Ryokan').click();
 
     await reveal(page, 'when');
@@ -454,8 +444,7 @@ test.describe('taking something back', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
     await eventRow(page, 'Fushimi Inari').click();
 
     await page.getByRole('button', { name: 'Delete event' }).click();
@@ -474,8 +463,7 @@ test.describe('taking something back', () => {
     await newTrip(page);
 
     for (const name of ['One', 'Two', 'Three', 'Four']) {
-      await page.getByRole('textbox', { name: 'New event' }).fill(name);
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await addNewEvent(page, name);
       await expect(eventRow(page, name)).toBeVisible();
     }
 
@@ -506,8 +494,7 @@ test.describe('text a field will not take', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
     // One click opens the event; a double-click on its name goes straight to
     // the compact inline name editor.
     await eventRow(page, 'Fushimi Inari').getByTestId('event-name').dblclick();
@@ -523,8 +510,7 @@ test.describe('text a field will not take', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
     await eventRow(page, 'Fushimi Inari').click();
     await reveal(page, 'links');
 
@@ -548,7 +534,7 @@ test.describe('trips you cannot open', () => {
     await expect(page.getByTestId('no-access')).toContainText('not here');
 
     // Nothing to type into, because nothing typed would ever be saved.
-    await expect(page.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Add event' })).toHaveCount(0);
   });
 
   test('a trip you have been removed from says that, not that it is missing', async ({
@@ -570,7 +556,7 @@ test.describe('trips you cannot open', () => {
     const other = await browser.newContext();
     const guest = await other.newPage();
     await guest.goto(`/join/${token}`);
-    await expect(guest.getByRole('textbox', { name: 'New event' })).toBeVisible();
+    await expect(guest.getByRole('button', { name: 'Add event' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Share trip' }).click();
     const panel = page.getByTestId('share-panel');
@@ -647,8 +633,7 @@ test.describe('reaching things with a finger', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
 
     // Nothing to hover on a phone, so the box has to be there already.
     await expect(page.getByTestId('event-select')).toBeVisible();
@@ -663,8 +648,7 @@ test.describe('reaching things with a finger', () => {
       await page.goto('/');
       await newTrip(page);
 
-      await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await addNewEvent(page, 'Fushimi Inari');
       await eventRow(page, 'Fushimi Inari').click();
 
       // Enough fields open that the editor is taller than the screen, which is
@@ -690,8 +674,7 @@ test.describe('a stay', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Ryokan');
     await eventRow(page, 'Ryokan').click();
     await page.getByTestId('event-kind-button').click();
     await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Stay' }).click();
@@ -721,8 +704,7 @@ test.describe('a stay', () => {
     // Consecutive hotels share one rail instead of each consuming another
     // stacked row beneath the timetable.
     await page.getByTestId('close-editor').click();
-    await page.getByRole('textbox', { name: 'New event' }).fill('City Hotel');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'City Hotel');
     await eventRow(page, 'City Hotel').click();
     await page.getByTestId('event-kind-button').click();
     await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Stay' }).click();
@@ -756,8 +738,7 @@ test.describe('a stay', () => {
 
 test.describe('a flight', () => {
   async function newFlight(page: Page) {
-    await page.getByRole('textbox', { name: 'New event' }).fill('NH017');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'NH017');
     await eventRow(page, 'NH017').click();
     await page.getByTestId('event-kind-button').click();
     await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Flight' }).click();
@@ -838,8 +819,7 @@ test.describe('the map and the forecast', () => {
     await page.getByTestId('go-to-date').fill(anchored);
 
     async function pin(name: string, query: string, day = anchored) {
-      await page.getByRole('textbox', { name: 'New event' }).fill(name);
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await addNewEvent(page, name);
       await eventRow(page, name).click();
 
       // On the day the map is showing, which is the day the view is anchored
@@ -922,11 +902,11 @@ test.describe('who is on a trip', () => {
     // A reader becomes an editor without being removed and invited again.
     await role.selectOption('viewer');
     await guest.reload();
-    await expect(guest.getByRole('textbox', { name: 'New event' })).toHaveCount(0);
+    await expect(guest.getByRole('button', { name: 'Add event' })).toHaveCount(0);
 
     await role.selectOption('editor');
     await guest.reload();
-    await expect(guest.getByRole('textbox', { name: 'New event' })).toBeVisible();
+    await expect(guest.getByRole('button', { name: 'Add event' })).toBeVisible();
 
     await other.close();
     void tripId;
@@ -979,8 +959,7 @@ test.describe('a trip is more than its name', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
     await eventRow(page, 'Fushimi Inari').click();
     await reveal(page, 'when');
     await page.getByTestId('event-date').fill('2027-04-14');
@@ -1035,8 +1014,7 @@ test.describe('days and what has none', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Book the ryokan');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Book the ryokan');
     await expect(eventRow(page, 'Book the ryokan')).toBeVisible();
 
     for (const view of ['Week', 'Month'] as const) {
@@ -1109,8 +1087,7 @@ test.describe('attaching files', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Ryokan');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Ryokan');
     await eventRow(page, 'Ryokan').click();
     await reveal(page, 'files');
 

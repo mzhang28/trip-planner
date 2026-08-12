@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { addNewEvent } from './helpers';
 
 test('work made while away is kept when the trip has to be reloaded', async ({ page, context }) => {
   await page.goto('/');
@@ -16,8 +17,7 @@ test('work made while away is kept when the trip has to be reloaded', async ({ p
   await page.goto(`/t/${trip.id}`);
   await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
 
-  await page.getByRole('textbox', { name: 'New event' }).fill('Booked before the sweep');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await addNewEvent(page, 'Booked before the sweep');
   await expect(page.getByTestId('event')).toHaveCount(1);
   await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
 
@@ -25,8 +25,7 @@ test('work made while away is kept when the trip has to be reloaded', async ({ p
   // server will refuse this document: it predates the sweep and could put
   // deleted events back.
   await context.setOffline(true);
-  await page.getByRole('textbox', { name: 'New event' }).fill('Added while away');
-  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await addNewEvent(page, 'Added while away');
   await expect(page.getByTestId('event')).toHaveCount(2);
 
   await context.setOffline(false);

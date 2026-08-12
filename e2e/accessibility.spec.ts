@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { addNewEvent } from './helpers';
 
 async function newTrip(page: Page) {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -60,8 +61,7 @@ test.describe('accessibility', () => {
       await page.goto('/');
       await newTrip(page);
 
-      await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-      await page.getByRole('button', { name: 'Add', exact: true }).click();
+      await addNewEvent(page, 'Fushimi Inari');
       await page.getByTestId('event').first().click();
       await expect(page.getByTestId('event-editor')).toBeVisible();
 
@@ -89,8 +89,7 @@ test.describe('accessibility', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page.getByRole('textbox', { name: 'New event' }).fill('Fushimi Inari');
-    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    await addNewEvent(page, 'Fushimi Inari');
     await expect(page.getByTestId('event').first()).toBeVisible();
 
     // Tab to the card and open it with the keyboard alone. Opening an event is
