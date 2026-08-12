@@ -2,6 +2,7 @@ name: trip-planner
 
 services:
   app:
+    image: forgejo.apps.mzhang.io/michael/trip-planner:latest
     build: .
     # Set anything else, S3 credentials included, in a .env file beside this
     # one. See .env.example.
