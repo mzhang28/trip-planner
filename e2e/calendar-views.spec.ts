@@ -364,7 +364,13 @@ test.describe('flights and the map', () => {
 
     const editor = page.getByTestId('event-editor');
     await page.getByTestId('event-kind-button').click();
-    await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Flight' }).click();
+    await page
+      .getByRole('dialog', { name: 'Event kind' })
+      .getByRole('button', { name: 'Transit' })
+      .click();
+    // A flight is a transit journey whose method is flight, and only that method
+    // opens the richer per-airport editor.
+    await editor.getByTestId('transit-method').getByText('Flight', { exact: true }).click();
     await expect(
       eventRow(page, 'Flight to Osaka').getByRole('img', { name: 'Flight' }),
     ).toBeVisible();

@@ -23,6 +23,7 @@ import { events as eventRows } from '@trip/schema';
 import { eq } from 'drizzle-orm';
 import { unzipSync, zipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { tripDocSchema } from './archive/manifest';
 import { readArchive, withoutUnavailableFiles } from './archive/read';
 import { archiveBytes, archiveFilename, exportableDoc } from './archive/write';
 import { createApp } from './app';
@@ -604,5 +605,52 @@ describe('exporting and importing over HTTP', () => {
     const response = await app.request('/api/trips/import', { method: 'POST' });
     expect(response.status).toBe(400);
     expect(((await response.json()) as { error: string }).error).toBe('empty');
+  });
+});
+
+describe('reading an archive written before flights folded into transit', () => {
+  const legacyEvent = {
+    id: 'e1',
+    kind: 'flight',
+    name: 'NH017',
+    booking: { status: 'booked' },
+    links: {},
+    attachments: {},
+    customFields: {},
+    flight: { airline: 'ANA', number: 'NH017', from: 'NRT', to: 'LHR', seat: '32A' },
+    updatedAt: 1,
+    updatedBy: 'ada',
+  };
+
+  it('turns a stored flight into a transit journey with method flight', () => {
+    const parsed = tripDocSchema.parse({
+      meta: { name: 'Japan', homeTimezone: 'Asia/Tokyo' },
+      fieldDefs: {},
+      events: { e1: legacyEvent },
+    });
+
+    const event = parsed.events.e1!;
+    expect(event.kind).toBe('transit');
+    expect(event.transit).toEqual({
+      method: 'flight',
+      operator: 'ANA',
+      number: 'NH017',
+      from: 'NRT',
+      to: 'LHR',
+      seat: '32A',
+    });
+    expect((event as Record<string, unknown>).flight).toBeUndefined();
+  });
+
+  it('maps a custom field that applied to flights onto transit', () => {
+    const parsed = tripDocSchema.parse({
+      meta: { name: 'Japan', homeTimezone: 'Asia/Tokyo' },
+      fieldDefs: {
+        f1: { id: 'f1', label: 'Miles', type: 'number', appliesTo: ['flight'], order: 0 },
+      },
+      events: {},
+    });
+
+    expect(parsed.fieldDefs.f1!.appliesTo).toEqual(['transit']);
   });
 });

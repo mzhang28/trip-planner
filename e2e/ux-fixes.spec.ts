@@ -575,7 +575,10 @@ test.describe('trips you cannot open', () => {
     await other.close();
   });
 
-  test('a list that could not be fetched is not an empty list', async ({ page, context }) => {
+  test('a list that could not be fetched falls back to the one saved here', async ({
+    page,
+    context,
+  }) => {
     await page.goto('/');
     await newTrip(page);
 
@@ -589,13 +592,17 @@ test.describe('trips you cannot open', () => {
     await context.setOffline(true);
     await page.reload();
 
-    // "No trips yet" here would send somebody off to make the trip they
-    // already have.
-    await expect(page.getByTestId('trips-unreachable')).toBeVisible();
+    // The saved list stands in, so the trip is reachable and the screen never
+    // claims there are none -- which would send somebody off to make the trip
+    // they already have.
+    await expect(page.getByTestId('trips-from-cache')).toBeVisible();
+    await expect(page.getByText('Japan, April')).toBeVisible();
     await expect(page.getByText('No trips yet')).toHaveCount(0);
 
+    // Back online, the freshly fetched list replaces the saved one.
     await context.setOffline(false);
-    await page.getByTestId('trips-unreachable').getByRole('button', { name: 'Try again' }).click();
+    await page.reload();
+    await expect(page.getByTestId('trips-from-cache')).toHaveCount(0);
     await expect(page.getByText('Japan, April')).toBeVisible();
   });
 });
@@ -748,7 +755,16 @@ test.describe('a flight', () => {
     await addNewEvent(page, 'NH017');
     await eventRow(page, 'NH017').click();
     await page.getByTestId('event-kind-button').click();
-    await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Flight' }).click();
+    await page
+      .getByRole('dialog', { name: 'Event kind' })
+      .getByRole('button', { name: 'Transit' })
+      .click();
+    // A flight is the transit method with the per-airport editor.
+    await page
+      .getByTestId('event-editor')
+      .getByTestId('transit-method')
+      .getByText('Flight', { exact: true })
+      .click();
   }
 
   test('asks for the departure date rather than assuming today', async ({ page }) => {

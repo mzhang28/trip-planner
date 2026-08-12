@@ -13,6 +13,8 @@ import type {
   Instant,
   LinkId,
   OptionId,
+  TransitMethod,
+  TransitMode,
   TripDoc,
   TripEvent,
   TripFile,
@@ -53,6 +55,67 @@ export function normalizeBookingStatuses(doc: Doc): Doc {
     for (const event of Object.values(d.events ?? {})) {
       const normalized = normalizeBookingStatus(event.booking.status);
       if (event.booking.status !== normalized) event.booking.status = normalized;
+    }
+  });
+}
+
+// The mode an older transit event carried maps to the closest method. 'transit'
+// was labelled "Train / bus", so it becomes a train; a walk is not really a way
+// to travel between cities, so it falls to 'other'.
+const MODE_TO_METHOD: Record<TransitMode, TransitMethod> = {
+  fly: 'flight',
+  drive: 'car',
+  transit: 'train',
+  walk: 'other',
+};
+
+/**
+ * Folds the retired `flight` kind into `transit`, and gives an older transit
+ * event a `method` in place of its `mode`.
+ *
+ * A flight becomes a transit event whose method is 'flight', carrying the same
+ * airline, seats, and airports under their new names. Like the booking-status
+ * pass, this is an Automerge change so the correction syncs back to every
+ * device rather than each interface hiding the old shape on its own. An event
+ * already in the new shape is left untouched, so on a migrated document the
+ * change is empty and nothing is written.
+ */
+export function normalizeEventKinds(doc: Doc): Doc {
+  return A.change(doc, (d) => {
+    for (const event of Object.values(d.events ?? {})) {
+      const e = event as unknown as Record<string, unknown>;
+
+      if (e.kind === 'flight') {
+        const f = (e.flight ?? {}) as Record<string, string | undefined>;
+        const transit: Record<string, unknown> = { method: 'flight' };
+        // airline is the only field that changed name; the rest keep theirs.
+        const carry: Array<[string, string]> = [
+          ['airline', 'operator'],
+          ['number', 'number'],
+          ['from', 'from'],
+          ['to', 'to'],
+          ['fromCity', 'fromCity'],
+          ['toCity', 'toCity'],
+          ['departsTz', 'departsTz'],
+          ['arrivesTz', 'arrivesTz'],
+          ['seat', 'seat'],
+          ['terminal', 'terminal'],
+          ['gate', 'gate'],
+        ];
+        for (const [old, next] of carry) {
+          if (f[old] !== undefined) transit[next] = f[old];
+        }
+
+        e.kind = 'transit';
+        e.transit = transit;
+        delete e.flight;
+      } else if (e.kind === 'transit' && e.transit) {
+        const t = e.transit as Record<string, unknown>;
+        if (t.method === undefined) {
+          t.method = MODE_TO_METHOD[t.mode as TransitMode] ?? 'other';
+          delete t.mode;
+        }
+      }
     }
   });
 }

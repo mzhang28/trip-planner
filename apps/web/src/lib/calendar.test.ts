@@ -227,7 +227,7 @@ describe('city coverage within a day', () => {
           kind: 'transit',
           startsAt: at('2026-08-12', 9),
           durationMinutes: 180,
-          transit: { mode: 'transit', fromCity: 'Kyoto', toCity: 'Osaka' },
+          transit: { method: 'train', fromCity: 'Kyoto', toCity: 'Osaka' },
         }),
         // This needs no duplicate city: the arrival carries through it and
         // through the otherwise-empty time after it.
@@ -255,10 +255,11 @@ describe('city coverage within a day', () => {
     const segments = cityDaySegments(
       [
         event({
-          kind: 'flight',
+          kind: 'transit',
           startsAt: departs,
           durationMinutes: (arrives - departs) / 60_000,
-          flight: {
+          transit: {
+            method: 'flight',
             fromCity: 'Tokyo',
             toCity: 'London',
             departsTz: TOKYO,

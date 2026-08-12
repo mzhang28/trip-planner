@@ -266,25 +266,29 @@ describe('the remote MCP server', () => {
     expect(before).toEqual({ city: 'Kyoto' });
   });
 
-  it('keeps the rest of a flight when one of its fields is set', async () => {
+  it('keeps the rest of a journey when one of its fields is set', async () => {
     const { accessToken, tripId } = await connect();
 
     const created = await rpc(app, accessToken, 'tools/call', {
       name: 'create_event',
-      arguments: { tripId, name: 'BOS -> SFO', kind: 'flight' },
+      arguments: { tripId, name: 'BOS -> SFO', kind: 'transit' },
     });
     const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
 
     await rpc(app, accessToken, 'tools/call', {
       name: 'update_event',
-      arguments: { tripId, eventId, flight: { airline: 'Delta', number: '860', from: 'BOS' } },
+      arguments: {
+        tripId,
+        eventId,
+        transit: { method: 'flight', operator: 'Delta', number: '860', from: 'BOS' },
+      },
     });
 
-    // A second call naming one field. The event holds its flight as a single
-    // value, so this is the call that would flatten the other three.
+    // A second call naming one field. The event holds its journey as a single
+    // value, so this is the call that would flatten the rest.
     const patched = await rpc(app, accessToken, 'tools/call', {
       name: 'update_event',
-      arguments: { tripId, eventId, flight: { seat: '14C' } },
+      arguments: { tripId, eventId, transit: { seat: '14C' } },
     });
     expect(patched.body.result.isError, patched.body.result.content[0].text).toBeUndefined();
 
@@ -294,7 +298,55 @@ describe('the remote MCP server', () => {
     });
     const { event } = JSON.parse(after.body.result.content[0].text);
 
-    expect(event.flight).toMatchObject({ airline: 'Delta', number: '860', from: 'BOS', seat: '14C' });
+    // The method survives the second patch even though it did not name it.
+    expect(event.transit).toMatchObject({
+      method: 'flight',
+      operator: 'Delta',
+      number: '860',
+      from: 'BOS',
+      seat: '14C',
+    });
+  });
+
+  it('lets an agent set a train journey, platform and coach included', async () => {
+    const { accessToken, tripId } = await connect();
+
+    const created = await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Kyoto to Osaka', kind: 'transit' },
+    });
+    const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
+
+    const set = await rpc(app, accessToken, 'tools/call', {
+      name: 'update_event',
+      arguments: {
+        tripId,
+        eventId,
+        transit: {
+          method: 'train',
+          operator: 'JR West',
+          number: 'Special Rapid',
+          fromCity: 'Kyoto',
+          toCity: 'Osaka',
+          platform: '4',
+          coach: '6',
+          seat: '12A',
+        },
+      },
+    });
+    expect(set.body.result.isError, set.body.result.content[0].text).toBeUndefined();
+
+    const after = await rpc(app, accessToken, 'tools/call', {
+      name: 'get_event',
+      arguments: { tripId, eventId },
+    });
+    expect(JSON.parse(after.body.result.content[0].text).event.transit).toMatchObject({
+      method: 'train',
+      operator: 'JR West',
+      platform: '4',
+      coach: '6',
+      seat: '12A',
+    });
   });
 
   it('adds, changes, and removes a to-do, and reads it back on the event', async () => {
@@ -369,7 +421,7 @@ describe('the remote MCP server', () => {
 
     const created = await rpc(app, accessToken, 'tools/call', {
       name: 'create_event',
-      arguments: { tripId, name: 'BOS -> SFO', kind: 'flight' },
+      arguments: { tripId, name: 'BOS -> SFO', kind: 'transit' },
     });
     const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
 
@@ -381,7 +433,11 @@ describe('the remote MCP server', () => {
         startsAt: '2026-08-21T10:05:00-04:00',
         durationMinutes: 394,
         timezone: 'America/New_York',
-        flight: { departsTz: 'America/New_York', arrivesTz: 'America/Los_Angeles' },
+        transit: {
+          method: 'flight',
+          departsTz: 'America/New_York',
+          arrivesTz: 'America/Los_Angeles',
+        },
       },
     });
 

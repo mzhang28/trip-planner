@@ -14,6 +14,7 @@ import {
   liveEvents,
   mergeEvents,
   normalizeBookingStatuses,
+  normalizeEventKinds,
   referencedBlobs,
   removeTodo,
   setCityColor,
@@ -60,6 +61,71 @@ describe('booking status', () => {
     const normalized = normalizeBookingStatuses(legacy);
 
     expect((normalized as TripDoc).events.e1!.booking.status).toBe('idea');
+  });
+});
+
+describe('folding flight into transit', () => {
+  it('turns a flight event into a transit journey with method flight', () => {
+    const legacy = A.change(trip(), (draft) => {
+      const event = draft.events.e1! as unknown as Record<string, unknown>;
+      event.kind = 'flight';
+      event.flight = {
+        airline: 'ANA',
+        number: 'NH017',
+        from: 'NRT',
+        to: 'ITM',
+        fromCity: 'Tokyo',
+        toCity: 'Osaka',
+        seat: '32A',
+      };
+    });
+
+    const migrated = normalizeEventKinds(legacy) as TripDoc;
+    const event = migrated.events.e1!;
+
+    expect(event.kind).toBe('transit');
+    // airline is the one field that changed name; the rest carry over.
+    expect(event.transit).toEqual({
+      method: 'flight',
+      operator: 'ANA',
+      number: 'NH017',
+      from: 'NRT',
+      to: 'ITM',
+      fromCity: 'Tokyo',
+      toCity: 'Osaka',
+      seat: '32A',
+    });
+    expect((event as unknown as Record<string, unknown>).flight).toBeUndefined();
+  });
+
+  it('gives an older transit event a method in place of its mode', () => {
+    const legacy = A.change(trip(), (draft) => {
+      const event = draft.events.e1! as unknown as Record<string, unknown>;
+      event.kind = 'transit';
+      event.transit = { mode: 'transit', fromCity: 'Kyoto', toCity: 'Nara' };
+    });
+
+    const migrated = normalizeEventKinds(legacy) as TripDoc;
+
+    // "Train / bus" was what that mode was labelled, so it becomes a train.
+    expect(migrated.events.e1!.transit).toEqual({
+      method: 'train',
+      fromCity: 'Kyoto',
+      toCity: 'Nara',
+    });
+  });
+
+  it('writes nothing when every event is already in the new shape', () => {
+    const already = A.change(trip(), (draft) => {
+      const event = draft.events.e1! as unknown as Record<string, unknown>;
+      event.kind = 'transit';
+      event.transit = { method: 'ferry', fromCity: 'Naoshima', toCity: 'Uno' };
+    });
+
+    const migrated = normalizeEventKinds(already);
+
+    // An empty Automerge change records nothing, so nothing syncs to peers.
+    expect(A.getChanges(already, migrated)).toHaveLength(0);
   });
 });
 

@@ -38,8 +38,58 @@ export const BLOB_HASH = /^[a-f0-9]{64}$/;
 
 const instant = z.number().int();
 const blobHash = z.string().regex(BLOB_HASH);
-const eventKind = z.enum(['activity', 'lodging', 'flight', 'transit', 'note']);
+const eventKind = z.enum(['activity', 'lodging', 'transit', 'note']);
 const transitMode = z.enum(['walk', 'transit', 'drive', 'fly']);
+const transitMethod = z.enum(['flight', 'train', 'bus', 'car', 'ferry', 'other']);
+
+// An archive written before flights folded into transit carries `kind: 'flight'`
+// with a `flight` object, or a transit event with a `mode`. Old archives on disk
+// are a real thing someone still has, and they describe a readable trip. Migrate
+// each event to the new shape before it is validated, the same fold the document
+// normalizer does on read -- done here so the manifest schema stays new-shape.
+const LEGACY_MODE_TO_METHOD: Record<string, string> = {
+  fly: 'flight',
+  drive: 'car',
+  transit: 'train',
+  walk: 'other',
+};
+
+function migrateLegacyEvent(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const event = { ...(raw as Record<string, unknown>) };
+
+  if (event.kind === 'flight') {
+    const flight = (event.flight ?? {}) as Record<string, unknown>;
+    const transit: Record<string, unknown> = { method: 'flight' };
+    const carry: Array<[string, string]> = [
+      ['airline', 'operator'],
+      ['number', 'number'],
+      ['from', 'from'],
+      ['to', 'to'],
+      ['fromCity', 'fromCity'],
+      ['toCity', 'toCity'],
+      ['departsTz', 'departsTz'],
+      ['arrivesTz', 'arrivesTz'],
+      ['seat', 'seat'],
+      ['terminal', 'terminal'],
+      ['gate', 'gate'],
+    ];
+    for (const [old, next] of carry) if (flight[old] !== undefined) transit[next] = flight[old];
+
+    event.kind = 'transit';
+    event.transit = transit;
+    delete event.flight;
+  } else if (event.kind === 'transit' && event.transit && typeof event.transit === 'object') {
+    const transit = { ...(event.transit as Record<string, unknown>) };
+    if (transit.method === undefined) {
+      transit.method = LEGACY_MODE_TO_METHOD[transit.mode as string] ?? 'other';
+      delete transit.mode;
+    }
+    event.transit = transit;
+  }
+
+  return event;
+}
 
 const place = z.object({
   label: z.string(),
@@ -86,12 +136,25 @@ const fieldDef = z.object({
     .optional(),
   unit: z.string().optional(),
   currency: z.string().optional(),
-  appliesTo: z.array(eventKind).optional(),
+  // A field that applied to flights now applies to transit. An old archive can
+  // name 'flight' here; map it rather than reject the whole trip.
+  appliesTo: z
+    .array(z.string())
+    .transform((kinds) =>
+      kinds
+        .map((kind) => (kind === 'flight' ? 'transit' : kind))
+        .filter((kind): kind is z.infer<typeof eventKind> =>
+          (['activity', 'lodging', 'transit', 'note'] as const).includes(
+            kind as z.infer<typeof eventKind>,
+          ),
+        ),
+    )
+    .optional(),
   order: z.number(),
   deletedAt: instant.optional(),
 });
 
-const tripEvent = z.object({
+const tripEvent = z.preprocess(migrateLegacyEvent, z.object({
   id: z.string(),
   kind: eventKind,
   name: z.string(),
@@ -134,9 +197,10 @@ const tripEvent = z.object({
     )
     .optional(),
   customFields: z.record(z.string(), customValue),
-  flight: z
+  transit: z
     .object({
-      airline: z.string().optional(),
+      method: transitMethod,
+      operator: z.string().optional(),
       number: z.string().optional(),
       from: z.string().optional(),
       to: z.string().optional(),
@@ -147,10 +211,9 @@ const tripEvent = z.object({
       seat: z.string().optional(),
       terminal: z.string().optional(),
       gate: z.string().optional(),
+      platform: z.string().optional(),
+      coach: z.string().optional(),
     })
-    .optional(),
-  transit: z
-    .object({ mode: transitMode, fromCity: z.string().optional(), toCity: z.string().optional() })
     .optional(),
   lodging: z
     .object({
@@ -162,7 +225,7 @@ const tripEvent = z.object({
   deletedAt: instant.optional(),
   updatedAt: instant,
   updatedBy: z.string(),
-});
+}));
 
 export const tripDocSchema = z.object({
   meta: z.object({

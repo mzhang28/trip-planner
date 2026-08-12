@@ -12,9 +12,13 @@ export type UserId = string;
 /** Epoch milliseconds. Every instant in the document is one of these. */
 export type Instant = number;
 
-export type EventKind = 'activity' | 'lodging' | 'flight' | 'transit' | 'note';
+export type EventKind = 'activity' | 'lodging' | 'transit' | 'note';
 
+/** The mode of a "getting here" leg, distinct from a transit event's method. */
 export type TransitMode = 'walk' | 'transit' | 'drive' | 'fly';
+
+/** How a transit-kind journey is made. A flight is one of these now. */
+export type TransitMethod = 'flight' | 'train' | 'bus' | 'car' | 'ferry' | 'other';
 
 export interface Place {
   label: string;
@@ -63,36 +67,42 @@ export interface EventTodo {
 }
 
 /**
- * The parts of a flight that are not already on the event.
+ * A journey that is an itinerary event in its own right.
  *
- * There are no times here. A flight departs at the event's `startsAt` and lands
- * `durationMinutes` later, which is what the calendar, the editor, and the
- * boarding-pass strip all read. Storing the two instants again would let a
- * record disagree with itself, and the copy nothing keeps current is the one
- * that ends up being read.
+ * There are no times here. A journey departs at the event's `startsAt` and
+ * arrives `durationMinutes` later, which is what the calendar, the editor, and
+ * the summary all read. Storing the two instants again would let a record
+ * disagree with itself, and the copy nothing keeps current is the one that ends
+ * up being read.
+ *
+ * The fields are a superset: a flight fills most of them, a walk barely any.
+ * Which ones the editor offers depends on `method`, but the document holds
+ * whatever was set, so changing the method never throws a value away.
  */
-export interface FlightDetails {
-  airline?: string;
+export interface TransitDetails {
+  method: TransitMethod;
+  /** Airline, train operator, bus line, ferry company, or rental firm. */
+  operator?: string;
+  /** Flight number, train service, or route number. */
   number?: string;
-  /** IATA codes. */
+  /** Departure point: an airport IATA code, a station, a stop, or a port. */
   from?: string;
   to?: string;
-  /** City at each end. Airport selection fills these, and they remain editable. */
+  /** City at each end. Picking an airport fills these, and they stay editable. */
   fromCity?: string;
   toCity?: string;
-  /** Zone of each airport, so a ticket's local clock survives a zone change. */
+  /** Zone at each end, so a ticket's local clock survives a zone change. */
   departsTz?: string;
   arrivesTz?: string;
   seat?: string;
+  /** Flight or ferry terminal. */
   terminal?: string;
+  /** Flight gate. */
   gate?: string;
-}
-
-/** A journey that is an itinerary event in its own right. */
-export interface TransitDetails {
-  mode: TransitMode;
-  fromCity?: string;
-  toCity?: string;
+  /** Train platform. */
+  platform?: string;
+  /** Train coach or carriage. */
+  coach?: string;
 }
 
 export interface LodgingDetails {
@@ -194,7 +204,6 @@ export interface TripEvent {
   /** Optional for events created before todos were added. */
   todos?: Record<TodoId, EventTodo>;
   customFields: Record<FieldDefId, CustomValue>;
-  flight?: FlightDetails;
   transit?: TransitDetails;
   lodging?: LodgingDetails;
   /**

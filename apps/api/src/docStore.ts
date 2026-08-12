@@ -4,6 +4,7 @@ import {
   eventSearchText,
   normalizeBookingStatus,
   normalizeBookingStatuses,
+  normalizeEventKinds,
   type Doc,
   type TripDoc,
 } from '@trip/crdt';
@@ -72,7 +73,7 @@ export class DocStore {
     }
 
     const beforeNormalization = doc;
-    doc = normalizeBookingStatuses(doc);
+    doc = normalizeEventKinds(normalizeBookingStatuses(doc));
     const normalizationChanges = A.getChanges(beforeNormalization, doc);
     if (normalizationChanges.length > 0) {
       this.commit(tripId, doc, normalizationChanges, 'system');

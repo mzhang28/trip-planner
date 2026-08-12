@@ -1,11 +1,11 @@
-import type { FlightDetails, TripEvent } from '@trip/crdt';
+import type { TransitDetails, TripEvent } from '@trip/crdt';
 import { useState } from 'react';
 import { TextField, cn } from '@trip/ui';
 import { Plane, PlaneLanding, PlaneTakeoff } from 'lucide-react';
 import { formatTime, setDay, setTimeOfDay, toDateInput } from '../lib/time';
 import { AirportPicker } from './AirportPicker';
 import { TimeField } from './TimeField';
-import { RouteCityField } from './TransitFields';
+import { RouteCityField, TransitSummary } from './TransitFields';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -69,7 +69,7 @@ export function FlightFields({
   // Why an arrival date was refused. The time field says its own piece; a date
   // control has nowhere to put a message.
   const [arrivalProblem, setArrivalProblem] = useState<string | null>(null);
-  const flight = event.flight ?? {};
+  const flight = event.transit ?? { method: 'flight' as const };
   const departsTz = flight.departsTz ?? event.timezone ?? homeTimezone;
   const arrivesTz = flight.arrivesTz ?? departsTz;
   const arrivesAt =
@@ -77,15 +77,15 @@ export function FlightFields({
       ? undefined
       : event.startsAt + event.durationMinutes * 60_000;
 
-  const patchFlight = (next: Partial<FlightDetails>) =>
-    onPatch({ flight: { ...flight, ...next } });
+  const patchFlight = (next: Partial<TransitDetails>) =>
+    onPatch({ transit: { ...flight, ...next } });
 
   /** Changes the departure zone without changing what the ticket's clock says. */
-  function setDepartureZone(timezone: string, nextFlight: Partial<FlightDetails> = {}) {
+  function setDepartureZone(timezone: string, nextFlight: Partial<TransitDetails> = {}) {
     if (event.startsAt === undefined) {
       onPatch({
         timezone,
-        flight: { ...flight, ...nextFlight, departsTz: timezone },
+        transit: { ...flight, ...nextFlight, departsTz: timezone },
       });
       return;
     }
@@ -106,12 +106,12 @@ export function FlightFields({
       startsAt: moved,
       durationMinutes: nextDuration,
       timezone,
-      flight: { ...flight, ...nextFlight, departsTz: timezone },
+      transit: { ...flight, ...nextFlight, departsTz: timezone },
     });
   }
 
   /** Changes the arrival zone and preserves the local day and time. */
-  function setArrivalZone(timezone: string, nextFlight: Partial<FlightDetails> = {}) {
+  function setArrivalZone(timezone: string, nextFlight: Partial<TransitDetails> = {}) {
     let durationMinutes = event.durationMinutes;
     if (arrivesAt !== undefined && event.startsAt !== undefined) {
       const moved = moveWallClock(arrivesAt, arrivesTz, timezone);
@@ -122,7 +122,7 @@ export function FlightFields({
 
     onPatch({
       durationMinutes,
-      flight: { ...flight, ...nextFlight, arrivesTz: timezone },
+      transit: { ...flight, ...nextFlight, arrivesTz: timezone },
     });
   }
 
@@ -140,7 +140,7 @@ export function FlightFields({
       // to the departure airport too.
       timezone: departsTz,
       timeUndecided: timed ? undefined : true,
-      flight: { ...flight, departsTz },
+      transit: { ...flight, departsTz },
     });
   }
 
@@ -162,7 +162,7 @@ export function FlightFields({
       startsAt: at,
       timezone: departsTz,
       timeUndecided: undefined,
-      flight: { ...flight, departsTz },
+      transit: { ...flight, departsTz },
     });
     return null;
   }
@@ -182,7 +182,7 @@ export function FlightFields({
 
     onPatch({
       durationMinutes: Math.round((at - event.startsAt) / 60_000),
-      flight: { ...flight, arrivesTz },
+      transit: { ...flight, arrivesTz },
     });
     return null;
   }
@@ -352,9 +352,9 @@ export function FlightFields({
         <TextField
           label="Airline"
           className="col-span-3 sm:col-auto"
-          defaultValue={flight.airline ?? ''}
+          defaultValue={flight.operator ?? ''}
           placeholder="ANA"
-          onBlur={(e) => patchFlight({ airline: e.currentTarget.value.trim() || undefined })}
+          onBlur={(e) => patchFlight({ operator: e.currentTarget.value.trim() || undefined })}
         />
         <TextField
           label="Flight number"
@@ -402,7 +402,7 @@ function moveWallClock(at: number, fromZone: string, toZone: string): number | n
  * and how much the clock changes in between.
  */
 export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeTimezone: string }) {
-  const flight = event.flight;
+  const flight = event.transit;
   if (!flight?.from && !flight?.to && !flight?.fromCity && !flight?.toCity) return null;
 
   const departsTz = flight.departsTz ?? event.timezone ?? homeTimezone;
@@ -453,6 +453,21 @@ export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeT
         </span>
       )}
     </div>
+  );
+}
+
+/**
+ * A journey's read-only summary, whichever way it is made.
+ *
+ * A flight gets the boarding-pass strip with both airports and their local
+ * times; every other method gets the plainer from/to line. One component so a
+ * caller shows "the journey" without first asking how it is made.
+ */
+export function JourneySummary({ event, homeTimezone }: { event: TripEvent; homeTimezone: string }) {
+  return event.transit?.method === 'flight' ? (
+    <FlightSummary event={event} homeTimezone={homeTimezone} />
+  ) : (
+    <TransitSummary event={event} />
   );
 }
 

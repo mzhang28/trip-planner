@@ -12,7 +12,7 @@ import {
   removeTodo,
   updateEvent,
   updateTodo,
-  type FlightDetails,
+  type TransitDetails,
   type TripDoc,
   type TripEvent,
   type TripFile,
@@ -52,15 +52,20 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'a date as YYYY-MM-DD');
 
 /**
- * A flight's own fields, all optional, none of them times.
+ * A transit journey's own fields, all optional, none of them times.
  *
- * When it departs is the event's `startsAt` and how long it flies is
+ * When it departs is the event's `startsAt` and how long it takes is
  * `durationMinutes`, both of which this tool already sets. Accepting a
  * `departsAt` here too would give a caller two ways to say the same thing and
  * no way to be told which one the app reads.
+ *
+ * The fields are a superset across methods: a flight fills most, a bus few. The
+ * document holds whatever is set, so which method it is only decides which
+ * fields make sense, not which are allowed.
  */
-const flightPatch = z.object({
-  airline: z.string().optional(),
+const transitPatch = z.object({
+  method: z.enum(['flight', 'train', 'bus', 'car', 'ferry', 'other']).optional(),
+  operator: z.string().optional(),
   number: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
@@ -71,6 +76,8 @@ const flightPatch = z.object({
   seat: z.string().optional(),
   terminal: z.string().optional(),
   gate: z.string().optional(),
+  platform: z.string().optional(),
+  coach: z.string().optional(),
 });
 
 export interface ToolContext {
@@ -116,27 +123,30 @@ function describeFile(ctx: ToolContext, file: TripFile): Record<string, unknown>
 }
 
 /**
- * The flight's own fields, named one by one.
+ * A transit journey's fields, named one by one.
  *
- * A document written before flights lost their `departsAt` and `arrivesAt` still
- * carries those keys, and nothing has kept them current since. Returning the
- * stored object whole handed a reader two arrival times that disagreed, and the
- * wrong one looked every bit as authoritative as the right one. Naming the
- * fields means an old key cannot travel back out of here.
+ * A document written before flights folded into transit can still carry retired
+ * keys -- an old `departsAt`, or a `mode` the normalizer replaces with a method.
+ * Returning the stored object whole would hand a reader those stale keys as
+ * though they were current. Naming the fields means only the ones that mean
+ * something now travel back out of here.
  */
-function describeFlight(flight: FlightDetails): Record<string, unknown> {
+function describeTransit(transit: TransitDetails): Record<string, unknown> {
   return {
-    airline: flight.airline,
-    number: flight.number,
-    from: flight.from,
-    to: flight.to,
-    fromCity: flight.fromCity,
-    toCity: flight.toCity,
-    departsTz: flight.departsTz,
-    arrivesTz: flight.arrivesTz,
-    seat: flight.seat,
-    terminal: flight.terminal,
-    gate: flight.gate,
+    method: transit.method,
+    operator: transit.operator,
+    number: transit.number,
+    from: transit.from,
+    to: transit.to,
+    fromCity: transit.fromCity,
+    toCity: transit.toCity,
+    departsTz: transit.departsTz,
+    arrivesTz: transit.arrivesTz,
+    seat: transit.seat,
+    terminal: transit.terminal,
+    gate: transit.gate,
+    platform: transit.platform,
+    coach: transit.coach,
   };
 }
 
@@ -179,8 +189,7 @@ function summarise(ctx: ToolContext, event: TripEvent): Record<string, unknown> 
         : event.startsAt + event.durationMinutes * 60_000,
     timezone: event.timezone,
     durationMinutes: event.durationMinutes,
-    flight: event.flight && describeFlight(event.flight),
-    transit: event.transit,
+    transit: event.transit && describeTransit(event.transit),
     booking: {
       ...event.booking,
       status: bookingStatus === 'booked' ? 'confirmed' : 'flexible',
@@ -235,7 +244,7 @@ export const TOOL_DEFINITIONS = [
   {
     name: 'update_event',
     description:
-      'Change fields on an event. A flight leaves at startsAt and lands durationMinutes later; its airline, number, airports, and zones go under flight.',
+      'Change fields on an event. A journey (kind transit) leaves at startsAt and arrives durationMinutes later; its method, operator, number, from/to points, cities, and zones go under transit. A flight is method "flight".',
   },
   { name: 'delete_event', description: 'Remove an event.' },
   { name: 'set_booking_status', description: 'Mark an event as flexible or confirmed.' },
@@ -265,7 +274,7 @@ export const toolSchemas = {
   create_event: z.object({
     tripId: z.string(),
     name: z.string().min(1),
-    kind: z.enum(['activity', 'lodging', 'flight', 'transit', 'note']).optional(),
+    kind: z.enum(['activity', 'lodging', 'transit', 'note']).optional(),
     city: z.string().optional(),
     startsAt: instant.optional(),
     timezone: z.string().optional(),
@@ -278,7 +287,7 @@ export const toolSchemas = {
     startsAt: instant.optional(),
     timezone: z.string().optional(),
     durationMinutes: z.number().int().positive().optional(),
-    flight: flightPatch.optional(),
+    transit: transitPatch.optional(),
   }),
   delete_event: z.object({ tripId: z.string(), eventId: z.string() }),
   set_booking_status: z.object({
@@ -422,16 +431,19 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       }
 
       /*
-       * Merged onto the flight already there, because a patch key is written
-       * whole: sending `{ flight: { seat: '12A' } }` by itself would take the
-       * airline and the number down with it.
+       * Merged onto the journey already there, because a patch key is written
+       * whole: sending `{ transit: { seat: '12A' } }` by itself would take the
+       * operator and the number down with it.
        *
-       * Only the fields `describeFlight` names survive the merge, so a document
-       * still carrying the retired `departsAt` is rid of it the first time
-       * anything touches its flight.
+       * Only the fields `describeTransit` names survive the merge, so a document
+       * still carrying a retired key is rid of it the first time anything
+       * touches its transit. A journey has to name a method; when neither the
+       * caller nor the stored value does, it is the unspecific one.
        */
-      if (a.flight !== undefined) {
-        patch.flight = { ...describeFlight(existing.flight ?? {}), ...a.flight };
+      if (a.transit !== undefined) {
+        const merged = { ...describeTransit(existing.transit ?? { method: 'other' }), ...a.transit };
+        if (merged.method === undefined) merged.method = 'other';
+        patch.transit = merged;
       }
 
       if (Object.keys(patch).length === 0) return { ok: true, changed: 0 };

@@ -1,5 +1,10 @@
 import * as A from '@automerge/automerge';
-import { canSyncIncrementally, normalizeBookingStatuses, type Doc } from '@trip/crdt';
+import {
+  canSyncIncrementally,
+  normalizeBookingStatuses,
+  normalizeEventKinds,
+  type Doc,
+} from '@trip/crdt';
 import { trips } from '@trip/schema';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -111,7 +116,7 @@ export function syncRoutes() {
           return c.json({ error: 'read_only' }, 403);
         }
 
-        doc = normalizeBookingStatuses(doc);
+        doc = normalizeEventKinds(normalizeBookingStatuses(doc));
         docs.commit(tripId, doc, A.getChanges(current, doc), membership.userId);
       }
 

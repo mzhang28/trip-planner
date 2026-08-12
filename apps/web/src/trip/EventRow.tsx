@@ -6,6 +6,7 @@ import type {
   EventKind,
   FieldDef,
   FieldDefId,
+  TransitMethod,
   TripDoc,
   TripEvent,
 } from '@trip/crdt';
@@ -27,8 +28,7 @@ import { useDisplayZone } from './useDisplayZone';
 import { EventDetails } from './EventDetails';
 import { EventEditor } from './EventEditor';
 import { EVENT_KIND_LABEL, EVENT_KIND_OPTIONS, EventKindIcon } from './EventKind';
-import { FlightSummary } from './FlightFields';
-import { TransitSummary } from './TransitFields';
+import { JourneySummary } from './FlightFields';
 
 export interface EventRowProps {
   event: TripEvent;
@@ -104,9 +104,11 @@ function EventContentIndicators({ event }: { event: TripEvent }) {
 
 function EventKindPicker({
   kind,
+  method,
   onChange,
 }: {
   kind: EventKind;
+  method?: TransitMethod;
   onChange: (kind: EventKind) => void;
 }) {
   return (
@@ -120,7 +122,7 @@ function EventKindPicker({
           'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-1',
         )}
       >
-        <EventKindIcon kind={kind} className="size-5" />
+        <EventKindIcon kind={kind} method={method} className="size-5" />
       </Button>
 
       <Popover
@@ -349,11 +351,7 @@ export function EventRow({
 
   const linkCount = Object.keys(event.links).length;
   const summary = [
-    event.kind === 'flight'
-      ? event.flight?.fromCity ?? event.city
-      : event.kind === 'transit'
-        ? event.transit?.fromCity
-        : event.city,
+    event.kind === 'transit' ? event.transit?.fromCity ?? event.city : event.city,
     event.location?.label,
     linkCount > 0 ? `${linkCount} link${linkCount === 1 ? '' : 's'}` : undefined,
   ].filter(Boolean);
@@ -463,7 +461,11 @@ export function EventRow({
             <span className="tabular w-11 shrink-0 text-xs text-ink-muted">
               {time ?? '--:--'}
             </span>
-            <EventKindPicker kind={event.kind} onChange={(kind) => onPatch({ kind })} />
+            <EventKindPicker
+              kind={event.kind}
+              method={event.transit?.method}
+              onChange={(kind) => onPatch({ kind })}
+            />
             <ColorPicker
               value={event.color}
               label={`Color for ${event.name || 'this event'}`}
@@ -496,7 +498,11 @@ export function EventRow({
               <span className="min-w-0 flex-1">
                 {/* An event made by picking a day is real before it is named. */}
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <EventKindIcon kind={event.kind} className="size-3.5 shrink-0 text-ink-muted" />
+                  <EventKindIcon
+                    kind={event.kind}
+                    method={event.transit?.method}
+                    className="size-3.5 shrink-0 text-ink-muted"
+                  />
                   <span
                     data-testid="event-name"
                     className={cn(
@@ -529,15 +535,9 @@ export function EventRow({
         )}
       </div>
 
-      {event.kind === 'flight' && (
-        <div className="px-3 pb-2">
-          <FlightSummary event={event} homeTimezone={homeTimezone} />
-        </div>
-      )}
-
       {event.kind === 'transit' && (
         <div className="px-3 pb-2">
-          <TransitSummary event={event} />
+          <JourneySummary event={event} homeTimezone={homeTimezone} />
         </div>
       )}
 

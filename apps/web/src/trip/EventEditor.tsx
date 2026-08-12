@@ -26,7 +26,7 @@ import { EventTodos } from './EventTodos';
 import { FieldPalette, type PaletteChip } from './FieldPalette';
 import { FlightFields } from './FlightFields';
 import { PlacePicker } from './PlacePicker';
-import { TransitFields } from './TransitFields';
+import { TransitFields, TransitMethodPicker } from './TransitFields';
 
 const TRANSIT_MODES = [
   { value: 'walk', label: 'Walk' },
@@ -508,14 +508,19 @@ export function EventEditor({
       },
     ];
 
-    if (event.kind === 'flight' || event.kind === 'lodging' || event.kind === 'transit') {
-      // A stay and flight own their schedule, so the generic controls would
-      // drift from them. Flights and transit also own both route endpoints;
-      // one generic City or Place field cannot describe those two places.
+    // A flight is a transit event whose method is flight; it keeps the timeline
+    // at each airport the old flight kind had, so it alone among journeys owns
+    // its schedule and both city fields.
+    const isFlight = event.kind === 'transit' && (event.transit?.method ?? 'other') === 'flight';
+
+    if (event.kind === 'lodging' || event.kind === 'transit') {
+      // A stay and a flight own their schedule, so the generic controls would
+      // drift from them. Every journey owns both route endpoints; one generic
+      // City or Place field cannot describe those two places.
       const owned = new Set([
-        ...(event.kind === 'transit' ? [] : ['when', 'duration']),
-        ...(event.kind === 'flight' ? ['city', 'place'] : []),
-        ...(event.kind === 'transit' ? ['city', 'place', 'transit'] : []),
+        ...(event.kind === 'lodging' || isFlight ? ['when', 'duration'] : []),
+        ...(isFlight ? ['city', 'place'] : []),
+        ...(event.kind === 'transit' && !isFlight ? ['city', 'place', 'transit'] : []),
       ]);
       for (let index = list.length - 1; index >= 0; index -= 1) {
         if (owned.has(list[index]!.key)) list.splice(index, 1);
@@ -623,37 +628,39 @@ export function EventEditor({
       });
     }
 
-    if (event.kind === 'flight') {
-      list.push({
-        key: 'flight',
-        label: 'Flight',
-        width: 'full',
-        filled: true,
-        render: () => (
-          <FlightFields
-            event={event}
-            homeTimezone={homeTimezone}
-            cityColors={doc?.cityColors}
-            onPatch={(patch) => onPatch(patch)}
-            onSetCityColor={onSetCityColor}
-          />
-        ),
-      });
-    }
-
     if (event.kind === 'transit') {
+      const method = event.transit?.method ?? 'other';
+
       list.push({
         key: 'route',
-        label: 'Route',
+        label: 'Journey',
         width: 'full',
         filled: true,
         render: () => (
-          <TransitFields
-            event={event}
-            cityColors={doc?.cityColors}
-            onPatch={(patch) => onPatch(patch)}
-            onSetCityColor={onSetCityColor}
-          />
+          <div className="flex flex-col gap-3">
+            <TransitMethodPicker
+              method={method}
+              // Method lives on transit, so setting it keeps whatever else is
+              // there and gives an event that had no transit yet one.
+              onChange={(next) => onPatch({ transit: { ...(event.transit ?? {}), method: next } })}
+            />
+            {method === 'flight' ? (
+              <FlightFields
+                event={event}
+                homeTimezone={homeTimezone}
+                cityColors={doc?.cityColors}
+                onPatch={(patch) => onPatch(patch)}
+                onSetCityColor={onSetCityColor}
+              />
+            ) : (
+              <TransitFields
+                event={event}
+                cityColors={doc?.cityColors}
+                onPatch={(patch) => onPatch(patch)}
+                onSetCityColor={onSetCityColor}
+              />
+            )}
+          </div>
         ),
       });
     }

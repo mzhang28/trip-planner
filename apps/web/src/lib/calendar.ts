@@ -248,23 +248,12 @@ function cityTransitions(events: TripEvent[], homeTimezone: string): CityTransit
   for (const event of events) {
     if (event.startsAt === undefined) continue;
 
-    const departureZone =
-      event.kind === 'flight'
-        ? event.flight?.departsTz ?? event.timezone ?? homeTimezone
-        : event.timezone ?? homeTimezone;
-    const fromCity =
-      event.kind === 'flight'
-        ? event.flight?.fromCity ?? event.city
-        : event.kind === 'transit'
-          ? event.transit?.fromCity ?? event.city
-          : event.city;
-    const toCity =
-      event.kind === 'flight'
-        ? event.flight?.toCity
-        : event.kind === 'transit'
-          ? event.transit?.toCity
-          : undefined;
-    const isJourney = event.kind === 'flight' || event.kind === 'transit';
+    const isJourney = event.kind === 'transit';
+    const departureZone = isJourney
+      ? event.transit?.departsTz ?? event.timezone ?? homeTimezone
+      : event.timezone ?? homeTimezone;
+    const fromCity = isJourney ? event.transit?.fromCity ?? event.city : event.city;
+    const toCity = isJourney ? event.transit?.toCity : undefined;
 
     const departure = cityTransition(event.startsAt, departureZone, fromCity, {
       timeUndecided: event.timeUndecided,
@@ -285,8 +274,7 @@ function cityTransitions(events: TripEvent[], homeTimezone: string): CityTransit
     }
 
     const arrivesAt = event.startsAt + event.durationMinutes * 60_000;
-    const arrivalZone =
-      event.kind === 'flight' ? event.flight?.arrivesTz ?? departureZone : departureZone;
+    const arrivalZone = isJourney ? event.transit?.arrivesTz ?? departureZone : departureZone;
     const arrival = cityTransition(arrivesAt, arrivalZone, toCity);
     if (arrival) transitions.push(arrival);
   }
