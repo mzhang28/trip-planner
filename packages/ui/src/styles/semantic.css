@@ -96,41 +96,47 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --surface-page: var(--grey-900);
-  --surface-card: var(--grey-850);
-  --surface-raised: var(--grey-800);
-  --surface-sunken: var(--grey-950);
+  /*
+   * Keep the cool, ink-like character of the theme, but start two steps above
+   * black. The old page/card pair only differed by 1.11:1, which made the app
+   * read as one nearly black sheet. This wider run gives cards and raised
+   * controls a visible place in the hierarchy without turning them grey.
+   */
+  --surface-page: var(--grey-850);
+  --surface-card: var(--grey-800);
+  --surface-raised: var(--grey-700);
+  --surface-sunken: var(--grey-900);
   --surface-inverse: var(--grey-50);
   --surface-overlay: rgb(5 7 9 / 0.62);
 
-  --text-primary: var(--grey-50);
-  --text-secondary: var(--grey-300);
-  --text-muted: var(--grey-400);
-  --text-placeholder: var(--grey-500);
+  --text-primary: var(--grey-25);
+  --text-secondary: var(--grey-200);
+  --text-muted: var(--grey-300);
+  --text-placeholder: var(--grey-300);
   --text-inverse: var(--grey-900);
 
-  --border-subtle: var(--grey-800);
-  --border-default: var(--grey-700);
-  --border-strong: var(--grey-600);
-  --border-input: var(--grey-500);
+  --border-subtle: var(--grey-700);
+  --border-default: var(--grey-600);
+  --border-strong: var(--grey-500);
+  --border-input: var(--grey-400);
 
-  --status-booked: var(--green-300);
-  --status-booked-text: var(--green-300);
-  --status-booked-soft: var(--green-950);
+  --status-booked: var(--green-275);
+  --status-booked-text: var(--green-275);
+  --status-booked-soft: var(--green-900);
 
   --status-pending: var(--amber-400);
   --status-pending-text: var(--amber-400);
-  --status-pending-soft: var(--amber-950);
+  --status-pending-soft: var(--amber-900);
 
   --status-idea: var(--grey-400);
   /* A step lighter than the mark, so the label still clears 4.5:1 on idea-soft. */
   --status-idea-text: var(--grey-300);
-  --status-idea-soft: var(--grey-800);
+  --status-idea-soft: var(--grey-700);
 
   --accent: var(--indigo-400);
-  --accent-text: var(--indigo-350);
-  --accent-hover: var(--indigo-350);
-  --accent-soft: var(--indigo-950);
+  --accent-text: var(--indigo-325);
+  --accent-hover: var(--indigo-325);
+  --accent-soft: var(--indigo-900);
   --accent-ink: var(--grey-950);
 
   --accent-now: var(--vermilion-400);
