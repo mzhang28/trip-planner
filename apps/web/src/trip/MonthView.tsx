@@ -2,7 +2,7 @@ import type { TripEvent } from '@trip/crdt';
 import { StatusSpine, cn, coloredSurfaceStyle } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
 import type { DayKey } from '../lib/calendar';
-import { citySegments, eventsByDay, monthGrid, monthOf } from '../lib/calendar';
+import { addDays, cityDaySegments, eventsByDay, fourWeekGrid } from '../lib/calendar';
 import { EventKindIcon } from './EventKind';
 import { weatherGlyph, type DailyWeather } from './useWeather';
 
@@ -10,6 +10,8 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export interface MonthViewProps {
   anchor: DayKey;
+  tripStart: DayKey;
+  tripEnd: DayKey;
   events: TripEvent[];
   cityColors?: Record<string, string>;
   homeTimezone: string;
@@ -22,7 +24,7 @@ export interface MonthViewProps {
 }
 
 /**
- * One day in the month.
+ * One day in the four-week view.
  *
  * The date opens the day and the space below it makes an event on that day.
  * Two jobs, two targets: a single click that both opened the day and created
@@ -51,7 +53,7 @@ function DayCell({
       ref={setNodeRef}
       data-testid={`day-${day}`}
       className={cn(
-        'group relative flex min-h-16 flex-col items-stretch gap-0.5 sm:min-h-20 lg:min-h-24 xl:min-h-28',
+        'group relative flex min-h-0 flex-col items-stretch gap-0.5 overflow-hidden',
         isOver && 'bg-accent-soft',
         className,
       )}
@@ -86,15 +88,17 @@ function DayCell({
 }
 
 /**
- * A month read as places rather than as appointments.
+ * Four weeks read as places rather than as appointments.
  *
- * Consecutive days in one city join into a continuous band carrying the name,
- * so a month of a trip shows three or four places instead of thirty separate
- * squares. What someone wants from a month of a trip is where they are, and
- * only then what is on.
+ * Each day's background is a 24-hour strip. A city change at noon therefore
+ * puts the first city's colour in the top half and the next city's colour in
+ * the bottom half. The fixed four rows use the available height without
+ * making the route scroll.
  */
 export function MonthView({
   anchor,
+  tripStart,
+  tripEnd,
   events,
   cityColors,
   homeTimezone,
@@ -104,19 +108,13 @@ export function MonthView({
   onOpenDay,
   onCreateOn,
 }: MonthViewProps) {
-  const days = monthGrid(anchor);
+  const days = fourWeekGrid(anchor);
   const byDay = eventsByDay(events, homeTimezone);
-  const cities = citySegments(byDay, days);
-  const thisMonth = monthOf(anchor);
-
-  const weeks: DayKey[][] = [];
-  for (let index = 0; index < days.length; index += 7) {
-    weeks.push(days.slice(index, index + 7));
-  }
+  const citiesByDay = cityDaySegments(events, days, homeTimezone);
 
   return (
-    <div>
-      <div className="grid grid-cols-7 gap-px pb-1">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="grid shrink-0 grid-cols-7 gap-px pb-1">
         {WEEKDAYS.map((label) => (
           <div key={label} className="px-1 text-2xs font-medium text-ink-muted">
             {label}
@@ -124,49 +122,62 @@ export function MonthView({
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-line">
-        {weeks.map((week) => (
-          <div key={week[0]}>
-            {/* The place ribbon, drawn across the week above its days. */}
-            <div className="grid grid-cols-7 gap-px bg-line">
-              {week.map((day) => {
-                const segment = cities.find((run) => day >= run.from && day <= run.to);
-                const startsHere = segment && (segment.from === day || day === week[0]);
+      <div
+        data-testid="month-grid"
+        className="grid min-h-0 flex-1 grid-cols-7 grid-rows-4 gap-px overflow-hidden rounded-lg border border-line bg-line"
+      >
+        {days.map((day, dayIndex) => {
+          const dayEvents = byDay.get(day) ?? [];
+          const forecast = weather.get(day);
+          const glyph = forecast ? weatherGlyph(forecast.code) : null;
+          const outside = day < tripStart || day > tripEnd;
+          const cityBands = citiesByDay.get(day) ?? [];
+          const previousBands = citiesByDay.get(addDays(day, -1)) ?? [];
+          const previousCity = previousBands.at(-1)?.label;
 
-                return (
-                  <div
-                    key={day}
-                    style={coloredSurfaceStyle(
-                      segment ? cityColors?.[segment.label] : undefined,
-                    )}
-                    className={cn(
-                      'truncate px-1.5 py-0.5 text-2xs font-medium',
-                      segment ? 'bg-accent-soft text-accent-text' : 'bg-card',
-                    )}
-                  >
-                    {/* Empty, not transparent: see the week view. */}
-                    {startsHere ? segment.label : ''}
-                  </div>
-                );
-              })}
-            </div>
+          return (
+            <DayCell
+              key={day}
+              day={day}
+              disabled={readOnly}
+              onOpen={() => onOpenDay(day)}
+              onCreate={() => onCreateOn(day)}
+              className={outside ? 'bg-sunken' : 'bg-card'}
+            >
+              {cityBands.length > 0 && (
+                <div className="pointer-events-none absolute inset-0 flex flex-col">
+                  {cityBands.map((band) => {
+                    const duration = band.toMinute - band.fromMinute;
+                    const namesThisBand =
+                      band.fromMinute > 0 || dayIndex % 7 === 0 || previousCity !== band.label;
 
-            <div className="grid grid-cols-7 gap-px bg-line">
-              {week.map((day) => {
-                const dayEvents = byDay.get(day) ?? [];
-                const forecast = weather.get(day);
-                const glyph = forecast ? weatherGlyph(forecast.code) : null;
-                const outside = monthOf(day) !== thisMonth;
+                    return (
+                      <div
+                        key={`${band.label}:${band.fromMinute}`}
+                        data-testid="city-time-band"
+                        data-city={band.label}
+                        data-from-minute={band.fromMinute}
+                        data-to-minute={band.toMinute}
+                        style={{
+                          flexBasis: 0,
+                          flexGrow: duration,
+                          ...coloredSurfaceStyle(cityColors?.[band.label]),
+                        }}
+                        className={cn(
+                          'min-h-0 overflow-hidden px-1.5 py-0.5 text-2xs font-medium',
+                          namesThisBand && band.fromMinute === 0 && 'pl-6',
+                          cityColors?.[band.label]
+                            ? undefined
+                            : 'bg-accent-soft text-accent-text',
+                        )}
+                      >
+                        {namesThisBand ? band.label : ''}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-                return (
-                  <DayCell
-                    key={day}
-                    day={day}
-                    disabled={readOnly}
-                    onOpen={() => onOpenDay(day)}
-                    onCreate={() => onCreateOn(day)}
-                    className={outside ? 'bg-sunken' : 'bg-card'}
-                  >
                     <span className="relative z-10 flex items-baseline justify-between gap-1 p-1">
                       <button
                         type="button"
@@ -247,12 +258,9 @@ export function MonthView({
                         )}
                       </button>
                     )}
-                  </DayCell>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+            </DayCell>
+          );
+        })}
       </div>
     </div>
   );

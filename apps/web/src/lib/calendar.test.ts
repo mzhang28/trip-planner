@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   clampDay,
+  cityDaySegments,
   citySegments,
   daysInRange,
   eventsByDay,
+  fourWeekGrid,
   lodgingSpans,
   monthGrid,
   openingDay,
@@ -77,6 +79,15 @@ describe('day arithmetic', () => {
     // A trip starting on the 30th needs its row complete, so the days either
     // side of the month are real cells rather than blanks.
     expect(grid[grid.length - 1]!).toBe('2026-09-06');
+  });
+
+  it('draws a month-ish view as exactly four weeks around its focus', () => {
+    const grid = fourWeekGrid('2026-08-12');
+
+    expect(grid).toHaveLength(28);
+    expect(grid[0]).toBe('2026-07-27');
+    expect(grid[27]).toBe('2026-08-23');
+    expect(grid.indexOf('2026-08-12')).toBe(16);
   });
 
   it('builds and clamps a finite inclusive range', () => {
@@ -157,6 +168,56 @@ describe('city segments', () => {
   it('finds nothing when no event names a city', () => {
     const byDay = eventsByDay([event({ startsAt: at('2026-08-12') })], TOKYO);
     expect(citySegments(byDay, days)).toEqual([]);
+  });
+});
+
+describe('city coverage within a day', () => {
+  const days = ['2026-08-11', '2026-08-12', '2026-08-13'];
+
+  it('splits the day at the precise time a new city begins', () => {
+    const segments = cityDaySegments(
+      [
+        event({ city: 'San Francisco', startsAt: at('2026-08-12', 0) }),
+        event({ city: 'Tokyo', startsAt: at('2026-08-12', 15) }),
+      ],
+      days,
+      TOKYO,
+    );
+
+    expect(segments.get('2026-08-12')).toEqual([
+      { label: 'San Francisco', fromMinute: 0, toMinute: 15 * 60 },
+      { label: 'Tokyo', fromMinute: 15 * 60, toMinute: 24 * 60 },
+    ]);
+  });
+
+  it('carries the last known city into later days and into the visible range', () => {
+    const segments = cityDaySegments(
+      [event({ city: 'Kyoto', startsAt: at('2026-08-10', 18) })],
+      days,
+      TOKYO,
+    );
+
+    expect(segments.get('2026-08-11')).toEqual([
+      { label: 'Kyoto', fromMinute: 0, toMinute: 24 * 60 },
+    ]);
+    expect(segments.get('2026-08-13')).toEqual([
+      { label: 'Kyoto', fromMinute: 0, toMinute: 24 * 60 },
+    ]);
+  });
+
+  it('uses midnight for a city whose time is undecided', () => {
+    const segments = cityDaySegments(
+      [
+        event({ city: 'Kyoto', startsAt: at('2026-08-11', 12) }),
+        event({ city: 'Osaka', startsAt: at('2026-08-12'), timeUndecided: true }),
+      ],
+      days,
+      TOKYO,
+    );
+
+    expect(segments.get('2026-08-12')).toEqual([
+      { label: 'Osaka', fromMinute: 0, toMinute: 24 * 60 },
+    ]);
   });
 });
 

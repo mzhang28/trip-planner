@@ -40,7 +40,7 @@ import { Link, useParams } from 'react-router';
 import { ApiError, api, type TripSummary } from '../lib/api';
 import { randomId } from '../lib/crypto';
 import { dayKey, formatDayHeading, moveToDay, setDay, setTimeOfDay } from '../lib/time';
-import { clampDay, eventDay, tripDateRange, type DayKey } from '../lib/calendar';
+import { addDays, clampDay, eventDay, tripDateRange, type DayKey } from '../lib/calendar';
 import { DayMap } from '../trip/DayMap';
 import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
 import { useUploadFlush } from '../trip/Attachments';
@@ -96,6 +96,12 @@ function groupByDay(events: TripEvent[], homeTimezone: string) {
   }
 
   return [...days.entries()];
+}
+
+function middleDay(start: DayKey, end: DayKey): DayKey {
+  const dayMilliseconds = 24 * 60 * 60 * 1000;
+  const duration = Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`);
+  return addDays(start, Math.floor(duration / dayMilliseconds / 2));
 }
 
 function HeaderActions({
@@ -617,7 +623,12 @@ export function TripView() {
               label="Calendar view"
               options={VIEW_OPTIONS}
               value={view}
-              onChange={setView}
+              onChange={(nextView) => {
+                if (nextView === 'month' && view !== 'month') {
+                  moveAnchor(middleDay(tripRange.start, tripRange.end));
+                }
+                setView(nextView);
+              }}
             />
             <HeaderActions
               canShare={trip?.role === 'owner'}
@@ -641,11 +652,9 @@ export function TripView() {
       </header>
 
       <main
-        className={`min-h-0 w-full flex-1 px-4 py-6 sm:px-6 lg:px-8 ${
-          view === 'month' ? 'overflow-y-auto' : 'flex flex-col overflow-hidden'
-        }`}
+        className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-4 py-6 sm:px-6 lg:px-8"
       >
-        <div className={view === 'month' ? undefined : 'shrink-0'}>
+        <div className="shrink-0">
         {state && store && <RecoveryBanner state={state} store={store} />}
 
         {/*
@@ -706,7 +715,7 @@ export function TripView() {
         />
         </div>
 
-        <div className={view === 'month' ? undefined : 'min-h-0 flex-1 overflow-hidden'}>
+        <div className="min-h-0 flex-1 overflow-hidden">
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           {/*
             Everything still waiting for a day. The week and the month are
@@ -767,6 +776,8 @@ export function TripView() {
           {view === 'month' && (
             <MonthView
               anchor={anchor}
+              tripStart={tripRange.start}
+              tripEnd={tripRange.end}
               events={events}
               cityColors={doc?.cityColors}
               homeTimezone={homeTimezone}

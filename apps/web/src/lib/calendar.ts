@@ -97,6 +97,19 @@ export function monthGrid(day: DayKey): DayKey[] {
   return cells;
 }
 
+/**
+ * Four complete weeks around a focal day.
+ *
+ * A four-row board cannot put every weekday at the exact midpoint. The week
+ * containing the focal day goes in whichever of the two middle rows keeps the
+ * day closest to the centre of the 28-day range.
+ */
+export function fourWeekGrid(day: DayKey): DayKey[] {
+  const weeksBefore = weekdayOf(day) <= 3 ? 2 : 1;
+  const start = addDays(startOfWeek(day), -weeksBefore * 7);
+  return Array.from({ length: 28 }, (_, index) => addDays(start, index));
+}
+
 export function monthOf(day: DayKey): string {
   return day.slice(0, 7);
 }
@@ -173,6 +186,114 @@ export function citySegments(
 
   if (current) segments.push(current);
   return segments;
+}
+
+export interface CityDaySegment {
+  label: string;
+  /** Minute of the day at which this city starts, from 0 through 1439. */
+  fromMinute: number;
+  /** Exclusive end, up to 1440. */
+  toMinute: number;
+}
+
+interface CityTransition {
+  day: DayKey;
+  minute: number;
+  label: string;
+  startsAt: number;
+}
+
+/** The event's wall-clock minute in the place where it happens. */
+function eventMinute(event: TripEvent, homeTimezone: string): number {
+  if (event.startsAt === undefined || event.timeUndecided) return 0;
+
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: event.timezone ?? homeTimezone,
+  }).formatToParts(event.startsAt);
+  const part = (type: 'hour' | 'minute') =>
+    Number(parts.find((candidate) => candidate.type === type)?.value ?? 0);
+
+  return part('hour') * 60 + part('minute');
+}
+
+/**
+ * The cities occupying each day, split at the exact time a new city begins.
+ *
+ * A named city carries through later days until another timed event names a
+ * different one. On the first named day, the first city covers midnight up to
+ * any later transition because there is no earlier known location to show.
+ */
+export function cityDaySegments(
+  events: TripEvent[],
+  days: DayKey[],
+  homeTimezone: string,
+): Map<DayKey, CityDaySegment[]> {
+  const result = new Map<DayKey, CityDaySegment[]>();
+  if (days.length === 0) return result;
+
+  const transitions: CityTransition[] = events
+    .filter(
+      (event): event is TripEvent & { city: string; startsAt: number } =>
+        Boolean(event.city) && event.startsAt !== undefined,
+    )
+    .map((event) => ({
+      day: eventDay(event, homeTimezone)!,
+      minute: eventMinute(event, homeTimezone),
+      label: event.city,
+      startsAt: event.startsAt,
+    }))
+    .sort(
+      (a, b) =>
+        a.day.localeCompare(b.day) || a.minute - b.minute || a.startsAt - b.startsAt,
+    );
+
+  let carried: string | null = null;
+  let transitionIndex = 0;
+
+  while (
+    transitionIndex < transitions.length &&
+    transitions[transitionIndex]!.day < days[0]!
+  ) {
+    carried = transitions[transitionIndex]!.label;
+    transitionIndex += 1;
+  }
+
+  for (const day of days) {
+    while (transitionIndex < transitions.length && transitions[transitionIndex]!.day < day) {
+      carried = transitions[transitionIndex]!.label;
+      transitionIndex += 1;
+    }
+
+    const today: CityTransition[] = [];
+    while (transitionIndex < transitions.length && transitions[transitionIndex]!.day === day) {
+      today.push(transitions[transitionIndex]!);
+      transitionIndex += 1;
+    }
+
+    let current = carried ?? today[0]?.label ?? null;
+    let fromMinute = 0;
+    const segments: CityDaySegment[] = [];
+
+    for (const transition of today) {
+      if (transition.label === current) continue;
+      if (current && transition.minute > fromMinute) {
+        segments.push({ label: current, fromMinute, toMinute: transition.minute });
+      }
+      current = transition.label;
+      fromMinute = transition.minute;
+    }
+
+    if (current) {
+      segments.push({ label: current, fromMinute, toMinute: 24 * 60 });
+      carried = current;
+    }
+    result.set(day, segments);
+  }
+
+  return result;
 }
 
 export interface LodgingSpan {

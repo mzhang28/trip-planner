@@ -164,15 +164,55 @@ test.describe('week and month views', () => {
      * Named once per week row it runs into, not once per day.
      *
      * A band that continues onto the next row needs its name again, or the
-     * second row is an unlabelled stripe. But repeating it in all 42 cells
+     * second row is an unlabelled stripe. But repeating it in all 28 cells
      * would be the grid of dots this view exists to avoid, so the count has to
-     * stay at or below the six rows a month grid can have.
+     * stay at or below the four rows this view has.
      */
     const labels = page.getByText('Kyoto', { exact: true });
     const count = await labels.count();
     expect(count).toBeGreaterThanOrEqual(1);
-    expect(count).toBeLessThanOrEqual(6);
+    expect(count).toBeLessThanOrEqual(4);
   });
+
+  test(
+    'the month-ish view is four rows, fits its space, and splits cities by time',
+    { tag: '@responsive' },
+    async ({ page }) => {
+      await page.goto('/');
+      await newTrip(page, 'Pacific crossing');
+      await setTripDates(page, '2026-08-10', '2026-08-16');
+      await addEvent(page, 'Morning in SF', 'San Francisco', '00:00');
+      await addEvent(page, 'Arrive Tokyo', 'Tokyo', '15:00');
+
+      await switchTo(page, 'Month');
+
+      const grid = page.getByTestId('month-grid');
+      await expect(grid.locator('[data-testid^="day-"]')).toHaveCount(28);
+      await expect(page.getByTestId('day-2026-08-13')).toBeVisible();
+
+      const cell = page.getByTestId(`day-${ON}`);
+      const sf = cell.locator('[data-testid="city-time-band"][data-city="San Francisco"]');
+      const tokyo = cell.locator('[data-testid="city-time-band"][data-city="Tokyo"]');
+      await expect(sf).toHaveAttribute('data-from-minute', '0');
+      await expect(sf).toHaveAttribute('data-to-minute', '900');
+      await expect(tokyo).toHaveAttribute('data-from-minute', '900');
+      await expect(tokyo).toHaveAttribute('data-to-minute', '1440');
+
+      const [cellBox, sfBox, tokyoBox] = await Promise.all([
+        cell.boundingBox(),
+        sf.boundingBox(),
+        tokyo.boundingBox(),
+      ]);
+      if (!cellBox || !sfBox || !tokyoBox) throw new Error('no month city-band bounds');
+      expect(sfBox.height / cellBox.height).toBeCloseTo(15 / 24, 1);
+      expect(tokyoBox.height / cellBox.height).toBeCloseTo(9 / 24, 1);
+
+      const mainFits = await page.locator('main').evaluate(
+        (element) => element.scrollHeight <= element.clientHeight,
+      );
+      expect(mainFits).toBe(true);
+    },
+  );
 
   test('a month names what is on each day and opens the day when clicked', async ({ page }) => {
     await page.goto('/');

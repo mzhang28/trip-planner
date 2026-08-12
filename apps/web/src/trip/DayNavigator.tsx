@@ -1,7 +1,7 @@
 import { Button, IconButton, cn } from '@trip/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DayKey } from '../lib/calendar';
-import { addDays, clampDay } from '../lib/calendar';
+import { addDays, clampDay, fourWeekGrid } from '../lib/calendar';
 import {
   setCalendarDisplaySettings,
   useCalendarDisplaySettings,
@@ -23,11 +23,16 @@ function describe(view: CalendarView, anchor: DayKey, tripEnd?: DayKey): string 
   const at = Date.parse(`${anchor}T12:00:00Z`);
 
   if (view === 'month') {
-    return new Intl.DateTimeFormat('en-GB', {
-      month: 'long',
+    const days = fourWeekGrid(anchor);
+    const format = new Intl.DateTimeFormat('en-GB', {
+      day: 'numeric',
+      month: 'short',
       year: 'numeric',
       timeZone: 'UTC',
-    }).format(at);
+    });
+    return `${format.format(Date.parse(`${days[0]}T12:00:00Z`))} – ${format.format(
+      Date.parse(`${days.at(-1)}T12:00:00Z`),
+    )}`;
   }
 
   if (view === 'week') {
