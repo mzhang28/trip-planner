@@ -297,6 +297,73 @@ describe('the remote MCP server', () => {
     expect(event.flight).toMatchObject({ airline: 'Delta', number: '860', from: 'BOS', seat: '14C' });
   });
 
+  it('adds, changes, and removes a to-do, and reads it back on the event', async () => {
+    const { accessToken, tripId } = await connect();
+
+    const created = await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Fushimi Inari' },
+    });
+    const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
+
+    const added = await rpc(app, accessToken, 'tools/call', {
+      name: 'add_todo',
+      arguments: { tripId, eventId, text: 'Buy the train ticket', deadline: '2026-04-10' },
+    });
+    expect(added.body.result.isError, added.body.result.content[0].text).toBeUndefined();
+    const { todoId } = JSON.parse(added.body.result.content[0].text) as { todoId: string };
+
+    // The event carries its to-dos, so an agent reads the id it needs to change.
+    const withTodo = await rpc(app, accessToken, 'tools/call', {
+      name: 'get_event',
+      arguments: { tripId, eventId },
+    });
+    expect(JSON.parse(withTodo.body.result.content[0].text).event.todos).toMatchObject([
+      { id: todoId, text: 'Buy the train ticket', completed: false, deadline: '2026-04-10' },
+    ]);
+
+    // Marking it done leaves the text and deadline as they were.
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'update_todo',
+      arguments: { tripId, eventId, todoId, completed: true },
+    });
+    const done = await rpc(app, accessToken, 'tools/call', {
+      name: 'get_event',
+      arguments: { tripId, eventId },
+    });
+    expect(JSON.parse(done.body.result.content[0].text).event.todos[0]).toMatchObject({
+      text: 'Buy the train ticket',
+      completed: true,
+      deadline: '2026-04-10',
+    });
+
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'remove_todo',
+      arguments: { tripId, eventId, todoId },
+    });
+    const gone = await rpc(app, accessToken, 'tools/call', {
+      name: 'get_event',
+      arguments: { tripId, eventId },
+    });
+    expect(JSON.parse(gone.body.result.content[0].text).event.todos).toEqual([]);
+  });
+
+  it('refuses a deadline that is not a plain date', async () => {
+    const { accessToken, tripId } = await connect();
+
+    const created = await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Fushimi Inari' },
+    });
+    const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
+
+    const bad = await rpc(app, accessToken, 'tools/call', {
+      name: 'add_todo',
+      arguments: { tripId, eventId, text: 'Pack', deadline: '2026-04-10T09:00:00Z' },
+    });
+    expect(bad.body.result.isError).toBe(true);
+  });
+
   it('says when an event is over, so nobody adds up a duration across a date line', async () => {
     const { accessToken, tripId } = await connect();
 
@@ -1403,6 +1470,43 @@ describe('undoing what an agent did', () => {
       arguments: { tripId, eventId },
     });
     expect(JSON.parse(after.body.result.content[0].text).event.city).toBe('Kyoto');
+  });
+
+  it('puts a removed to-do back, with its id and text intact', async () => {
+    const { browser, tripId, accessToken } = await setup();
+
+    const created = await rpc(app, accessToken, 'tools/call', {
+      name: 'create_event',
+      arguments: { tripId, name: 'Fushimi Inari' },
+    });
+    const { eventId } = JSON.parse(created.body.result.content[0].text) as { eventId: string };
+
+    const added = await rpc(app, accessToken, 'tools/call', {
+      name: 'add_todo',
+      arguments: { tripId, eventId, text: 'Buy the train ticket' },
+    });
+    const { todoId } = JSON.parse(added.body.result.content[0].text) as { todoId: string };
+
+    await rpc(app, accessToken, 'tools/call', {
+      name: 'remove_todo',
+      arguments: { tripId, eventId, todoId },
+    });
+
+    const log = await browser.request(`/api/audit/${tripId}?source=mcp`);
+    expect(log.body.entries[0].summary).toContain('Removed a to-do');
+
+    const undo = await browser.request(`/api/audit/${tripId}/${log.body.entries[0].id}/undo`, {
+      method: 'POST',
+    });
+    expect(undo.status).toBe(200);
+
+    const after = await rpc(app, accessToken, 'tools/call', {
+      name: 'get_event',
+      arguments: { tripId, eventId },
+    });
+    expect(JSON.parse(after.body.result.content[0].text).event.todos).toMatchObject([
+      { id: todoId, text: 'Buy the train ticket' },
+    ]);
   });
 
   it('undoes a creation by removing what it made', async () => {

@@ -3,12 +3,15 @@ import {
   BOOKING_STATUS_LABEL,
   addEvent,
   addLink,
+  addTodo,
   deleteEvent,
   eventSearchText,
   liveEvents,
   liveFieldDefs,
   normalizeBookingStatus,
+  removeTodo,
   updateEvent,
+  updateTodo,
   type FlightDetails,
   type TripDoc,
   type TripEvent,
@@ -38,6 +41,15 @@ const instant = z.union([z.number().int(), z.string()]).transform((value, ctx) =
   }
   return parsed;
 });
+
+/**
+ * A to-do's deadline is a day, not a moment: it falls due on a date wherever
+ * the traveller reads it, so it carries no time and no zone. YYYY-MM-DD is the
+ * form the document stores and the app shows.
+ */
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'a date as YYYY-MM-DD');
 
 /**
  * A flight's own fields, all optional, none of them times.
@@ -128,6 +140,23 @@ function describeFlight(flight: FlightDetails): Record<string, unknown> {
   };
 }
 
+/**
+ * An event's to-dos as a list, each carrying the id a caller needs to change
+ * it. Stored as a map so two clients adding at once do not collide; a reader
+ * wants them in order, so oldest first by when they were added.
+ */
+function describeTodos(event: TripEvent): Array<Record<string, unknown>> {
+  return Object.entries(event.todos ?? {})
+    .map(([id, todo]) => ({
+      id,
+      text: todo.text,
+      completed: todo.completed,
+      deadline: todo.deadline,
+      addedAt: todo.addedAt,
+    }))
+    .sort((a, b) => (a.addedAt as number) - (b.addedAt as number));
+}
+
 function summarise(ctx: ToolContext, event: TripEvent): Record<string, unknown> {
   const bookingStatus = normalizeBookingStatus(event.booking.status);
 
@@ -158,6 +187,7 @@ function summarise(ctx: ToolContext, event: TripEvent): Record<string, unknown> 
     },
     links: Object.values(event.links).map((link) => ({ url: link.url, title: link.title })),
     files: Object.values(event.attachments).map((file) => describeFile(ctx, file)),
+    todos: describeTodos(event),
   };
 }
 
@@ -210,6 +240,15 @@ export const TOOL_DEFINITIONS = [
   { name: 'delete_event', description: 'Remove an event.' },
   { name: 'set_booking_status', description: 'Mark an event as flexible or confirmed.' },
   { name: 'add_link', description: 'Attach a web address to an event.' },
+  {
+    name: 'add_todo',
+    description: "Add a to-do to an event. The event's to-dos come back in get_event and list_events.",
+  },
+  {
+    name: 'update_todo',
+    description: 'Change a to-do: its text, whether it is done, or its deadline. Needs the todoId from the event.',
+  },
+  { name: 'remove_todo', description: 'Delete a to-do from an event.' },
   { name: 'list_field_defs', description: "The trip's custom fields." },
   {
     name: 'list_files',
@@ -254,6 +293,21 @@ export const toolSchemas = {
     url: z.string().url(),
     title: z.string().optional(),
   }),
+  add_todo: z.object({
+    tripId: z.string(),
+    eventId: z.string(),
+    text: z.string().min(1),
+    deadline: isoDate.optional(),
+  }),
+  update_todo: z.object({
+    tripId: z.string(),
+    eventId: z.string(),
+    todoId: z.string(),
+    text: z.string().min(1).optional(),
+    completed: z.boolean().optional(),
+    deadline: isoDate.optional(),
+  }),
+  remove_todo: z.object({ tripId: z.string(), eventId: z.string(), todoId: z.string() }),
   list_field_defs: z.object({ tripId: z.string() }),
   list_files: z.object({ tripId: z.string() }),
 } as const;
@@ -459,6 +513,77 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
 
       record(ctx, a.tripId, name, a, undefined, `Added a link`);
       return { linkId };
+    }
+
+    case 'add_todo': {
+      const a = args as z.infer<typeof toolSchemas.add_todo>;
+      authorize(ctx, a.tripId, true);
+
+      const doc = docs.load(a.tripId) as TripDoc | null;
+      const existing = doc?.events[a.eventId];
+      if (!existing || existing.deletedAt !== undefined) throw new Error('No such event');
+
+      const todoId = `todo_${token(12)}`;
+      withDoc(ctx, a.tripId, (d) =>
+        addTodo(d as never, a.eventId, todoId, { text: a.text, deadline: a.deadline }, {
+          userId: ctx.access.userId,
+        }) as never,
+      );
+
+      // The whole to-do map as it was, which undo writes back over the event's
+      // `todos` key -- the map without this to-do, so undoing removes it. The
+      // per-tool undo path is generic, so `before` has to be a set of event
+      // fields, and `todos` is one; a bare list of changed to-do fields would be
+      // written onto the event as stray keys instead.
+      record(ctx, a.tripId, name, a, { todos: existing.todos ?? {} }, `Added a to-do to “${existing.name}”`);
+      return { todoId };
+    }
+
+    case 'update_todo': {
+      const a = args as z.infer<typeof toolSchemas.update_todo>;
+      authorize(ctx, a.tripId, true);
+
+      const doc = docs.load(a.tripId) as TripDoc | null;
+      const existing = doc?.events[a.eventId];
+      const todo = existing?.todos?.[a.todoId];
+      if (!existing || !todo) throw new Error('No such to-do');
+
+      // Only the keys the caller sent, so changing the text leaves the deadline
+      // and the done flag as they were.
+      const patch: Record<string, unknown> = {};
+      for (const key of ['text', 'completed', 'deadline'] as const) {
+        if (a[key] !== undefined) patch[key] = a[key];
+      }
+
+      if (Object.keys(patch).length === 0) return { ok: true, changed: 0 };
+
+      withDoc(ctx, a.tripId, (d) =>
+        updateTodo(d as never, a.eventId, a.todoId, patch, { userId: ctx.access.userId }) as never,
+      );
+
+      // The map as it was, so undo restores this to-do's old fields. See add_todo
+      // for why undo takes a set of event fields rather than to-do fields.
+      record(ctx, a.tripId, name, a, { todos: existing.todos ?? {} }, `Changed a to-do on “${existing.name}”`);
+      return { ok: true };
+    }
+
+    case 'remove_todo': {
+      const a = args as z.infer<typeof toolSchemas.remove_todo>;
+      authorize(ctx, a.tripId, true);
+
+      const doc = docs.load(a.tripId) as TripDoc | null;
+      const existing = doc?.events[a.eventId];
+      const todo = existing?.todos?.[a.todoId];
+      if (!existing || !todo) throw new Error('No such to-do');
+
+      withDoc(ctx, a.tripId, (d) =>
+        removeTodo(d as never, a.eventId, a.todoId, { userId: ctx.access.userId }) as never,
+      );
+
+      // The map with the to-do still in it, so undo puts it back whole -- its id,
+      // its text, and when it was added.
+      record(ctx, a.tripId, name, a, { todos: existing.todos ?? {} }, `Removed a to-do from “${existing.name}”`);
+      return { ok: true };
     }
 
     case 'list_field_defs': {
