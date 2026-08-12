@@ -112,7 +112,8 @@ export function MonthView({
 }: MonthViewProps) {
   const days = fourWeekGrid(anchor);
   const byDay = eventsByDay(events, homeTimezone);
-  const citiesByDay = cityDaySegments(events, days, homeTimezone);
+  const tripDays = days.filter((day) => day >= tripStart && day <= tripEnd);
+  const citiesByDay = cityDaySegments(events, tripDays, homeTimezone);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

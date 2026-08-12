@@ -198,6 +198,17 @@ test.describe('week and month views', () => {
       await expect(tokyo).toHaveAttribute('data-from-minute', '900');
       await expect(tokyo).toHaveAttribute('data-to-minute', '1440');
 
+      // The final known city carries through the trip's inclusive end date,
+      // but not into the extra calendar cells after the trip.
+      await expect(
+        page
+          .getByTestId('day-2026-08-16')
+          .locator('[data-testid="city-time-band"][data-city="Tokyo"]'),
+      ).toHaveCount(1);
+      await expect(
+        page.getByTestId('day-2026-08-17').locator('[data-testid="city-time-band"]'),
+      ).toHaveCount(0);
+
       const [cellBox, sfBox, tokyoBox] = await Promise.all([
         cell.boundingBox(),
         sf.boundingBox(),
