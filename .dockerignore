@@ -1,0 +1,37 @@
+.git
+.gitignore
+
+# Installed inside the image for the image's own platform. Copying the host's
+# tree in would bring native binaries built for the host along with it.
+node_modules
+**/node_modules
+
+# Runtime state. The database and the blob store live in a volume.
+/data
+
+dist
+**/dist
+apps/web/dev-dist
+storybook-static
+
+**/*.test.ts
+e2e
+playwright.config.ts
+playwright-report
+test-results
+blob-report
+.playwright
+coverage
+
+.env
+.env.*
+!.env.example
+
+.agents
+.codex
+Dockerfile
+.dockerignore
+docker-compose.yml
+*.tsbuildinfo
+*.log
+.DS_Store

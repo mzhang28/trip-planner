@@ -73,6 +73,23 @@ pnpm test:e2e       # Playwright
 Nothing external is needed to run the app. Attachments go to `data/blobs` and the
 database to `data/trip-planner.db` unless configured otherwise.
 
+### With Docker
+
+```sh
+cp .env.example .env      # set PUBLIC_URL if it is not localhost:8080
+docker compose up -d --build
+```
+
+Two containers out of one `Dockerfile`. The web one serves the built PWA on port
+8080 and forwards `/api`, `/oauth`, `/mcp` and `/.well-known` to the API beside
+it, the same four prefixes the dev server proxies. That makes both one origin,
+which is what an agent's access token is bound to — so `PUBLIC_URL` has to be the
+URL people actually open, and the API is not published on a port of its own.
+
+The database and the blob store share one volume, `trip-data`, mounted where both
+already point. Anything in `.env` reaches the API, so `BLOB_STORE=s3` and its
+credentials belong there; the database stays in the volume either way.
+
 ### Ports
 
 Every `pnpm test:e2e` invocation starts the API and web preview on OS-assigned
