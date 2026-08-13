@@ -794,7 +794,14 @@ export function EventEditor({
         discovery and the editor actions share one toolbar: two separate rows
         repeated context and made a short event feel like a form page.
       */}
-      <div className="sticky bottom-0 -mx-3 -mb-4 flex flex-wrap items-center gap-2 border-t border-line bg-card px-3 py-2">
+      {/*
+        Rounded at the foot because it paints the card's bottom edge itself.
+        The card cannot clip it -- the clip is what a sticky footer would stick
+        inside -- so a square bar sat over both rounded corners and squared
+        them off. Stuck part way up a tall card the curve is invisible: what is
+        behind it there is more card, in the same colour.
+      */}
+      <div className="sticky bottom-0 -mx-3 -mb-4 flex flex-wrap items-center gap-2 rounded-b-lg border-t border-line bg-card px-3 py-2">
         <div className="min-w-0 flex-1">
           <FieldPalette chips={chips} onAdd={onReveal} collapsedCount={3} />
         </div>

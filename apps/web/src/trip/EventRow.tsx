@@ -407,7 +407,16 @@ export function EventRow({
      * and a card taller than the screen would pin Done to the card's own
      * bottom edge -- which is exactly the part that is off screen.
      */
-    <Card className={cn('relative', isOpen ? 'overflow-visible' : 'overflow-hidden')}>
+    <Card
+      className={cn(
+        // The spine's own strip, kept clear of everything else. Laid over the
+        // card without it, the mark sat inside the padding of whatever it
+        // crossed -- the editor's fields had four of their twelve pixels of
+        // gutter taken away and read as pressed against the edge.
+        'relative pl-1',
+        isOpen ? 'overflow-visible' : 'overflow-hidden',
+      )}
+    >
       {/*
         Laid over the card rather than sitting in the header row.
 
@@ -426,9 +435,7 @@ export function EventRow({
 
       <div
         className={cn(
-          // `pl-1` stands in for the width the spine used to take as a flex
-          // child, so nothing in the header moves.
-          'event-row-header group/event-row flex pl-1 transition-colors duration-100',
+          'event-row-header group/event-row flex transition-colors duration-100',
           isOpen && 'rounded-t-lg',
         )}
         style={coloredSurfaceStyle(event.color)}
