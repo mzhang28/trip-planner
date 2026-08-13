@@ -197,7 +197,7 @@ function WeekLodging({
       const viewportRect = viewport.getBoundingClientRect();
       const barRect = barElement.getBoundingClientRect();
       // The first 2.5rem is the sticky time-axis gutter, not usable rail.
-      const visibleStart = viewportRect.left + 40;
+      const visibleStart = viewportRect.left + RAIL_PIXELS;
       const visibleWidth = Math.max(
         0,
         Math.min(barRect.right, viewportRect.right) - Math.max(barRect.left, visibleStart),
@@ -241,10 +241,13 @@ function WeekLodging({
         data-testid="week-lodging-label"
         data-visible={showLabel ? 'true' : 'false'}
         className={cn(
-          'sticky left-[calc(2.5rem+0.5rem)] flex w-max max-w-[calc(100%-1rem)] items-center gap-1.5 px-2 py-1',
+          'sticky flex w-max max-w-[calc(100%-1rem)] items-center gap-1.5 px-2 py-1',
           'transition-opacity duration-100',
           showLabel ? 'opacity-100' : 'opacity-0',
         )}
+        // Clear of the rail, whatever the rail is worth. It was written in as
+        // two and a half rem, and widening the rail slid the name under it.
+        style={{ left: `calc(${RAIL_WIDTH} + 0.5rem)` }}
       >
         <StatusSpine
           status={event.booking.status}
@@ -358,24 +361,32 @@ const COLUMN_WIDTH = 'max(6.5rem, calc((100cqw - 3.25rem - 7px) / 7))';
  */
 const RAIL_WIDTH = '3.25rem';
 
+/** The same width in pixels, for the measuring the lodging label does. */
+const RAIL_PIXELS = 52;
+
 /** The gutter before a run's rail, so one run reads as ending and another beginning. */
 const RUN_GAP = '0.75rem';
 
 /**
  * One row of the week, drawn run by run with a rail in front of each.
  *
- * The rail is a flex child of its run rather than a cell of one big grid.
- * A sticky grid item is pinned inside its own grid area and so cannot travel,
- * which is why the hours used to scroll away with the days; as a flex child it
- * is held by the run, sticks for as long as the run is on screen, and is
- * pushed out by the run that follows.
+ * The rail is a flex child of its run rather than a cell of one big grid, and
+ * that is what lets it stick. A sticky box may only travel inside its own
+ * containing block: as a grid item that is the one cell it occupies, so it has
+ * nowhere to go, while as a flex child of the run it may travel the run's whole
+ * width -- held at the left edge for as long as those days are on screen, and
+ * pushed off by the run that follows.
+ *
+ * The other half of it is that the whole week is one scroller. Sticky resolves
+ * against the nearest ancestor that scrolls, so while the timetable scrolled
+ * vertically on its own, every rail inside it was pinned to a box that never
+ * moved sideways.
  */
 function RunRows({
   runs,
   className,
   rowClassName,
   testId,
-  scroller,
   rail,
   children,
 }: {
@@ -384,61 +395,17 @@ function RunRows({
   /** Applied to each run's grid of days. */
   rowClassName?: string;
   testId?: string;
-  /**
-   * The horizontal scroller, for rows that cannot use `position: sticky`.
-   *
-   * The timetable scrolls vertically, and a box that scrolls is the viewport
-   * its own sticky children are measured against -- so a rail inside it sticks
-   * to a box that never moves sideways, which is to say it does not stick at
-   * all. Given the scroller, the rail is moved by hand instead.
-   */
-  scroller?: RefObject<HTMLDivElement | null>;
   rail: (run: ZoneRun) => React.ReactNode;
   children: (run: ZoneRun) => React.ReactNode;
 }) {
-  const root = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const viewport = scroller?.current;
-    const container = root.current;
-    if (!viewport || !container) return;
-
-    const follow = () => {
-      const origin = viewport.getBoundingClientRect().left - viewport.scrollLeft;
-
-      for (const section of container.querySelectorAll<HTMLElement>('[data-week-run]')) {
-        const bar = section.firstElementChild;
-        if (!(bar instanceof HTMLElement)) continue;
-
-        const start = section.getBoundingClientRect().left - origin;
-        const travel = Math.max(0, section.offsetWidth - bar.offsetWidth);
-        const held = Math.min(Math.max(viewport.scrollLeft - start, 0), travel);
-
-        bar.style.transform = held === 0 ? '' : `translateX(${held}px)`;
-      }
-    };
-
-    follow();
-    viewport.addEventListener('scroll', follow, { passive: true });
-    const resize = new ResizeObserver(follow);
-    resize.observe(container);
-
-    return () => {
-      viewport.removeEventListener('scroll', follow);
-      resize.disconnect();
-    };
-  }, [scroller, runs]);
-
   return (
-    <div ref={root} className={cn('flex', className)} data-testid={testId}>
+    <div className={cn('flex', className)} data-testid={testId}>
       {runs.map((run, index) => (
         <section
           key={`${run.zone}:${run.days[0]!.day}`}
           data-week-run={run.days[0]!.day}
           data-zone={run.zone}
           className="flex min-w-0"
-          // Air before each rail but the first, which is already at the edge.
-          style={index === 0 ? undefined : { paddingLeft: RUN_GAP }}
         >
           {/*
             The line is what separates the hours from the day beside them. Space
@@ -1000,15 +967,39 @@ export function WeekView({
       // A drag that ends outside the grid is abandoned rather than left armed.
       onPointerLeave={() => setDrag(null)}
     >
+      {/*
+        One scroller for both directions, which is what makes the rails work.
+        The hours used to have a scroller of their own for the vertical, and a
+        sticky box is measured against the nearest ancestor that scrolls -- so
+        every rail inside it was stuck to something that never moved sideways.
+        Here the dates stick to the top, the rails to the left, and the beds to
+        the bottom, all against this one box.
+      */}
       <div
         ref={horizontalScroller}
         data-testid="week-horizontal-scroll"
-        className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        tabIndex={0}
+        className={cn(
+          'min-h-0 flex-1 overflow-x-auto overscroll-x-contain',
+          displaySettings.weekFitToView
+            ? 'overflow-y-hidden'
+            : 'overflow-y-auto overscroll-y-contain',
+        )}
         style={{ containerType: 'inline-size' }}
       >
-        <div className="flex h-full w-max min-w-full flex-col">
-          {/* City and date rows do not move when the timetable scrolls vertically. */}
-          <div className="shrink-0">
+        <div
+          className={cn(
+            'flex w-max min-w-full flex-col',
+            // Fitted, the week is exactly as tall as the box; otherwise it is
+            // as tall as its hours and this scroller takes up the difference.
+            displaySettings.weekFitToView && 'h-full',
+          )}
+        >
+          {/*
+            The city, date and untimed rows travel with the days sideways and
+            hold their place while the hours scroll under them.
+          */}
+          <div className="sticky top-0 z-30 shrink-0 bg-page">
             {hasCities && (
               <RunRows runs={runs} className="pb-1" rail={() => null}>
                 {(run) =>
@@ -1217,20 +1208,25 @@ export function WeekView({
             )}
           </div>
 
-          {/* Time scroll is independent; every rendered day stays aligned. */}
+          {/*
+            The hours. No scroller of its own: it is as tall as it needs to be
+            and the week's one scroller carries it, which is what leaves the
+            rails free to stick to that scroller's left edge.
+          */}
           <div
-            data-testid="week-timetable-scroll"
-            tabIndex={0}
+            data-testid="week-timetable"
             className={cn(
-              'min-h-0 flex-1 overscroll-y-contain rounded-b-lg border-x border-b border-line',
-              displaySettings.weekFitToView ? 'overflow-hidden' : 'overflow-y-auto',
+              'min-h-0 rounded-b-lg border-x border-b border-line',
+              displaySettings.weekFitToView && 'flex-1',
             )}
+            style={
+              displaySettings.weekFitToView ? undefined : { height: timetableHeight }
+            }
           >
             <RunRows
               runs={runs}
               className="h-full"
               rowClassName="h-full bg-line"
-              scroller={horizontalScroller}
               rail={() => (
                 <div
                   aria-hidden="true"
@@ -1412,7 +1408,20 @@ export function WeekView({
             </RunRows>
           </div>
 
-          <section className="mt-2 mb-4 shrink-0" aria-label="Where you are sleeping">
+          {/*
+            Where you are sleeping, held at the bottom of the box. It is the
+            point of this view, so it stays put while the hours above it scroll
+            rather than being something to scroll down and find.
+          */}
+          <section
+            /*
+             * The padding underneath is what keeps the bars off the horizontal
+             * scrollbar, which would otherwise be drawn across the hotel names
+             * and the controls for booking a night.
+             */
+            className="sticky bottom-0 z-30 mt-2 shrink-0 bg-page pt-1 pb-4"
+            aria-label="Where you are sleeping"
+          >
             {beds.length === 0 && (readOnly || empties.length === 0) ? (
               <p className="px-1 py-2 text-2xs text-ink-muted">
                 No hotels this week. Add an event and set its kind to lodging to see it here.

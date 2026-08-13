@@ -56,19 +56,20 @@ test('a lodging label follows a wide visible remainder and leaves a short one al
     const bar = node.querySelector<HTMLElement>('[data-testid="week-lodging"]')!;
     const viewport = node.getBoundingClientRect();
     const rect = bar.getBoundingClientRect();
-    node.scrollLeft += rect.left - viewport.left - 40 + 80;
+    node.scrollLeft += rect.left - viewport.left - 52 + 80;
   });
   await expect(label).toHaveAttribute('data-visible', 'true');
   const [scrollerBox, labelBox] = await Promise.all([scroller.boundingBox(), label.boundingBox()]);
   if (!scrollerBox || !labelBox) throw new Error('no lodging rail bounds');
-  expect(labelBox.x).toBeCloseTo(scrollerBox.x + 48, 0);
+  // The rail is 3.25rem and the label clears it by half a rem.
+  expect(labelBox.x).toBeCloseTo(scrollerBox.x + 60, 0);
 
   await scroller.evaluate((node) => {
     const bar = node.querySelector<HTMLElement>('[data-testid="week-lodging"]')!;
     const label = bar.querySelector<HTMLElement>('[data-testid="week-lodging-label"]')!;
     const viewport = node.getBoundingClientRect();
     const rect = bar.getBoundingClientRect();
-    node.scrollLeft += rect.right - (viewport.left + 40) - label.offsetWidth + 16;
+    node.scrollLeft += rect.right - (viewport.left + 52) - label.offsetWidth + 16;
   });
   await expect(label).toHaveAttribute('data-visible', 'false');
 });

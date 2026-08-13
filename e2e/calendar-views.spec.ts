@@ -328,6 +328,47 @@ test.describe('week and month views', () => {
     },
   );
 
+  test('the hours stay beside the days they belong to', async ({ page }) => {
+    await page.setViewportSize({ width: 700, height: 800 });
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-08-05', '2026-08-25');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    await page.getByTestId('go-to-date').fill(ON);
+    await switchTo(page, 'Week');
+
+    const scroller = page.getByTestId('week-horizontal-scroll');
+    const rails = page.locator('[data-week-run] > div:first-child');
+
+    /*
+     * A sticky box is measured against the nearest ancestor that scrolls. The
+     * hours had a scroller of their own for the vertical, so every rail was
+     * pinned to a box that never moved sideways and the numbers scrolled off
+     * with the days. Nothing about that was visible to a test that only asked
+     * whether the rail existed.
+     */
+    const edges = async () => {
+      const box = await scroller.boundingBox();
+      const positions = await rails.evaluateAll((nodes) =>
+        nodes.map((node) => node.getBoundingClientRect().left),
+      );
+      return positions.map((left) => Math.round(left - box!.x));
+    };
+
+    const before = await edges();
+    expect(before.length).toBeGreaterThan(0);
+    expect(Math.min(...before)).toBeLessThan(2);
+
+    await scroller.evaluate((node) => node.scrollTo({ left: 400 }));
+    await expect(async () => {
+      expect(await scroller.evaluate((node) => node.scrollLeft)).toBeGreaterThan(200);
+    }).toPass();
+
+    // Held where they were rather than dragged along by the scroll.
+    expect(Math.min(...(await edges()))).toBeLessThan(2);
+  });
+
   test('picking an event in the week opens it in the day view', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
