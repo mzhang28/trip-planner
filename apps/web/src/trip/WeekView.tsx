@@ -16,12 +16,14 @@ import {
   clampDay,
   cityDaySegments,
   daysInRange,
-  eventsByDay,
+
   lodgingSpans,
   nightsWithoutLodging,
   spanWithin,
 } from '../lib/calendar';
-import { formatTime } from '../lib/time';
+import { eventsBySlot, zoneRuns, type DaySlot, type ZoneRun } from '../lib/dayZones';
+import { formatTime, timeZoneAbbreviation } from '../lib/time';
+import { TimezonePicker } from './TimezonePicker';
 import { EventKindIcon } from './EventKind';
 import { useCalendarDisplaySettings } from './useCalendarDisplaySettings';
 import { useDisplayZone } from './useDisplayZone';
@@ -65,8 +67,7 @@ function minutesSinceMidnight(at: number, timeZone: string): number {
  */
 function positionEvents(
   events: TripEvent[],
-  displayZone: (eventZone: string | undefined, homeZone: string) => string,
-  homeTimezone: string,
+  columnZone: string,
   windowStart: number,
   windowEnd: number,
   fitToView: boolean,
@@ -77,10 +78,16 @@ function positionEvents(
         event.startsAt !== undefined && !event.timeUndecided,
     )
     .map((event) => {
-      const actualStart = minutesSinceMidnight(
-        event.startsAt,
-        displayZone(event.timezone, homeTimezone),
-      );
+      /*
+       * Measured on the column's clock, not the event's.
+       *
+       * Two events in different zones used to be laid out against one another
+       * as though both were local, so a Tokyo evening and a Honolulu morning
+       * that are hours apart could be drawn overlapping. The column is one
+       * day in one place; where a card sits in it says when it happens there.
+       * The card still prints its own local time, tagged with its own zone.
+       */
+      const actualStart = minutesSinceMidnight(event.startsAt, columnZone);
       const duration = Math.max(1, event.durationMinutes ?? DEFAULT_EVENT_MINUTES);
 
       /*
@@ -258,6 +265,15 @@ export interface WeekViewProps {
   events: TripEvent[];
   cityColors?: Record<string, string>;
   homeTimezone: string;
+  /**
+   * Every day of the trip with the zone it is lived in, in order.
+   *
+   * Worked out from the journeys rather than assumed, so a week that crosses
+   * zones draws each day on the clock of the place it happens in.
+   */
+  slots: DaySlot[];
+  /** Fixes a day's zone by hand, or hands it back to be worked out. */
+  onSetDayZone: (day: DayKey, timezone: string | undefined) => void;
   weather: Map<DayKey, DailyWeather>;
   today: DayKey;
   readOnly: boolean;
@@ -322,6 +338,176 @@ function InlineEventDraft({
         />
       </label>
     </div>
+  );
+}
+
+/**
+ * The width of one day, shared by every row so the columns line up.
+ *
+ * Seven fit the view at the width the trip is usually read at, and a day never
+ * goes below the width its date needs. Each run of days adds a rail of its own,
+ * which the subtraction below does not try to account for: the alternative is
+ * columns that change width as the trip crosses a zone.
+ */
+const COLUMN_WIDTH = 'max(5.5rem, calc((100cqw - 2.5rem - 7px) / 7))';
+const RAIL_WIDTH = '2.5rem';
+
+/**
+ * One row of the week, drawn run by run with a rail in front of each.
+ *
+ * The rail is a flex child of its run rather than a cell of one big grid.
+ * A sticky grid item is pinned inside its own grid area and so cannot travel,
+ * which is why the hours used to scroll away with the days; as a flex child it
+ * is held by the run, sticks for as long as the run is on screen, and is
+ * pushed out by the run that follows.
+ */
+function RunRows({
+  runs,
+  className,
+  rowClassName,
+  testId,
+  scroller,
+  rail,
+  children,
+}: {
+  runs: ZoneRun[];
+  className?: string;
+  /** Applied to each run's grid of days. */
+  rowClassName?: string;
+  testId?: string;
+  /**
+   * The horizontal scroller, for rows that cannot use `position: sticky`.
+   *
+   * The timetable scrolls vertically, and a box that scrolls is the viewport
+   * its own sticky children are measured against -- so a rail inside it sticks
+   * to a box that never moves sideways, which is to say it does not stick at
+   * all. Given the scroller, the rail is moved by hand instead.
+   */
+  scroller?: RefObject<HTMLDivElement | null>;
+  rail: (run: ZoneRun) => React.ReactNode;
+  children: (run: ZoneRun) => React.ReactNode;
+}) {
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const viewport = scroller?.current;
+    const container = root.current;
+    if (!viewport || !container) return;
+
+    const follow = () => {
+      const origin = viewport.getBoundingClientRect().left - viewport.scrollLeft;
+
+      for (const section of container.querySelectorAll<HTMLElement>('[data-week-run]')) {
+        const bar = section.firstElementChild;
+        if (!(bar instanceof HTMLElement)) continue;
+
+        const start = section.getBoundingClientRect().left - origin;
+        const travel = Math.max(0, section.offsetWidth - bar.offsetWidth);
+        const held = Math.min(Math.max(viewport.scrollLeft - start, 0), travel);
+
+        bar.style.transform = held === 0 ? '' : `translateX(${held}px)`;
+      }
+    };
+
+    follow();
+    viewport.addEventListener('scroll', follow, { passive: true });
+    const resize = new ResizeObserver(follow);
+    resize.observe(container);
+
+    return () => {
+      viewport.removeEventListener('scroll', follow);
+      resize.disconnect();
+    };
+  }, [scroller, runs]);
+
+  return (
+    <div ref={root} className={cn('flex', className)} data-testid={testId}>
+      {runs.map((run) => (
+        <section
+          key={`${run.zone}:${run.days[0]!.day}`}
+          data-week-run={run.days[0]!.day}
+          data-zone={run.zone}
+          className="flex min-w-0"
+        >
+          <div
+            className="sticky left-0 z-20 shrink-0 bg-page"
+            style={{ width: RAIL_WIDTH }}
+          >
+            {rail(run)}
+          </div>
+          <div
+            className={cn('grid gap-px', rowClassName)}
+            style={{ gridTemplateColumns: `repeat(${run.days.length}, ${COLUMN_WIDTH})` }}
+          >
+            {children(run)}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Which clock a run of days is on, over its hours.
+ *
+ * Short, because it sits in a rail two and a half characters wide. The full
+ * zone name is in the title, and the marker says the zone was set by hand
+ * rather than worked out from the journeys.
+ */
+function ZoneTag({
+  zone,
+  at,
+  overridden,
+  readOnly,
+  onChange,
+}: {
+  zone: string;
+  at: number;
+  overridden: boolean;
+  readOnly: boolean;
+  onChange: (timezone: string | undefined) => void;
+}) {
+  const label = `${timeZoneAbbreviation(at, zone)}${overridden ? '*' : ''}`;
+
+  if (readOnly) {
+    return (
+      <span
+        data-testid="week-zone-tag"
+        data-zone={zone}
+        title={zone}
+        className="truncate text-2xs font-medium text-ink-muted"
+      >
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      data-testid="week-zone-tag"
+      data-zone={zone}
+      data-overridden={overridden ? 'true' : 'false'}
+      title={
+        overridden
+          ? `${zone}, set by hand. Press to change it, or set it back to the flights.`
+          : `${zone}, from the flights on this trip. Press to set it by hand.`
+      }
+      className={cn('flex min-w-0 items-center', overridden && 'text-accent-text')}
+    >
+      <TimezonePicker
+        value={zone}
+        at={at}
+        label={`Zone for these days: ${label}`}
+        onChange={(next) =>
+          /*
+           * Choosing the zone it already had means "stop correcting this" --
+           * the days go back to following the journeys, which is otherwise a
+           * state with no way back to it.
+           */
+          onChange(overridden && next === zone ? undefined : next)
+        }
+      />
+    </span>
   );
 }
 
@@ -562,6 +748,8 @@ export function WeekView({
   events,
   cityColors,
   homeTimezone,
+  slots,
+  onSetDayZone,
   weather,
   today,
   readOnly,
@@ -575,7 +763,23 @@ export function WeekView({
   const windowEnd = displaySettings.weekEndHour * 60;
   const timetableHeight = (windowEnd - windowStart) * MINUTE_HEIGHT;
   const horizontalScroller = useRef<HTMLDivElement>(null);
-  const gridTemplateColumns = `2.5rem repeat(${days.length}, minmax(5.5rem, calc((100cqw - 2.5rem - 7px) / 7)))`;
+
+  /*
+   * The week is drawn one run of days at a time, a run being the days that
+   * share a clock. Each run carries its own hours down the left, which is the
+   * only honest way to draw a week that changes zone halfway: one rail would
+   * be labelled for a place half the columns are not in.
+   *
+   * The rail sticks to the left edge while its own run is on screen and is
+   * pushed off by the next one, so scrolling across a trip hands over from one
+   * clock to the next at the day the trip moved.
+   */
+  const runs = useMemo(() => zoneRuns(slots), [slots]);
+  const zoneOfDay = useMemo(() => {
+    const byDay = new Map<DayKey, string>();
+    for (const slot of slots) byDay.set(slot.day, slot.zone);
+    return (day: DayKey) => byDay.get(day) ?? homeTimezone;
+  }, [slots, homeTimezone]);
 
   /*
    * The whole trip is one finite strip. Moving the anchor only brings its
@@ -726,11 +930,30 @@ export function WeekView({
       };
     });
   }
-  const calendarByDay = eventsByDay(
+  /*
+   * Bucketed by slot rather than by each event's own zone. A slot runs from its
+   * own midnight to the next one's, so a travel day that gains hours holds
+   * everything that happens before the next morning -- including the evening
+   * that is already tomorrow where it is being spent.
+   */
+  const calendarByDay = eventsBySlot(
     events.filter((event) => event.kind !== 'lodging'),
-    homeTimezone,
+    slots,
   );
   const displayZone = useDisplayZone();
+
+  /**
+   * The clock a column is drawn on.
+   *
+   * Somebody who has asked to see the trip in their own zone has asked for one
+   * clock throughout, which is the whole point of that setting: it answers
+   * "what time is it there for me", and per-day zones would take that away.
+   */
+  const columnZone = (slotZone: string) => displayZone(slotZone, slotZone);
+
+  /** Whether an event's own clock differs from the column it is drawn in. */
+  const foreignZone = (event: TripEvent, slotZone: string) =>
+    displayZone(event.timezone, homeTimezone) !== columnZone(slotZone);
   const citiesByDay = cityDaySegments(events, days, homeTimezone);
   const hasCities = Array.from(citiesByDay.values()).some((bands) => bands.length > 0);
   const beds = lodgingSpans(events, homeTimezone).filter((span) => spanWithin(span, days));
@@ -741,11 +964,8 @@ export function WeekView({
    */
   const empties = nightsWithoutLodging(beds, days);
 
-  /** Which grid column a day sits in. The first is the sticky time gutter. */
-  const columnOf = (day: DayKey) => days.indexOf(day) + 2;
-
   const emptyNights = empties.flatMap((gap) =>
-    days.slice(gap.start, gap.start + gap.length).map((day) => ({ day, column: columnOf(day) })),
+    days.slice(gap.start, gap.start + gap.length).map((day) => ({ day })),
   );
 
   // Split off the ones on a day but not at an hour. They belong to the day and
@@ -774,9 +994,9 @@ export function WeekView({
           {/* City and date rows do not move when the timetable scrolls vertically. */}
           <div className="shrink-0">
             {hasCities && (
-              <div className="grid gap-px pb-1" style={{ gridTemplateColumns }}>
-                <div className="sticky left-0 z-20 bg-page" />
-                {days.map((day) => {
+              <RunRows runs={runs} className="pb-1" rail={() => null}>
+                {(run) =>
+                  run.days.map(({ day }) => {
                   const bands = citiesByDay.get(day) ?? [];
                   const previousCity = citiesByDay.get(addDays(day, -1))?.at(-1)?.label;
 
@@ -815,16 +1035,37 @@ export function WeekView({
                       })}
                     </div>
                   );
-                })}
-              </div>
+                })
+                }
+              </RunRows>
             )}
 
-            <div
-              className="grid gap-px rounded-t-lg border border-line bg-line"
-              style={{ gridTemplateColumns }}
+            <RunRows
+              runs={runs}
+              className="rounded-t-lg border border-line bg-line"
+              rowClassName="bg-line"
+              rail={(run) => (
+                <div className="flex h-full items-end justify-end bg-page pr-0.5 pb-1">
+                  <ZoneTag
+                    zone={run.zone}
+                    at={run.days[0]!.startsAt}
+                    overridden={run.days[0]!.overridden}
+                    readOnly={readOnly}
+                    /*
+                     * Written on the first day of the run, because a correction
+                     * carries forward: it says where the trip is from that
+                     * morning until a recorded arrival says otherwise. Writing
+                     * it on every day of the run would freeze days the flights
+                     * are still entitled to speak for.
+                     */
+                    onChange={(timezone) => onSetDayZone(run.days[0]!.day, timezone)}
+                  />
+                </div>
+              )}
             >
-              <div className="sticky left-0 z-20 bg-page" />
-              {days.map((day) => {
+              {(run) =>
+                run.days.map((slot) => {
+                const { day } = slot;
                 const forecast = weather.get(day);
                 const glyph = forecast ? weatherGlyph(forecast.code) : null;
 
@@ -832,8 +1073,33 @@ export function WeekView({
                   <div
                     key={day}
                     data-week-day={day}
-                    className="min-w-0 bg-card px-1 py-1.5 text-center"
+                    className="group/day relative min-w-0 bg-card px-1 py-1.5 text-center"
                   >
+                    {/*
+                      Where the trip moves, said on the day it moves. A zone set
+                      here holds from this morning on, so a trip whose flights
+                      are not all typed in can still be told where it is -- once
+                      per leg rather than once per day.
+                    */}
+                    {!readOnly && (
+                      <span
+                        className={cn(
+                          'absolute top-0.5 right-0.5 z-10 flex min-w-0 items-center',
+                          // Hidden until asked for. The run's rail already says
+                          // which clock these days are on, and a chip sitting
+                          // over every date would cover the dates to repeat it.
+                          'opacity-0 transition-opacity group-hover/day:opacity-100 focus-within:opacity-100',
+                        )}
+                      >
+                        <ZoneTag
+                          zone={slot.zone}
+                          at={slot.startsAt}
+                          overridden={slot.overridden}
+                          readOnly={false}
+                          onChange={(timezone) => onSetDayZone(day, timezone)}
+                        />
+                      </span>
+                    )}
                     <div
                       className={cn(
                         'text-2xs',
@@ -873,8 +1139,9 @@ export function WeekView({
                     )}
                   </div>
                 );
-              })}
-            </div>
+              })
+              }
+            </RunRows>
 
             {/*
               Events on a day with no hour yet, above the hours rather than in
@@ -882,11 +1149,16 @@ export function WeekView({
               plan at the top of the grid as though that were the plan.
             */}
             {(untimed.size > 0 || (creating && creating.start === undefined)) && (
-              <div className="grid gap-px border-x border-line bg-line" style={{ gridTemplateColumns }}>
-                <div className="sticky left-0 z-20 bg-page py-0.5 pr-1 text-right text-2xs text-ink-muted">
-                  Any
-                </div>
-                {days.map((day) => (
+              <RunRows
+                runs={runs}
+                className="border-x border-line bg-line"
+                rowClassName="bg-line"
+                rail={() => (
+                  <div className="bg-page py-0.5 pr-1 text-right text-2xs text-ink-muted">Any</div>
+                )}
+              >
+                {(run) =>
+                  run.days.map(({ day }) => (
                   <div key={day} className="flex min-w-0 flex-col gap-0.5 bg-page p-0.5">
                     {creating?.day === day && creating.start === undefined && (
                       <InlineEventDraft
@@ -923,8 +1195,9 @@ export function WeekView({
                       </button>
                     ))}
                   </div>
-                ))}
-              </div>
+                  ))
+                }
+              </RunRows>
             )}
           </div>
 
@@ -937,45 +1210,45 @@ export function WeekView({
               displaySettings.weekFitToView ? 'overflow-hidden' : 'overflow-y-auto',
             )}
           >
-            <div
-              className="grid gap-px bg-line"
-              style={{
-                gridTemplateColumns,
-                height: displaySettings.weekFitToView ? '100%' : timetableHeight,
-              }}
+            <RunRows
+              runs={runs}
+              className="h-full"
+              rowClassName="h-full bg-line"
+              scroller={horizontalScroller}
+              rail={() => (
+                <div
+                  aria-hidden="true"
+                  className="relative h-full bg-page text-right text-2xs text-ink-muted"
+                >
+                  {Array.from(
+                    { length: displaySettings.weekEndHour - displaySettings.weekStartHour + 1 },
+                    (_, index) => displaySettings.weekStartHour + index,
+                  ).map((hour) => (
+                    <span
+                      key={hour}
+                      style={{
+                        top: displaySettings.weekFitToView
+                          ? `${((hour - displaySettings.weekStartHour) / (displaySettings.weekEndHour - displaySettings.weekStartHour)) * 100}%`
+                          : (hour - displaySettings.weekStartHour) * HOUR_HEIGHT,
+                      }}
+                      className={cn(
+                        'absolute right-1 tabular',
+                        hour === displaySettings.weekEndHour
+                          ? '-translate-y-full'
+                          : '-translate-y-1/2',
+                      )}
+                    >
+                      {hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`}
+                    </span>
+                  ))}
+                </div>
+              )}
             >
-              <div
-                aria-hidden="true"
-                className="sticky left-0 z-20 bg-page text-right text-2xs text-ink-muted"
-              >
-                {Array.from(
-                  { length: displaySettings.weekEndHour - displaySettings.weekStartHour + 1 },
-                  (_, index) => displaySettings.weekStartHour + index,
-                ).map((hour) => (
-                  <span
-                    key={hour}
-                    style={{
-                      top: displaySettings.weekFitToView
-                        ? `${((hour - displaySettings.weekStartHour) / (displaySettings.weekEndHour - displaySettings.weekStartHour)) * 100}%`
-                        : (hour - displaySettings.weekStartHour) * HOUR_HEIGHT,
-                    }}
-                    className={cn(
-                      'absolute right-1 tabular',
-                      hour === displaySettings.weekEndHour
-                        ? '-translate-y-full'
-                        : '-translate-y-1/2',
-                    )}
-                  >
-                    {hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`}
-                  </span>
-                ))}
-              </div>
-
-              {days.map((day) => {
+              {(run) =>
+                run.days.map(({ day, zone }) => {
                 const positioned = positionEvents(
                   calendarByDay.get(day) ?? [],
-                  displayZone,
-                  homeTimezone,
+                  columnZone(zone),
                   windowStart,
                   windowEnd,
                   displaySettings.weekFitToView,
@@ -1047,6 +1320,21 @@ export function WeekView({
                                   event.startsAt,
                                   displayZone(event.timezone, homeTimezone),
                                 )}
+                                {/*
+                                  Named only where it differs from the column
+                                  it is drawn in. A flight out of Tokyo keeps
+                                  its 09:00 in a column that is on another
+                                  clock, and without the tag that reads as an
+                                  event three hours from where it is drawn.
+                                */}
+                                {foreignZone(event, zone) && (
+                                  <span className="text-ink-muted">
+                                    {timeZoneAbbreviation(
+                                      event.startsAt,
+                                      displayZone(event.timezone, homeTimezone),
+                                    )}
+                                  </span>
+                                )}
                                 {outsideAfter && !outsideBefore && (
                                   <ChevronDown aria-hidden="true" className="size-3" />
                                 )}
@@ -1103,8 +1391,9 @@ export function WeekView({
                       )}
                   </DayColumn>
                 );
-              })}
-            </div>
+              })
+              }
+            </RunRows>
           </div>
 
           <section className="mt-2 mb-4 shrink-0" aria-label="Where you are sleeping">
@@ -1113,76 +1402,97 @@ export function WeekView({
                 No hotels this week. Add an event and set its kind to lodging to see it here.
               </p>
             ) : (
-              <div
-                data-testid="lodging-rail"
-                className="grid gap-px"
-                style={{ gridTemplateColumns }}
-              >
-                <div className="sticky left-0 z-20 bg-page" style={{ gridRow: 1 }} />
-                {beds.map((span) => {
-                  const placed = spanWithin(span, days)!;
+              <RunRows runs={runs} testId="lodging-rail" rail={() => null}>
+                {(run) => {
+                  const runDays = run.days.map((slot) => slot.day);
+                  const first = runDays[0]!;
+                  const last = runDays[runDays.length - 1]!;
 
                   return (
-                    <WeekLodging
-                      key={span.event.id}
-                      event={span.event}
-                      gridColumn={`${placed.start + 2} / span ${placed.length}`}
-                      scroller={horizontalScroller}
-                      onOpen={() => onOpenEvent(span.event.id)}
-                    />
+                    <>
+                      {/*
+                        A stay is drawn once per run of days it covers. A hotel
+                        held over a zone change is one booking and two bars,
+                        because the runs either side of the change are laid out
+                        separately -- the alternative is a bar drawn across a
+                        rail belonging to another clock.
+                      */}
+                      {beds.map((span) => {
+                        const placed = spanWithin(span, runDays);
+                        if (!placed) return null;
+
+                        return (
+                          <WeekLodging
+                            key={`${span.event.id}:${first}`}
+                            event={span.event}
+                            gridColumn={`${placed.start + 1} / span ${placed.length}`}
+                            scroller={horizontalScroller}
+                            onOpen={() => onOpenEvent(span.event.id)}
+                          />
+                        );
+                      })}
+
+                      {/*
+                       * The nights nothing covers, offered one by one rather
+                       * than left blank. An empty stretch of rail said only
+                       * that a hotel would be drawn here if one existed, and
+                       * left making it to another screen.
+                       */}
+                      {!readOnly &&
+                        emptyNights
+                          .filter(({ day }) => day >= first && day <= last)
+                          .map(({ day }) => {
+                            // The nights being named are one input across all
+                            // of them, so the offers underneath it stand down.
+                            if (bedDraft && day >= bedDraft.from && day <= bedDraft.to) {
+                              return null;
+                            }
+
+                            return (
+                              <AddLodging
+                                key={day}
+                                day={day}
+                                column={runDays.indexOf(day) + 1}
+                                selected={
+                                  bedDrag !== null && day >= bedDrag.from && day <= bedDrag.to
+                                }
+                                onPress={(touch) => {
+                                  // Remembered so the click that follows knows
+                                  // whether the drag above dealt with it.
+                                  bedPressWasMouse.current = !touch;
+                                  if (!touch) setBedDrag({ anchor: day, from: day, to: day });
+                                }}
+                                onEnter={() => dragOver(day)}
+                                onTap={() => {
+                                  if (bedPressWasMouse.current) return;
+                                  setBedDraft({ from: day, to: day, name: '' });
+                                }}
+                              />
+                            );
+                          })}
+
+                      {bedDraft && !readOnly && bedDraft.from <= last && bedDraft.to >= first && (
+                        <InlineEventDraft
+                          name={bedDraft.name}
+                          label="Hotel name"
+                          onChange={(name) =>
+                            setBedDraft((current) => (current ? { ...current, name } : current))
+                          }
+                          onCommit={commitLodging}
+                          onCancel={() => setBedDraft(null)}
+                          className="rounded-full"
+                          style={{
+                            gridColumn: `${runDays.indexOf(clampDay(bedDraft.from, first, last)) + 1} / ${
+                              runDays.indexOf(clampDay(bedDraft.to, first, last)) + 2
+                            }`,
+                            gridRow: 1,
+                          }}
+                        />
+                      )}
+                    </>
                   );
-                })}
-
-                {/*
-                 * The nights nothing covers, offered one by one rather than
-                 * left blank. An empty stretch of rail said only that a hotel
-                 * would be drawn here if one existed, and left making it to
-                 * another screen.
-                 */}
-                {!readOnly &&
-                  emptyNights.map(({ day, column }) => {
-                    // The nights being named are one input across all of them,
-                    // so the offers underneath it stand down.
-                    if (bedDraft && day >= bedDraft.from && day <= bedDraft.to) return null;
-
-                    return (
-                      <AddLodging
-                        key={day}
-                        day={day}
-                        column={column}
-                        selected={bedDrag !== null && day >= bedDrag.from && day <= bedDrag.to}
-                        onPress={(touch) => {
-                          // Remembered so the click that follows knows whether
-                          // the drag above has already dealt with this press.
-                          bedPressWasMouse.current = !touch;
-                          if (!touch) setBedDrag({ anchor: day, from: day, to: day });
-                        }}
-                        onEnter={() => dragOver(day)}
-                        onTap={() => {
-                          if (bedPressWasMouse.current) return;
-                          setBedDraft({ from: day, to: day, name: '' });
-                        }}
-                      />
-                    );
-                  })}
-
-                {bedDraft && !readOnly && (
-                  <InlineEventDraft
-                    name={bedDraft.name}
-                    label="Hotel name"
-                    onChange={(name) =>
-                      setBedDraft((current) => (current ? { ...current, name } : current))
-                    }
-                    onCommit={commitLodging}
-                    onCancel={() => setBedDraft(null)}
-                    className="rounded-full"
-                    style={{
-                      gridColumn: `${columnOf(bedDraft.from)} / ${columnOf(bedDraft.to) + 1}`,
-                      gridRow: 1,
-                    }}
-                  />
-                )}
-              </div>
+                }}
+              </RunRows>
             )}
           </section>
         </div>

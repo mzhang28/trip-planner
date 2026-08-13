@@ -61,15 +61,31 @@ describe('what zone a day is lived in', () => {
     expect(slots[0]!.zone).toBe('Asia/Tokyo');
   });
 
-  it('lets a day be corrected by hand, and says which days were', () => {
-    const slots = daySlots(days, [flight()], 'Asia/Tokyo', {
-      '2026-09-04': 'Pacific/Honolulu',
-    });
+  it('carries a correction forward from the day it is made', () => {
+    const slots = daySlots(days, [], 'Asia/Tokyo', { '2026-09-05': 'Pacific/Honolulu' });
+    const zoneOf = (day: string) => slots.find((slot) => slot.day === day)!.zone;
 
-    const corrected = slots.find((slot) => slot.day === '2026-09-04')!;
-    expect(corrected.zone).toBe('Pacific/Honolulu');
-    expect(corrected.overridden).toBe(true);
-    expect(slots.find((slot) => slot.day === '2026-09-03')!.overridden).toBe(false);
+    expect(zoneOf('2026-09-04')).toBe('Asia/Tokyo');
+    expect(zoneOf('2026-09-05')).toBe('Pacific/Honolulu');
+    // Saying where the trip is from the fifth says it for the sixth too.
+    expect(zoneOf('2026-09-06')).toBe('Pacific/Honolulu');
+
+    // Only the day it was made on is marked, which is the day that can undo it.
+    expect(slots.find((slot) => slot.day === '2026-09-05')!.overridden).toBe(true);
+    expect(slots.find((slot) => slot.day === '2026-09-06')!.overridden).toBe(false);
+  });
+
+  it('lets a recorded flight take over from a correction made earlier', () => {
+    const slots = daySlots(days, [flight()], 'Asia/Tokyo', {
+      '2026-09-03': 'Europe/London',
+    });
+    const zoneOf = (day: string) => slots.find((slot) => slot.day === day)!.zone;
+
+    expect(zoneOf('2026-09-03')).toBe('Europe/London');
+    expect(zoneOf('2026-09-04')).toBe('Europe/London');
+    // The flight lands on the fifth, and what it says outranks a correction
+    // made about days before it.
+    expect(zoneOf('2026-09-06')).toBe('Pacific/Honolulu');
   });
 
   it('groups the days into runs, one per clock', () => {

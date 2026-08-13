@@ -23,6 +23,7 @@ import {
   removeTodo,
   setCityColor,
   setCustomField,
+  setDayZone,
   updateEvent,
   updateTodo,
   type CustomValue,
@@ -46,7 +47,15 @@ import { Link, useParams } from 'react-router';
 import { ApiError, api, type TripSummary } from '../lib/api';
 import { randomId } from '../lib/crypto';
 import { dayKey, formatDayHeading, moveToDay, setDay, setTimeOfDay } from '../lib/time';
-import { addDays, clampDay, eventDay, tripDateRange, type DayKey } from '../lib/calendar';
+import {
+  addDays,
+  clampDay,
+  daysInRange,
+  eventDay,
+  tripDateRange,
+  type DayKey,
+} from '../lib/calendar';
+import { daySlots, slotForInstant, type DaySlot } from '../lib/dayZones';
 import { DayMap } from '../trip/DayMap';
 import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
 import { useUploadFlush } from '../trip/Attachments';
@@ -88,14 +97,24 @@ const ZONE_OPTIONS = [
   { value: 'device', label: 'My time' },
 ] as const;
 
-function groupByDay(events: TripEvent[], homeTimezone: string) {
+/**
+ * The itinerary, day by day.
+ *
+ * A day is the slot the instant falls in, so the list agrees with the week
+ * about which day a thing is on -- including on a travel day, which runs from
+ * its own morning to the next one wherever that is. An instant outside the
+ * trip's own days still gets a day of its own, read in the event's zone: it is
+ * something to show, not something to drop.
+ */
+function groupByDay(events: TripEvent[], slots: DaySlot[], homeTimezone: string) {
   const days = new Map<string, TripEvent[]>();
 
   for (const event of events) {
     const key =
       event.startsAt === undefined
         ? UNSCHEDULED
-        : dayKey(event.startsAt, event.timezone ?? homeTimezone);
+        : (slotForInstant(slots, event.startsAt) ??
+          dayKey(event.startsAt, event.timezone ?? homeTimezone));
 
     const bucket = days.get(key);
     if (bucket) bucket.push(event);
@@ -285,6 +304,22 @@ export function TripView() {
     [doc?.meta, events, homeTimezone, today],
   );
 
+  /*
+   * Every day of the trip with the zone it is lived in. Worked out from the
+   * journeys recorded, corrected by whatever anyone has fixed by hand, and
+   * shared by the views rather than each deciding for itself.
+   */
+  const slots = useMemo(
+    () =>
+      daySlots(
+        daysInRange(tripRange.start, tripRange.end),
+        events,
+        homeTimezone,
+        doc?.meta?.dayZones,
+      ),
+    [tripRange, events, homeTimezone, doc?.meta?.dayZones],
+  );
+
   /**
    * Moves the view, and records that it was moved on purpose.
    *
@@ -318,7 +353,7 @@ export function TripView() {
   }, [anchor, moveAnchor, tripRange, view]);
 
   const days = useMemo(() => {
-    const grouped = groupByDay(events, homeTimezone);
+    const grouped = groupByDay(events, slots, homeTimezone);
 
     /*
      * The anchored day is always present, even with nothing on it. Without it
@@ -334,7 +369,7 @@ export function TripView() {
       if (b === UNSCHEDULED) return -1;
       return a.localeCompare(b);
     });
-  }, [events, homeTimezone, view, anchor]);
+  }, [events, slots, homeTimezone, view, anchor]);
 
   /*
    * The map shows the day the list is anchored on, not the whole trip. Pins
@@ -391,9 +426,15 @@ export function TripView() {
     [events],
   );
 
+  /*
+   * The day the map draws, read the same way the week reads it: by the slot the
+   * instant falls in. A flight leaving at 09:00 in Tokyo and the dinner that
+   * follows it in Honolulu are one day of the trip, and the map of that day has
+   * both pins on it.
+   */
   const mappable = useMemo(
-    () => events.filter((event) => eventDay(event, homeTimezone) === anchor),
-    [events, homeTimezone, anchor],
+    () => events.filter((event) => event.startsAt !== undefined && slotForInstant(slots, event.startsAt) === anchor),
+    [events, slots, anchor],
   );
 
   /*
@@ -568,7 +609,7 @@ export function TripView() {
   }
 
   function goToDay(at: number) {
-    const key = dayKey(at, homeTimezone);
+    const key = slotForInstant(slots, at) ?? dayKey(at, homeTimezone);
     moveAnchor(key);
 
     // The day may not be on screen yet in week or month view, so move the
@@ -580,7 +621,10 @@ export function TripView() {
 
   function focusEvent(eventId: string) {
     const event = events.find((candidate) => candidate.id === eventId);
-    const day = event ? eventDay(event, homeTimezone) : null;
+    const day =
+      event?.startsAt === undefined
+        ? null
+        : (slotForInstant(slots, event.startsAt) ?? eventDay(event, homeTimezone));
 
     pendingEventScrollRef.current = eventId;
     if (day) moveAnchor(day);
@@ -904,6 +948,10 @@ export function TripView() {
               events={events}
               cityColors={doc?.cityColors}
               homeTimezone={homeTimezone}
+              slots={slots}
+              onSetDayZone={(day, timezone) =>
+                store?.change((current) => setDayZone(current, day, timezone))
+              }
               weather={weather}
               today={today}
               readOnly={readOnly}

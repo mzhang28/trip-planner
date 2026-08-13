@@ -74,7 +74,7 @@ export interface DaySlot {
   zone: string;
   /** When the slot begins: midnight of `day` in `zone`. */
   startsAt: Instant;
-  /** Set by hand rather than worked out from the journeys. */
+  /** The zone was fixed by hand on this day. Later days inherit it silently. */
   overridden: boolean;
   /** The zone differs from the day before, so this is where the trip moved. */
   changedFromPrevious: boolean;
@@ -106,8 +106,16 @@ export function daySlots(
   let next = 0;
 
   for (const day of days) {
+    /*
+     * A correction carries forward, the way an arrival does. Somebody fixing a
+     * day is saying where the trip is from then on -- "we are in Honolulu from
+     * the fifth" is one thing to say, not one per day until the flight home.
+     * The next recorded arrival takes over from it.
+     */
     const override = overrides?.[day];
-    const settled = override ?? zone;
+    if (override !== undefined) zone = override;
+
+    const settled = zone;
     const opened = setDay(undefined, settled, day) ?? Date.parse(`${day}T00:00:00Z`);
 
     slots.push({
