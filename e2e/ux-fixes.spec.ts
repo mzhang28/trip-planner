@@ -61,7 +61,7 @@ test.describe('putting an event on a chosen day', () => {
     await page.getByTestId('close-editor').click();
     await page.getByTestId('go-to-date').fill('2026-09-03');
 
-    await expect(page.getByTestId('range-label')).toContainText('3 September 2026');
+    await expect(page.getByTestId('go-to-date')).toHaveValue('2026-09-03');
     await expect(eventRow(page, 'Morning temple')).toBeVisible();
   });
 
@@ -91,7 +91,8 @@ test.describe('putting an event on a chosen day', () => {
         .click();
 
       await expect(page.getByTestId('go-to-date')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Today' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Earlier' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Later' })).toBeVisible();
     }
   });
 

@@ -285,7 +285,7 @@ test.describe('week and month views', () => {
   });
 
   test(
-    'moving between weeks changes what is shown, and Today comes back',
+    'moving between weeks changes what is shown, and the date field goes back',
     { tag: '@responsive' },
     async ({ page }) => {
       await page.goto('/');
@@ -645,7 +645,7 @@ test.describe('filling an event in gradually', () => {
       .poll(() => list.evaluate((element) => element.scrollHeight > element.clientHeight))
       .toBe(true);
 
-    const navigator = page.getByTestId('range-label');
+    const navigator = page.getByTestId('go-to-date');
     const navigatorTop = (await navigator.boundingBox())!.y;
     await list.evaluate((element) => {
       element.scrollTop = element.scrollHeight;

@@ -1,7 +1,7 @@
-import { Button, IconButton, cn } from '@trip/ui';
+import { IconButton, cn } from '@trip/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DayKey } from '../lib/calendar';
-import { addDays, clampDay, fourWeekGrid } from '../lib/calendar';
+import { addDays, clampDay } from '../lib/calendar';
 import {
   setCalendarDisplaySettings,
   useCalendarDisplaySettings,
@@ -12,68 +12,27 @@ export type CalendarView = 'day' | 'week' | 'month';
 export interface DayNavigatorProps {
   view: CalendarView;
   anchor: DayKey;
-  today: DayKey;
   /** Inclusive bounds used by the finite week strip. */
   tripStart?: DayKey;
   tripEnd?: DayKey;
   onChange: (day: DayKey) => void;
 }
 
-function describe(view: CalendarView, anchor: DayKey, tripEnd?: DayKey): string {
-  const at = Date.parse(`${anchor}T12:00:00Z`);
-
-  if (view === 'month') {
-    const days = fourWeekGrid(anchor);
-    const format = new Intl.DateTimeFormat('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
-    return `${format.format(Date.parse(`${days[0]}T12:00:00Z`))} – ${format.format(
-      Date.parse(`${days.at(-1)}T12:00:00Z`),
-    )}`;
-  }
-
-  if (view === 'week') {
-    const format = new Intl.DateTimeFormat('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
-    const naturalEnd = addDays(anchor, 6);
-    const end = tripEnd && naturalEnd > tripEnd ? tripEnd : naturalEnd;
-    return `${format.format(at)} – ${format.format(Date.parse(`${end}T12:00:00Z`))}`;
-  }
-
-  // The year is in there because a trip is often planned months out, and
-  // "Thursday 3 September" does not say which September.
-  return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(at);
-}
-
 /**
  * Moving about the trip, the same way in every view.
  *
+ * One control: a step back, the date, a step forward. The date is the label as
+ * well as the way to change it, so there is nothing to read twice — a separate
+ * range caption said what the field beside it already showed. Where the trip
+ * is now is drawn on the calendar itself, in the column marked as today, which
+ * is where somebody is already looking.
+ *
  * The day used to have no way to reach another date at all, so an event could
  * only be put on one by dragging it there from wherever it landed. A date field
- * sits beside the steps because "the Tuesday after next" is faster to pick than
- * to reach a fortnight at a time.
+ * rather than steps alone because "the Tuesday after next" is faster to pick
+ * than to reach a fortnight at a time.
  */
-export function DayNavigator({
-  view,
-  anchor,
-  today,
-  tripStart,
-  tripEnd,
-  onChange,
-}: DayNavigatorProps) {
+export function DayNavigator({ view, anchor, tripStart, tripEnd, onChange }: DayNavigatorProps) {
   const step = view === 'month' ? 28 : view === 'week' ? 7 : 1;
   const display = useCalendarDisplaySettings();
   const bounded = view === 'week' && tripStart && tripEnd;
@@ -82,7 +41,12 @@ export function DayNavigator({
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <div role="group" aria-label="Date navigation" className="inline-flex">
+      {/*
+        One joined control rather than three loose ones. The steps belong to
+        the date they step through, and the field's own borders are what
+        separate the three, so the group reads as a single dial.
+      */}
+      <div role="group" aria-label="Date navigation" className="inline-flex shrink-0 items-center">
         <IconButton
           label="Earlier"
           size="sm"
@@ -93,9 +57,28 @@ export function DayNavigator({
         >
           <ChevronLeft aria-hidden="true" />
         </IconButton>
-        <Button size="sm" onPress={() => move(today)} className="rounded-none shadow-none">
-          Today
-        </Button>
+
+        <label>
+          <span className="sr-only">Go to a date</span>
+          <input
+            type="date"
+            data-testid="go-to-date"
+            value={anchor}
+            min={bounded ? tripStart : undefined}
+            max={bounded ? tripEnd : undefined}
+            onChange={(e) => e.target.value && move(e.target.value)}
+            className={cn(
+              // Fixed rather than intrinsic: a bounded field (the week's, which
+              // carries min and max) is drawn narrower than an unbounded one,
+              // so switching view shifted the arrows sideways.
+              'h-7 w-33 rounded-none border border-line-default bg-card px-2 text-xs text-ink',
+              // Above its neighbours, so a focused field's ring is not clipped
+              // by the button sitting on top of its edge.
+              'focus:relative focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+            )}
+          />
+        </label>
+
         <IconButton
           label="Later"
           size="sm"
@@ -107,22 +90,6 @@ export function DayNavigator({
           <ChevronRight aria-hidden="true" />
         </IconButton>
       </div>
-
-      <label className="flex items-center gap-2">
-        <span className="sr-only">Go to a date</span>
-        <input
-          type="date"
-          data-testid="go-to-date"
-          value={anchor}
-          min={bounded ? tripStart : undefined}
-          max={bounded ? tripEnd : undefined}
-          onChange={(e) => e.target.value && move(e.target.value)}
-          className={cn(
-            'h-7 rounded-md border border-line-input bg-card px-2 text-xs text-ink',
-            'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
-          )}
-        />
-      </label>
 
       {view === 'week' && (
         <details className="relative">
@@ -186,10 +153,6 @@ export function DayNavigator({
           </div>
         </details>
       )}
-
-      <span data-testid="range-label" className="text-xs text-ink-muted">
-        {describe(view, anchor, view === 'week' ? tripEnd : undefined)}
-      </span>
     </div>
   );
 }

@@ -1011,7 +1011,6 @@ export function TripView() {
         <DayNavigator
           view={view}
           anchor={anchor}
-          today={today}
           tripStart={tripRange.start}
           tripEnd={tripRange.end}
           onChange={moveAnchor}

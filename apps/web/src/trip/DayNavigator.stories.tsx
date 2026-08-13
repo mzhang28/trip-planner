@@ -7,8 +7,9 @@ import { DayNavigator, type CalendarView } from './DayNavigator';
 /**
  * Moving about the trip, in whatever unit the current view is drawn in.
  *
- * The strip is finite: it runs from the first day of the trip to the last and
- * stops, because a trip has ends and a calendar that scrolls forever invites
+ * A step back, the date, a step forward — one joined control, with the date
+ * doing the reading as well as the changing. The steps stop at the ends of the
+ * trip, because a trip has ends and a calendar that scrolls forever invites
  * people to wander off the plan and wonder where it went.
  */
 const meta = {
@@ -25,7 +26,6 @@ function Navigator({ view, anchor = TODAY }: { view: CalendarView; anchor?: stri
     <DayNavigator
       view={view}
       anchor={day}
-      today={TODAY}
       tripStart={TRIP_START}
       tripEnd={TRIP_END}
       onChange={setDay}
