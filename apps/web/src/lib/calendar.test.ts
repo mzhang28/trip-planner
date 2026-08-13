@@ -1,5 +1,6 @@
 import type { TripEvent } from '@trip/crdt';
 import { describe, expect, it } from 'vitest';
+import type { DayKey } from './calendar';
 import {
   addDays,
   clampDay,
@@ -10,6 +11,7 @@ import {
   fourWeekGrid,
   lodgingSpans,
   monthGrid,
+  nightsWithoutLodging,
   openingDay,
   spanWithin,
   startOfWeek,
@@ -345,6 +347,42 @@ describe('placing a span in a run of days', () => {
   it('gives nothing for a span that misses this week entirely', () => {
     expect(spanWithin({ from: '2026-09-01', to: '2026-09-03' }, days)).toBeNull();
     expect(spanWithin({ from: '2026-07-01', to: '2026-07-03' }, days)).toBeNull();
+  });
+});
+
+describe('nights with nowhere to sleep', () => {
+  const days = weekOf('2026-08-10');
+  const span = (from: DayKey, to: DayKey) => ({ event: event({ kind: 'lodging' }), from, to });
+
+  it('offers the whole week when there is no hotel at all', () => {
+    expect(nightsWithoutLodging([], days)).toEqual([
+      { from: '2026-08-10', to: '2026-08-16', start: 0, length: 7 },
+    ]);
+  });
+
+  it('offers nothing when every night is covered', () => {
+    expect(nightsWithoutLodging([span('2026-08-10', '2026-08-16')], days)).toEqual([]);
+  });
+
+  it('keeps consecutive empty nights together as one run', () => {
+    expect(nightsWithoutLodging([span('2026-08-10', '2026-08-11')], days)).toEqual([
+      { from: '2026-08-12', to: '2026-08-16', start: 2, length: 5 },
+    ]);
+  });
+
+  it('splits a gap in the middle from a gap at the end', () => {
+    const booked = [span('2026-08-10', '2026-08-10'), span('2026-08-13', '2026-08-14')];
+
+    expect(nightsWithoutLodging(booked, days)).toEqual([
+      { from: '2026-08-11', to: '2026-08-12', start: 1, length: 2 },
+      { from: '2026-08-15', to: '2026-08-16', start: 5, length: 2 },
+    ]);
+  });
+
+  it('counts a night as covered by a stay that started before this week', () => {
+    expect(nightsWithoutLodging([span('2026-08-03', '2026-08-12')], days)).toEqual([
+      { from: '2026-08-13', to: '2026-08-16', start: 3, length: 4 },
+    ]);
   });
 });
 

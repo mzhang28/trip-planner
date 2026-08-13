@@ -510,6 +510,54 @@ export function TripView() {
     }
   }
 
+  /**
+   * Books somewhere for a run of nights the week had nothing over.
+   *
+   * `lastNight` is the last night slept there, so checkout is the morning after
+   * it — the rail draws a stay up to the night before its checkout day, and a
+   * hotel offered for three nights that came back covering two would be wrong
+   * in the one place the person was looking.
+   *
+   * The hours are the same convention the stay editor uses when a date is typed
+   * there, so a hotel made here and one made by hand are the same kind of thing.
+   */
+  function createLodging(firstNight: DayKey, lastNight: DayKey, name: string) {
+    if (!store || readOnly) return;
+
+    const checkInDay = setDay(undefined, homeTimezone, firstNight);
+    const checkOutDay = setDay(undefined, homeTimezone, addDays(lastNight, 1));
+    if (checkInDay === null || checkOutDay === null) return;
+
+    const checkIn = setTimeOfDay(checkInDay, homeTimezone, '15:00');
+    const checkOut = setTimeOfDay(checkOutDay, homeTimezone, '10:00');
+    if (checkIn === null || checkOut === null) return;
+
+    const id = `e_${randomId()}`;
+
+    store.change((current) => {
+      let next = addEvent(current, { id, name }, { userId: 'me' });
+
+      next = updateEvent(
+        next,
+        id,
+        {
+          kind: 'lodging',
+          lodging: { checkIn, checkOut },
+          startsAt: checkIn,
+          durationMinutes: Math.round((checkOut - checkIn) / 60_000),
+          timezone: homeTimezone,
+          timeUndecided: undefined,
+        },
+        { userId: 'me' },
+      );
+
+      return next;
+    });
+
+    // Stays in the week, where the bar it just made is now drawn.
+    setHighlighted(id);
+  }
+
   function goToDay(at: number) {
     const key = dayKey(at, homeTimezone);
     moveAnchor(key);
@@ -815,6 +863,7 @@ export function TripView() {
               onCreateAt={(day, name, startMinutes, endMinutes) =>
                 createOn(day, { startMinutes, endMinutes, name, openAfterCreate: false })
               }
+              onCreateLodging={createLodging}
             />
           )}
 

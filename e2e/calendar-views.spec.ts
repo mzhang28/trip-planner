@@ -796,3 +796,102 @@ test.describe('making an event from the calendar', () => {
     await expect(editor.getByText('Duration: 2 hr')).toBeVisible();
   });
 });
+
+test.describe('booking somewhere to sleep from the week', () => {
+  /** The day after a given one, for reading a checkout off a last night. */
+  function nextDay(day: string) {
+    const at = Date.parse(`${day}T12:00:00Z`) + 24 * 60 * 60 * 1000;
+    return new Date(at).toISOString().slice(0, 10);
+  }
+
+  test('a week with no hotel offers the nights, and naming one books them', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-09-01', '2026-09-05');
+    await switchTo(page, 'Week');
+
+    // Nothing is booked, so one offer covers every night of the trip rather
+    // than the rail sitting empty with an instruction in it.
+    const offer = page.getByTestId('week-add-lodging');
+    await expect(offer).toHaveCount(1);
+    await expect(offer).toHaveAttribute('data-from', '2026-09-01');
+    await expect(offer).toHaveAttribute('data-to', '2026-09-05');
+
+    const firstNight = '2026-09-01';
+    const lastNight = '2026-09-05';
+
+    await offer.click();
+
+    const draft = page.getByTestId('week-event-draft');
+    const name = draft.getByRole('textbox', { name: 'Hotel name' });
+    await expect(name).toBeFocused();
+    await name.fill('Ryokan Kyoto');
+    await name.press('Enter');
+
+    // The bar replaces the offer in place, without leaving the week.
+    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    const bar = page.getByTestId('week-lodging').filter({ hasText: 'Ryokan Kyoto' });
+    await expect(bar).toBeVisible();
+    await expect(page.getByTestId('week-add-lodging')).toHaveCount(0);
+
+    // The dates are the nights that were offered, with checkout the morning
+    // after the last of them.
+    await bar.click();
+    const editor = page.getByTestId('event-editor');
+    await expect(editor).toBeVisible();
+    await expect(editor.getByTestId('check-in')).toHaveValue(firstNight);
+    await expect(editor.getByTestId('check-out')).toHaveValue(nextDay(lastNight));
+  });
+
+  test('the nights already booked are not offered again', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-09-01', '2026-09-05');
+    await switchTo(page, 'Week');
+
+    await page.getByTestId('week-add-lodging').click();
+    const name = page.getByTestId('week-event-draft').getByRole('textbox', { name: 'Hotel name' });
+    await name.fill('Ryokan Kyoto');
+    await name.press('Enter');
+
+    // Hand back the last two nights by checking out earlier. What is left has
+    // to come back as an offer, and only for the nights actually given up.
+    await page.getByTestId('week-lodging').filter({ hasText: 'Ryokan Kyoto' }).click();
+    await page.getByTestId('check-out').fill('2026-09-04');
+    await page.getByTestId('close-editor').click();
+
+    await switchTo(page, 'Week');
+    const remaining = page.getByTestId('week-add-lodging');
+    await expect(remaining).toHaveCount(1);
+    await expect(remaining).toHaveAttribute('data-from', '2026-09-04');
+    await expect(remaining).toHaveAttribute('data-to', '2026-09-05');
+
+    // And the hotel still holds the nights it kept.
+    await expect(page.getByTestId('week-lodging')).toHaveCount(1);
+  });
+
+  test('a viewer is not offered nights they could not book', async ({ page, browser }) => {
+    await page.goto('/');
+    const tripId = await newTrip(page, 'Japan, April');
+
+    const token = await page.evaluate(async (id) => {
+      const res = await fetch(`/api/trips/${id}/share`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ role: 'viewer' }),
+      });
+      return ((await res.json()) as { token: string }).token;
+    }, tripId);
+
+    const other = await browser.newContext();
+    const viewer = await other.newPage();
+    await viewer.goto(`/join/${token}`);
+    await expect(viewer).toHaveURL(new RegExp(`/t/${tripId}`));
+    await switchTo(viewer, 'Week');
+
+    await expect(viewer.getByTestId('week-add-lodging')).toHaveCount(0);
+    await expect(viewer.getByText('No hotels this week')).toBeVisible();
+
+    await other.close();
+  });
+});

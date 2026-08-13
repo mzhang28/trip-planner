@@ -1,7 +1,7 @@
 import type { TripEvent } from '@trip/crdt';
 import { StatusSpine, cn, coloredSurfaceStyle } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import {
   useLayoutEffect,
   useEffect,
@@ -18,6 +18,7 @@ import {
   daysInRange,
   eventsByDay,
   lodgingSpans,
+  nightsWithoutLodging,
   spanWithin,
 } from '../lib/calendar';
 import { formatTime } from '../lib/time';
@@ -268,10 +269,18 @@ export interface WeekViewProps {
    * now rather than a reason to invent an hour for it.
    */
   onCreateAt: (day: DayKey, name: string, startMinutes?: number, endMinutes?: number) => void;
+  /**
+   * Makes a stay covering every night from `from` to `to` inclusive.
+   *
+   * `to` is the last night rather than the checkout day, the same way a stay is
+   * drawn, so the caller is the one that decides checkout is the morning after.
+   */
+  onCreateLodging: (from: DayKey, to: DayKey, name: string) => void;
 }
 
 function InlineEventDraft({
   name,
+  label = 'Event name',
   onChange,
   onCommit,
   onCancel,
@@ -279,6 +288,8 @@ function InlineEventDraft({
   style,
 }: {
   name: string;
+  /** What is being named, since the rail asks for a hotel and a column an event. */
+  label?: string;
   onChange: (name: string) => void;
   onCommit: () => void;
   onCancel: () => void;
@@ -296,7 +307,7 @@ function InlineEventDraft({
       )}
     >
       <label className="min-w-0 flex-1">
-        <span className="sr-only">Event name</span>
+        <span className="sr-only">{label}</span>
         <input
           autoFocus
           value={name}
@@ -306,11 +317,72 @@ function InlineEventDraft({
             if (event.key === 'Escape') onCancel();
           }}
           onBlur={() => (name.trim() ? onCommit() : onCancel())}
-          placeholder="Event name"
+          placeholder={label}
           className="h-6 w-full min-w-0 rounded-sm border-0 bg-card/80 px-1 text-xs text-ink outline-none placeholder:text-ink-placeholder focus:ring-2 focus:ring-accent"
         />
       </label>
     </div>
+  );
+}
+
+/** "12 to 16 August", for saying which nights an offer would cover. */
+function nightsLabel(from: DayKey, to: DayKey): string {
+  const month = (day: DayKey) =>
+    new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(
+      Date.parse(`${day}T12:00:00Z`),
+    );
+
+  const dayOf = (day: DayKey) => Number(day.slice(8));
+
+  if (from === to) return `${dayOf(from)} ${month(from)}`;
+  if (from.slice(0, 7) === to.slice(0, 7)) return `${dayOf(from)} to ${dayOf(to)} ${month(to)}`;
+
+  return `${dayOf(from)} ${month(from)} to ${dayOf(to)} ${month(to)}`;
+}
+
+/**
+ * An offer to fill a run of nights that nothing covers.
+ *
+ * Dashed rather than solid, because it stands for something that is not there
+ * yet. It takes the width of the nights it would cover, so the rail reads as a
+ * whole week whether or not anywhere is booked, and pressing it asks for a name
+ * where the stay will sit instead of moving to another screen for it.
+ */
+function AddLodging({
+  from,
+  to,
+  nights,
+  gridColumn,
+  onStart,
+}: {
+  from: DayKey;
+  to: DayKey;
+  nights: number;
+  gridColumn: string;
+  onStart: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid="week-add-lodging"
+      data-from={from}
+      data-to={to}
+      onClick={onStart}
+      aria-label={`Add a hotel for ${nights === 1 ? 'the night of' : `${nights} nights,`} ${nightsLabel(from, to)}`}
+      style={{ gridColumn, gridRow: 1 }}
+      className={cn(
+        // Stronger than the solid bars beside it, because a dotted line of the
+        // same weight all but disappears against the page.
+        'min-w-0 rounded-full border border-dotted border-line-strong text-left text-2xs',
+        'text-ink-muted hover:border-accent hover:bg-sunken hover:text-ink',
+        'focus-visible:outline-focus focus-visible:outline-2',
+      )}
+    >
+      <span className="sticky left-[calc(2.5rem+0.5rem)] flex w-max max-w-[calc(100%-1rem)] items-center gap-1.5 px-2 py-1">
+        <Plus className="size-3 shrink-0" />
+        <span className="truncate">Add hotel</span>
+      </span>
+    </button>
   );
 }
 
@@ -472,6 +544,7 @@ export function WeekView({
   readOnly,
   onOpenEvent,
   onCreateAt,
+  onCreateLodging,
 }: WeekViewProps) {
   const days = useMemo(() => daysInRange(tripStart, tripEnd), [tripStart, tripEnd]);
   const displaySettings = useCalendarDisplaySettings();
@@ -518,6 +591,9 @@ export function WeekView({
     name: string;
   } | null>(null);
 
+  /** The run of empty nights being named, once its offer has been pressed. */
+  const [bedDraft, setBedDraft] = useState<{ from: DayKey; to: DayKey; name: string } | null>(null);
+
   const selecting = drag
     ? {
         day: drag.day,
@@ -542,6 +618,16 @@ export function WeekView({
     onCreateAt(creating.day, name, creating.start, creating.end);
     setCreating(null);
   }
+
+  function commitLodging() {
+    if (!bedDraft) return;
+
+    const name = bedDraft.name.trim();
+    if (!name) return;
+
+    onCreateLodging(bedDraft.from, bedDraft.to, name);
+    setBedDraft(null);
+  }
   const calendarByDay = eventsByDay(
     events.filter((event) => event.kind !== 'lodging'),
     homeTimezone,
@@ -550,6 +636,7 @@ export function WeekView({
   const citiesByDay = cityDaySegments(events, days, homeTimezone);
   const hasCities = Array.from(citiesByDay.values()).some((bands) => bands.length > 0);
   const beds = lodgingSpans(events, homeTimezone).filter((span) => spanWithin(span, days));
+  const empties = nightsWithoutLodging(beds, days);
 
   // Split off the ones on a day but not at an hour. They belong to the day and
   // to no point in it, so they get a row of their own above the grid.
@@ -911,7 +998,7 @@ export function WeekView({
           </div>
 
           <section className="mt-2 mb-4 shrink-0" aria-label="Where you are sleeping">
-            {beds.length === 0 ? (
+            {beds.length === 0 && (readOnly || empties.length === 0) ? (
               <p className="px-1 py-2 text-2xs text-ink-muted">
                 No hotels this week. Add an event and set its kind to lodging to see it here.
               </p>
@@ -935,6 +1022,38 @@ export function WeekView({
                     />
                   );
                 })}
+
+                {/*
+                 * The nights nothing covers, offered rather than left blank. An
+                 * empty stretch of rail said only that a hotel would be drawn
+                 * here if one existed, and left making it to another screen.
+                 */}
+                {!readOnly &&
+                  empties.map((gap) =>
+                    bedDraft?.from === gap.from ? (
+                      <InlineEventDraft
+                        key={gap.from}
+                        name={bedDraft.name}
+                        label="Hotel name"
+                        onChange={(name) =>
+                          setBedDraft((current) => (current ? { ...current, name } : current))
+                        }
+                        onCommit={commitLodging}
+                        onCancel={() => setBedDraft(null)}
+                        className="rounded-full"
+                        style={{ gridColumn: `${gap.start + 2} / span ${gap.length}`, gridRow: 1 }}
+                      />
+                    ) : (
+                      <AddLodging
+                        key={gap.from}
+                        from={gap.from}
+                        to={gap.to}
+                        nights={gap.length}
+                        gridColumn={`${gap.start + 2} / span ${gap.length}`}
+                        onStart={() => setBedDraft({ from: gap.from, to: gap.to, name: '' })}
+                      />
+                    ),
+                  )}
               </div>
             )}
           </section>

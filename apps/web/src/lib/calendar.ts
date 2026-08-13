@@ -393,6 +393,44 @@ export function lodgingSpans(events: TripEvent[], homeTimezone: string): Lodging
   return spans.sort((a, b) => a.from.localeCompare(b.from));
 }
 
+/**
+ * The runs of nights no hotel covers, in the same terms as a span.
+ *
+ * Consecutive nights come back as one run rather than one each, so a week with
+ * nowhere to sleep reads as a single gap to fill instead of seven identical
+ * offers. The last night of a run is the last night without a bed, so a stay
+ * that fills it checks out the following morning.
+ */
+export function nightsWithoutLodging(
+  spans: LodgingSpan[],
+  days: DayKey[],
+): Array<{ from: DayKey; to: DayKey; start: number; length: number }> {
+  const runs: Array<{ from: DayKey; to: DayKey; start: number; length: number }> = [];
+  let openedAt: number | null = null;
+
+  // One past the end, so a run reaching the last day is closed by the same code
+  // that closes every other one.
+  for (let index = 0; index <= days.length; index++) {
+    const day = days[index];
+    const empty =
+      day !== undefined && !spans.some((span) => day >= span.from && day <= span.to);
+
+    if (empty && openedAt === null) openedAt = index;
+
+    if (!empty && openedAt !== null) {
+      runs.push({
+        from: days[openedAt]!,
+        to: days[index - 1]!,
+        start: openedAt,
+        length: index - openedAt,
+      });
+      openedAt = null;
+    }
+  }
+
+  return runs;
+}
+
 /** Where a span sits within a run of days, for drawing it across columns. */
 export function spanWithin(
   span: { from: DayKey; to: DayKey },
