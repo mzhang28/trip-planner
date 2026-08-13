@@ -11,8 +11,11 @@ import {
   addEvent,
   addLink,
   addTodo,
+  clearField,
   deleteEvents,
+  fieldContents,
   restoreEvent,
+  restoreField,
   liveFieldDefs,
   mergeEvents,
   removeAttachment,
@@ -218,8 +221,14 @@ export function TripView() {
   /** An event chosen before the day view has mounted its list. */
   const pendingEventScrollRef = useRef<string | null>(null);
 
-  /** The last deletion, while it can still be taken back. */
-  const [undoable, setUndoable] = useState<{ ids: string[]; message: string } | null>(null);
+  /**
+   * The last removal, while it can still be taken back.
+   *
+   * The bar used to know it was undoing a deleted event and put it back by id.
+   * Removing a field takes content out of an event that stays, which is not
+   * something an id can express -- so what is kept is the way back itself.
+   */
+  const [undoable, setUndoable] = useState<{ message: string; revert: () => void } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mergePrimary, setMergePrimary] = useState<string | null>(null);
 
@@ -600,7 +609,46 @@ export function TripView() {
     if (ids.length === 0) return;
 
     store?.change((current) => deleteEvents(current, ids, { userId: 'me' }));
-    setUndoable({ ids, message });
+    setUndoable({
+      message,
+      revert: () =>
+        store?.change((current) =>
+          ids.reduce((doc, id) => restoreEvent(doc, id, { userId: 'me' }), current),
+        ),
+    });
+  }
+
+  /**
+   * Takes a field off an event, with what it holds.
+   *
+   * The content goes with the field on purpose -- a card that still carries a
+   * confirmation code it no longer shows is a document disagreeing with itself,
+   * and the code would still be in the export and in search. What was there is
+   * read first and handed to the undo offer, which puts it back with the same
+   * link and attachment ids rather than as new ones.
+   */
+  function removeField(eventId: string, key: string, label: string) {
+    const event = events.find((candidate) => candidate.id === eventId);
+    if (!event) return;
+
+    const held = fieldContents(event, key);
+    store?.change((current) => clearField(current, eventId, key, { userId: 'me' }));
+
+    // Also stop asking for it. A field revealed by its chip and then removed
+    // would otherwise come straight back as an empty box.
+    setRevealedFields((current) => {
+      const forEvent = current[eventId];
+      if (!forEvent?.has(key)) return current;
+
+      const next = new Set(forEvent);
+      next.delete(key);
+      return { ...current, [eventId]: next };
+    });
+
+    setUndoable({
+      message: `Removed ${label}`,
+      revert: () => store?.change((current) => restoreField(current, eventId, held, { userId: 'me' })),
+    });
   }
 
   function bulkDelete() {
@@ -1053,6 +1101,7 @@ export function TripView() {
                                 [event.id]: new Set(current[event.id]).add(key),
                               }))
                             }
+                            onRemoveField={(key, label) => removeField(event.id, key, label)}
                           />
                           </div>
                         )}
@@ -1112,12 +1161,7 @@ export function TripView() {
           <UndoBar
             message={undoable.message}
             onUndo={() => {
-              store?.change((current) =>
-                undoable.ids.reduce(
-                  (doc, id) => restoreEvent(doc, id, { userId: 'me' }),
-                  current,
-                ),
-              );
+              undoable.revert();
               setUndoable(null);
             }}
             onDismiss={() => setUndoable(null)}

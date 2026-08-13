@@ -2,6 +2,7 @@ import * as A from '@automerge/automerge';
 import { higherStatus, normalizeBookingStatus } from './status';
 import type {
   AttachmentId,
+  Booking,
   CustomValue,
   EventAttachment,
   EventId,
@@ -609,6 +610,156 @@ export function valueMatchesType(value: CustomValue, def: FieldDef): boolean {
     case 'multiselect':
       return value.kind === 'options';
   }
+}
+
+/**
+ * Which parts of an event a field on the editor stands for.
+ *
+ * The editor shows a field once it holds something, so taking one off the card
+ * means taking out what it holds. A field is rarely one key: "Date" is an
+ * instant and the flag saying the hour is not decided yet, and "Booking
+ * reference" lives inside `booking` beside a status that has to stay.
+ *
+ * A custom field is named `custom:<id>` and handled apart from this table,
+ * since its key is only known once the trip defines it.
+ */
+const FIELD_PARTS: Record<string, readonly (keyof TripEvent | `booking.${keyof Booking}`)[]> = {
+  when: ['startsAt', 'timeUndecided', 'timezone'],
+  duration: ['durationMinutes'],
+  city: ['city'],
+  place: ['location'],
+  confirmation: ['booking.confirmationCode'],
+  note: ['booking.note'],
+  description: ['description'],
+  links: ['links'],
+  todos: ['todos'],
+  files: ['attachments'],
+  transit: ['transit'],
+  lodging: ['lodging'],
+  route: ['transitIn'],
+};
+
+/** Whether this field is one the editor can take off an event. */
+export function isClearableField(key: string): boolean {
+  return key in FIELD_PARTS || key.startsWith('custom:');
+}
+
+/**
+ * What a field holds right now, as plain data.
+ *
+ * Taken before the field is cleared, so that undo can put back exactly what was
+ * there -- the same link ids, the same attachments, in one write. Rebuilding a
+ * collection through the add functions instead would mint new ids, and a peer
+ * that had already merged the removal would end up with two of everything.
+ */
+export type FieldContents = Record<string, unknown>;
+
+export function fieldContents(event: TripEvent, key: string): FieldContents {
+  const held: FieldContents = {};
+
+  if (key.startsWith('custom:')) {
+    const fieldId = key.slice('custom:'.length);
+    const value = event.customFields?.[fieldId];
+    if (value !== undefined) held[key] = clone(value);
+    return held;
+  }
+
+  for (const part of FIELD_PARTS[key] ?? []) {
+    const value = readPart(event, part);
+    if (value !== undefined) held[part] = clone(value);
+  }
+
+  return held;
+}
+
+/**
+ * Takes a field off an event, and what it holds with it.
+ *
+ * Hiding the field and keeping the value was the other way to do this, and it
+ * would have meant a document that says one thing and shows another: a
+ * confirmation code still in the export, still in search, still on a peer
+ * running an older build. Removal is what it looks like. `restoreField` and the
+ * undo offered beside it are the way back.
+ */
+export function clearField(doc: Doc, eventId: EventId, key: string, author: Author): Doc {
+  return A.change(doc, (d) => {
+    const event = d.events[eventId];
+    if (!event) return;
+
+    if (key.startsWith('custom:')) {
+      delete event.customFields[key.slice('custom:'.length)];
+      stamp(event, author);
+      return;
+    }
+
+    for (const part of FIELD_PARTS[key] ?? []) {
+      if (part.startsWith('booking.')) {
+        delete (event.booking as unknown as Record<string, unknown>)[
+          part.slice('booking.'.length)
+        ];
+      } else {
+        delete (event as unknown as Record<string, unknown>)[part];
+      }
+    }
+
+    // The three keyed collections are declared as always present. Emptying one
+    // leaves the map behind rather than the key missing, which is what every
+    // reader of an event expects to find.
+    if (key === 'links') event.links = {};
+    if (key === 'files') event.attachments = {};
+    if (key === 'todos') event.todos = {};
+
+    stamp(event, author);
+  });
+}
+
+/** Puts back what `fieldContents` took, exactly as it was. */
+export function restoreField(
+  doc: Doc,
+  eventId: EventId,
+  held: FieldContents,
+  author: Author,
+): Doc {
+  return A.change(doc, (d) => {
+    const event = d.events[eventId];
+    if (!event) return;
+
+    for (const [part, value] of Object.entries(held)) {
+      if (part.startsWith('custom:')) {
+        event.customFields[part.slice('custom:'.length)] = value as CustomValue;
+      } else if (part.startsWith('booking.')) {
+        (event.booking as unknown as Record<string, unknown>)[part.slice('booking.'.length)] =
+          value;
+      } else {
+        (event as unknown as Record<string, unknown>)[part] = value;
+      }
+    }
+
+    stamp(event, author);
+  });
+}
+
+function readPart(event: TripEvent, part: string): unknown {
+  if (part.startsWith('booking.')) {
+    return (event.booking as unknown as Record<string, unknown>)[part.slice('booking.'.length)];
+  }
+
+  const value = (event as unknown as Record<string, unknown>)[part];
+
+  // An empty collection holds nothing, and restoring one would put back an
+  // empty map over whatever had been added in the meantime.
+  if (value !== null && typeof value === 'object' && Object.keys(value).length === 0) {
+    return undefined;
+  }
+
+  return value;
+}
+
+/* Automerge proxies cannot be written back into a document at another path, and
+ * the value read out of one is a proxy. This is the same trick `addAttachment`
+ * uses for a file taken from the trip library. */
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 export function deleteFieldDef(doc: Doc, id: FieldDefId, now = Date.now()): Doc {

@@ -8,7 +8,7 @@ import type {
   TripEvent,
 } from '@trip/crdt';
 import { Button, ColorPicker, CustomFieldInput, SegmentedControl, TextField, cn } from '@trip/ui';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import {
   endTimeFromClock,
@@ -63,6 +63,11 @@ export interface EventEditorProps {
    */
   revealed: ReadonlySet<string>;
   onReveal: (key: string) => void;
+  /**
+   * Takes a field off this event, with what it holds. The label goes in the
+   * undo offer, which is the only way back.
+   */
+  onRemoveField: (key: string, label: string) => void;
 }
 
 interface Section {
@@ -113,6 +118,7 @@ export function EventEditor({
   onClose,
   revealed,
   onReveal,
+  onRemoveField,
 }: EventEditorProps) {
   const zone = zoneFor(event.timezone, homeTimezone);
   const time =
@@ -746,9 +752,38 @@ export function EventEditor({
           <div
             key={section.key}
             data-testid={`field-${section.key}`}
-            className={SECTION_WIDTH[section.width]}
+            className={cn('group/field relative', SECTION_WIDTH[section.width])}
           >
             {section.render()}
+
+            {/*
+              A field that was added by mistake, or has stopped applying, had no
+              way off the card: it shows because it holds something, so the only
+              way to be rid of it was to empty it by hand and reopen the event.
+              The button does both, and the undo offer beside it is what makes
+              taking the content with it safe.
+
+              Shown on hover on a pointer, and always where there is none --
+              hover is not a thing a touch screen has, and the control would be
+              unreachable there.
+            */}
+            <button
+              type="button"
+              data-testid={`remove-field-${section.key}`}
+              aria-label={`Remove ${section.label}`}
+              title={`Remove ${section.label} and what it holds`}
+              onClick={() => onRemoveField(section.key, section.label)}
+              className={cn(
+                'absolute -top-1 -right-1 rounded-full border border-line bg-card p-1',
+                'text-ink-muted shadow-xs',
+                'opacity-0 transition-opacity group-hover/field:opacity-100',
+                'focus-visible:opacity-100 focus-visible:outline-focus focus-visible:outline-2',
+                'hover:border-danger hover:text-danger',
+                '[@media(hover:none)]:opacity-100',
+              )}
+            >
+              <X aria-hidden="true" className="size-3.5" />
+            </button>
           </div>
         ))}
       </div>

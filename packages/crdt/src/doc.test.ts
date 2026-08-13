@@ -8,15 +8,18 @@ import {
   addLink,
   addTripFile,
   addTodo,
+  clearField,
   createTrip,
   deleteEvent,
   deleteEvents,
+  fieldContents,
   liveEvents,
   mergeEvents,
   normalizeBookingStatuses,
   normalizeEventKinds,
   referencedBlobs,
   removeTodo,
+  restoreField,
   setCityColor,
   setCustomField,
   tripFiles,
@@ -576,5 +579,100 @@ describe('a patch carrying an object', () => {
     );
 
     expect(doc.events.e1!.location).toEqual({ label: 'Kyoto Station', lat: 34.98, lng: 135.75 });
+  });
+});
+
+describe('taking a field off an event', () => {
+  it('removes what the field holds and nothing beside it', () => {
+    let doc = trip();
+    doc = updateEvent(
+      doc,
+      'e1' as EventId,
+      { booking: { status: 'booked', confirmationCode: '7K2QLM', note: 'paid in full' } },
+      ada,
+    );
+
+    const held = fieldContents(doc.events.e1!, 'confirmation');
+    doc = clearField(doc, 'e1' as EventId, 'confirmation', ada);
+
+    expect(doc.events.e1!.booking.confirmationCode).toBeUndefined();
+    // The status and the note share `booking` with the code and are their own
+    // fields on the card, so neither goes with it.
+    expect(doc.events.e1!.booking.status).toBe('booked');
+    expect(doc.events.e1!.booking.note).toBe('paid in full');
+
+    doc = restoreField(doc, 'e1' as EventId, held, ada);
+    expect(doc.events.e1!.booking.confirmationCode).toBe('7K2QLM');
+  });
+
+  it('gives a collection back under the ids it had', () => {
+    let doc = trip();
+    doc = addLink(doc, 'e1' as EventId, 'l1', { url: 'https://example.com/a' }, ada);
+    doc = addLink(doc, 'e1' as EventId, 'l2', { url: 'https://example.com/b', title: 'B' }, ada);
+
+    const held = fieldContents(doc.events.e1!, 'links');
+    doc = clearField(doc, 'e1' as EventId, 'links', ada);
+
+    // Emptied, not removed: every reader of an event expects the map to be
+    // there.
+    expect(doc.events.e1!.links).toEqual({});
+
+    doc = restoreField(doc, 'e1' as EventId, held, ada);
+    expect(Object.keys(doc.events.e1!.links)).toEqual(['l1', 'l2']);
+    expect(doc.events.e1!.links.l2!.title).toBe('B');
+  });
+
+  it('takes a date and the flag that goes with it together', () => {
+    let doc = trip();
+    doc = updateEvent(
+      doc,
+      'e1' as EventId,
+      { startsAt: 1_772_000_000_000, timeUndecided: true, timezone: 'Asia/Tokyo' },
+      ada,
+    );
+
+    const held = fieldContents(doc.events.e1!, 'when');
+    doc = clearField(doc, 'e1' as EventId, 'when', ada);
+
+    expect(doc.events.e1!.startsAt).toBeUndefined();
+    expect(doc.events.e1!.timeUndecided).toBeUndefined();
+    expect(doc.events.e1!.timezone).toBeUndefined();
+
+    doc = restoreField(doc, 'e1' as EventId, held, ada);
+    expect(doc.events.e1!.startsAt).toBe(1_772_000_000_000);
+    expect(doc.events.e1!.timeUndecided).toBe(true);
+  });
+
+  it('removes a custom field from the event without touching its definition', () => {
+    let doc = trip();
+    doc = addFieldDef(doc, { id: 'f1', label: 'Cost', type: 'money', currency: 'JPY', order: 0 });
+    doc = setCustomField(doc, 'e1' as EventId, 'f1', { kind: 'number', number: 1200 }, ada);
+
+    const held = fieldContents(doc.events.e1!, 'custom:f1');
+    doc = clearField(doc, 'e1' as EventId, 'custom:f1', ada);
+
+    expect(doc.events.e1!.customFields.f1).toBeUndefined();
+    // The definition belongs to the trip. Taking the field off one event says
+    // nothing about the others, and the Fields page is where it is deleted.
+    expect(doc.fieldDefs.f1!.deletedAt).toBeUndefined();
+
+    doc = restoreField(doc, 'e1' as EventId, held, ada);
+    expect(doc.events.e1!.customFields.f1).toEqual({ kind: 'number', number: 1200 });
+  });
+
+  it('lets a removal made offline merge with an edit made elsewhere', () => {
+    let doc = trip();
+    doc = updateEvent(doc, 'e1' as EventId, { city: 'Kyoto', description: 'morning' }, ada);
+
+    const [mine, theirs] = fork(doc);
+    const cleared = clearField(mine, 'e1' as EventId, 'city', ada);
+    const edited = updateEvent(theirs, 'e1' as EventId, { description: 'afternoon' }, bo);
+
+    // Each side touched its own keys, so the merge keeps both decisions rather
+    // than one whole event winning.
+    for (const merged of bothWays(cleared, edited)) {
+      expect(merged.events.e1!.city).toBeUndefined();
+      expect(merged.events.e1!.description).toBe('afternoon');
+    }
   });
 });

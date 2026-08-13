@@ -60,6 +60,8 @@ export interface EventRowProps {
   /** Fields asked for during this sitting, held by the list for the same reason. */
   revealed: ReadonlySet<string>;
   onReveal: (key: string) => void;
+  /** Takes a field off the event, with what it holds. Undo is offered after. */
+  onRemoveField: (key: string, label: string) => void;
   isSelected: boolean;
   onToggleSelected: () => void;
   /** Once anything is ticked, every card shows its box. */
@@ -336,6 +338,7 @@ export function EventRow({
   isOpen,
   revealed,
   onReveal,
+  onRemoveField,
   onToggle,
   isSelected,
   onToggleSelected,
@@ -574,6 +577,7 @@ export function EventRow({
           onClose={onToggle}
           revealed={revealed}
           onReveal={onReveal}
+          onRemoveField={onRemoveField}
         />
       )}
     </Card>
