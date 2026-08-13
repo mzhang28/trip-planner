@@ -34,6 +34,13 @@ const HOUR_HEIGHT = 56;
 const MINUTE_HEIGHT = HOUR_HEIGHT / 60;
 const DEFAULT_EVENT_MINUTES = 30;
 
+/*
+ * What a dragged event lands on. Half an hour is the grain a plan is made at --
+ * "half two" is a time somebody says, 14:23 is a time they would have to
+ * correct -- and it stays legible when a fitted week compresses the hours.
+ */
+const SNAP_MINUTES = 30;
+
 interface PositionedEvent {
   event: TripEvent;
   top: number | string;
@@ -282,6 +289,14 @@ export interface WeekViewProps {
    * drawn, so the caller is the one that decides checkout is the morning after.
    */
   onCreateLodging: (from: DayKey, to: DayKey, name: string) => void;
+  /**
+   * Moves a timed event to another day and hour, on that day's own clock.
+   *
+   * `minutes` is from the target day's midnight, snapped to the half hour --
+   * close enough to place a plan, coarse enough that a hand that wobbles by a
+   * pixel does not write 14:07.
+   */
+  onMoveEvent: (eventId: string, day: DayKey, minutes: number) => void;
 }
 
 function InlineEventDraft({
@@ -622,6 +637,10 @@ function DayColumn({
     <div
       ref={setNodeRef}
       data-testid={`day-${day}`}
+      // Read by a drag looking for the column under the pointer, which the
+      // test id would also answer to -- but that is a name for a test to use,
+      // not a thing for the view to depend on.
+      data-week-column={day}
       onPointerDown={(e) => {
         /*
          * Anywhere in the column except on an event. A press that started on
@@ -726,6 +745,7 @@ export function WeekView({
   onOpenEvent,
   onCreateAt,
   onCreateLodging,
+  onMoveEvent,
 }: WeekViewProps) {
   const days = useMemo(() => daysInRange(tripStart, tripEnd), [tripStart, tripEnd]);
   const displaySettings = useCalendarDisplaySettings();
@@ -852,9 +872,117 @@ export function WeekView({
       }
     : null;
 
+  /**
+   * An event being carried to another time, and where it would land.
+   *
+   * `grab` is how far down the card the press was, so the card keeps the
+   * position under the hand rather than jumping its top to the pointer.
+   * `travelled` is what tells a move from a click: a press that never went
+   * anywhere is somebody opening the event.
+   */
+  const [carry, setCarry] = useState<{
+    id: string;
+    minutes: number;
+    length: number;
+    day: DayKey;
+    grab: number;
+    travelled: boolean;
+  } | null>(null);
+
+  /*
+   * Held in a ref as well, because the click that follows a drag arrives after
+   * the state has been cleared and has to be swallowed: releasing the card
+   * would otherwise both move the event and open it.
+   */
+  const dropped = useRef(false);
+
+  useEffect(() => {
+    if (!carry) return;
+
+    /** Where the pointer is, as a day of the week and a half hour of that day. */
+    function readPosition(at: PointerEvent): { day: DayKey; minutes: number } | null {
+      const under = document
+        .elementFromPoint(at.clientX, at.clientY)
+        ?.closest<HTMLElement>('[data-week-column]');
+      if (!under?.dataset.weekColumn) return null;
+
+      const bounds = under.getBoundingClientRect();
+      const span = windowEnd - windowStart;
+      const top = at.clientY - bounds.top - carry!.grab;
+      const minutes = windowStart + Math.round((top / bounds.height) * span / SNAP_MINUTES) * SNAP_MINUTES;
+
+      return {
+        day: under.dataset.weekColumn,
+        minutes: Math.max(windowStart, Math.min(windowEnd - SNAP_MINUTES, minutes)),
+      };
+    }
+
+    function move(at: PointerEvent) {
+      const position = readPosition(at);
+      if (!position) return;
+
+      setCarry((current) =>
+        current === null
+          ? current
+          : {
+              ...current,
+              day: position.day,
+              minutes: position.minutes,
+              travelled:
+                current.travelled ||
+                position.day !== current.day ||
+                position.minutes !== current.minutes,
+            },
+      );
+    }
+
+    function drop() {
+      setCarry((current) => {
+        if (current?.travelled) {
+          dropped.current = true;
+          onMoveEvent(current.id, current.day, current.minutes);
+        }
+        return null;
+      });
+    }
+
+    // The system taking the gesture away leaves the event where it was.
+    const abandon = () => setCarry(null);
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', drop);
+    window.addEventListener('pointercancel', abandon);
+
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', drop);
+      window.removeEventListener('pointercancel', abandon);
+    };
+  }, [carry, onMoveEvent, windowStart, windowEnd]);
+
   function finishDrag() {
     if (selecting) setCreating({ ...selecting, name: '' });
     setDrag(null);
+  }
+
+  /** A stretch of a day as the band that draws it, fitted or scrolling. */
+  function landing(
+    span: { start: number; end: number } | null,
+  ): { top: number | string; height: number | string } | null {
+    if (!span) return null;
+
+    const visible = windowEnd - windowStart;
+    const end = Math.min(span.end, windowEnd);
+
+    return displaySettings.weekFitToView
+      ? {
+          top: `${((span.start - windowStart) / visible) * 100}%`,
+          height: `${((end - span.start) / visible) * 100}%`,
+        }
+      : {
+          top: (span.start - windowStart) * MINUTE_HEIGHT,
+          height: (end - span.start) * MINUTE_HEIGHT,
+        };
   }
 
   function commitCreation() {
@@ -1259,18 +1387,20 @@ export function WeekView({
                     day={day}
                     disabled={readOnly}
                     selected={false}
-                    band={
+                    /*
+                      One band, whether it is a time being dragged out or an
+                      event being carried onto this day. They cannot happen at
+                      once -- a press either lands on a card or on the sheet --
+                      and both answer the same question about where a thing
+                      would go.
+                    */
+                    band={landing(
                       selecting && selecting.day === day
-                        ? {
-                            top: displaySettings.weekFitToView
-                              ? `${((selecting.start - windowStart) / (windowEnd - windowStart)) * 100}%`
-                              : (selecting.start - windowStart) * MINUTE_HEIGHT,
-                            height: displaySettings.weekFitToView
-                              ? `${((selecting.end - selecting.start) / (windowEnd - windowStart)) * 100}%`
-                              : (selecting.end - selecting.start) * MINUTE_HEIGHT,
-                          }
-                        : null
-                    }
+                        ? { start: selecting.start, end: selecting.end }
+                        : carry?.travelled && carry.day === day
+                          ? { start: carry.minutes, end: carry.minutes + carry.length }
+                          : null,
+                    )}
                     onStart={(minutes) => {
                       setCreating(null);
                       setDrag({ day, from: minutes, to: minutes });
@@ -1292,7 +1422,42 @@ export function WeekView({
                           key={event.id}
                           type="button"
                           data-testid="week-event"
-                          onClick={() => onOpenEvent(event.id)}
+                          data-event-id={event.id}
+                          onClick={() => {
+                            // The release that ended a drag also fires a click.
+                            // Moving the event was the whole gesture; opening it
+                            // as well would bury the move under an editor.
+                            if (dropped.current) {
+                              dropped.current = false;
+                              return;
+                            }
+                            onOpenEvent(event.id);
+                          }}
+                          /*
+                           * A mouse may carry an event to another time. A finger
+                           * may not: dragging a card and scrolling the week are
+                           * the same gesture, and taking it for a move would
+                           * make a week of events unscrollable. Opening the
+                           * event and editing its time still works there.
+                           */
+                          onPointerDown={(e) => {
+                            if (readOnly || e.pointerType === 'touch') return;
+                            if (event.startsAt === undefined) return;
+
+                            const card = e.currentTarget.getBoundingClientRect();
+                            setDrag(null);
+                            setCarry({
+                              id: event.id,
+                              day,
+                              minutes: minutesSinceMidnight(event.startsAt, columnZone(zone)),
+                              length: Math.max(
+                                SNAP_MINUTES,
+                                event.durationMinutes ?? DEFAULT_EVENT_MINUTES,
+                              ),
+                              grab: e.clientY - card.top,
+                              travelled: false,
+                            });
+                          }}
                           style={{
                             ...coloredSurfaceStyle(event.color),
                             top,
@@ -1306,6 +1471,11 @@ export function WeekView({
                             // really starts or ends at the hour it is resting on.
                             outsideBefore && 'border-t-ink-muted [border-top-style:dashed]',
                             outsideAfter && 'border-b-ink-muted [border-bottom-style:dashed]',
+                            !readOnly && 'cursor-grab',
+                            // Left where it was, faded, while its shadow shows
+                            // where it would land. Hiding it would make the week
+                            // reflow around a gap that is about to be filled.
+                            carry?.id === event.id && carry.travelled && 'opacity-40',
                           )}
                         >
                           <StatusSpine status={event.booking.status} />

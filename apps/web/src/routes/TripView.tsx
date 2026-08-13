@@ -41,7 +41,7 @@ import {
   ThemeToggle,
   coloredSurfaceStyle,
 } from '@trip/ui';
-import { ChevronRight, GripVertical, Plus, Settings, Share2 } from 'lucide-react';
+import { ChevronRight, GripVertical, Plus, Settings, Share2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ApiError, api, type TripSummary } from '../lib/api';
@@ -77,6 +77,9 @@ import { useEvents, useTripState, useTripStore } from '../trip/useTrip';
 import { setZonePreference, useZonePreference } from '../trip/useDisplayZone';
 
 const UNSCHEDULED = 'unscheduled';
+
+/** How many steps back Ctrl+Z can walk. */
+const UNDO_DEPTH = 30;
 
 /** Shared so a card without revealed fields is not handed a new set each render. */
 const NOTHING_REVEALED: ReadonlySet<string> = new Set();
@@ -133,11 +136,16 @@ function middleDay(start: DayKey, end: DayKey): DayKey {
 function HeaderActions({
   canShare,
   zonePreference,
+  undoLabel,
+  onUndo,
   onChangeZone,
   onShare,
 }: {
   canShare: boolean;
   zonePreference: 'event' | 'device';
+  /** What pressing undo would take back, or absent when there is nothing. */
+  undoLabel: string | undefined;
+  onUndo: () => void;
   onChangeZone: (value: 'event' | 'device') => void;
   onShare: () => void;
 }) {
@@ -164,6 +172,21 @@ function HeaderActions({
 
   return (
     <div ref={container} className="relative flex items-center gap-1">
+      {/*
+        Says what it would take back rather than just "Undo", because by the
+        time somebody looks for it they may no longer be sure what the last
+        thing was. Ctrl+Z does the same thing without coming up here.
+      */}
+      <IconButton
+        label={undoLabel ? `Undo: ${undoLabel}` : 'Nothing to undo'}
+        variant="secondary"
+        data-testid="undo-last"
+        isDisabled={undoLabel === undefined}
+        onPress={onUndo}
+      >
+        <Undo2 aria-hidden="true" />
+      </IconButton>
+
       {canShare && (
         <IconButton label="Share trip" variant="secondary" onPress={onShare}>
           <Share2 aria-hidden="true" />
@@ -241,13 +264,38 @@ export function TripView() {
   const pendingEventScrollRef = useRef<string | null>(null);
 
   /**
-   * The last removal, while it can still be taken back.
+   * The way back from each thing that has been done, most recent last.
    *
-   * The bar used to know it was undoing a deleted event and put it back by id.
-   * Removing a field takes content out of an event that stays, which is not
-   * something an id can express -- so what is kept is the way back itself.
+   * A stack rather than a single slot, because Ctrl+Z is expected to keep
+   * going: moving three events and pressing it three times should leave the
+   * week as it was. Each entry carries its own way back rather than an id and a
+   * kind -- moving an event and taking a field off one have nothing in common
+   * to write down.
+   *
+   * Bounded, because these hold the values they would put back and a long
+   * afternoon of edits should not be a leak.
    */
+  const [undos, setUndos] = useState<Array<{ message: string; revert: () => void }>>([]);
+
+  /** The offer beside the last thing done, which stands for a few seconds. */
   const [undoable, setUndoable] = useState<{ message: string; revert: () => void } | null>(null);
+
+  const remember = useCallback((entry: { message: string; revert: () => void }) => {
+    setUndos((current) => [...current, entry].slice(-UNDO_DEPTH));
+    setUndoable(entry);
+  }, []);
+
+  /** Takes back the last thing done, wherever the asking came from. */
+  const undo = useCallback(() => {
+    setUndos((current) => {
+      const last = current[current.length - 1];
+      if (!last) return current;
+
+      last.revert();
+      setUndoable(null);
+      return current.slice(0, -1);
+    });
+  }, []);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [mergePrimary, setMergePrimary] = useState<string | null>(null);
 
@@ -608,6 +656,80 @@ export function TripView() {
     setHighlighted(id);
   }
 
+  /**
+   * Puts an event on another day and hour, read on that day's own clock.
+   *
+   * The zone is the day's, not the event's: dropping a card halfway down
+   * Thursday means half past two where Thursday is being spent. An event that
+   * never named a zone adopts that one, so it keeps reading as the time it was
+   * dropped at rather than shifting once the trip moves.
+   */
+  const moveEventTo = useCallback(
+    (eventId: string, day: DayKey, minutes: number) => {
+      const event = events.find((candidate) => candidate.id === eventId);
+      if (!event) return;
+
+      const zone = slots.find((slot) => slot.day === day)?.zone ?? homeTimezone;
+      const midnight = setDay(undefined, zone, day);
+      if (midnight === null) return;
+
+      const clock = `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(
+        minutes % 60,
+      ).padStart(2, '0')}`;
+      const at = setTimeOfDay(midnight, zone, clock);
+      if (at === null || at === event.startsAt) return;
+
+      const before = {
+        startsAt: event.startsAt,
+        timeUndecided: event.timeUndecided,
+        timezone: event.timezone,
+      };
+
+      store?.change((current) =>
+        updateEvent(
+          current,
+          eventId,
+          { startsAt: at, timeUndecided: undefined, timezone: event.timezone ?? zone },
+          { userId: 'me' },
+        ),
+      );
+
+      remember({
+        message: `Moved ${event.name || 'the unnamed event'}`,
+        revert: () =>
+          store?.change((current) => updateEvent(current, eventId, before, { userId: 'me' })),
+      });
+    },
+    [events, slots, homeTimezone, store, remember],
+  );
+
+  /*
+   * Ctrl+Z, except while typing. A field has its own undo and taking the key
+   * from it would make correcting a word revert an event instead.
+   */
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'z' && event.key !== 'Z') return;
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.shiftKey || event.altKey) return;
+
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.isContentEditable ||
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      undo();
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undo]);
+
   function goToDay(at: number) {
     const key = slotForInstant(slots, at) ?? dayKey(at, homeTimezone);
     moveAnchor(key);
@@ -653,7 +775,7 @@ export function TripView() {
     if (ids.length === 0) return;
 
     store?.change((current) => deleteEvents(current, ids, { userId: 'me' }));
-    setUndoable({
+    remember({
       message,
       revert: () =>
         store?.change((current) =>
@@ -689,7 +811,7 @@ export function TripView() {
       return { ...current, [eventId]: next };
     });
 
-    setUndoable({
+    remember({
       message: `Removed ${label}`,
       revert: () => store?.change((current) => restoreField(current, eventId, held, { userId: 'me' })),
     });
@@ -832,6 +954,8 @@ export function TripView() {
             <HeaderActions
               canShare={trip?.role === 'owner'}
               zonePreference={zonePreference}
+              undoLabel={readOnly ? undefined : undos[undos.length - 1]?.message}
+              onUndo={undo}
               onChangeZone={setZonePreference}
               onShare={share}
             />
@@ -960,6 +1084,7 @@ export function TripView() {
                 createOn(day, { startMinutes, endMinutes, name, openAfterCreate: false })
               }
               onCreateLodging={createLodging}
+              onMoveEvent={moveEventTo}
             />
           )}
 
@@ -1208,10 +1333,7 @@ export function TripView() {
         {undoable && selected.size === 0 && (
           <UndoBar
             message={undoable.message}
-            onUndo={() => {
-              undoable.revert();
-              setUndoable(null);
-            }}
+            onUndo={undo}
             onDismiss={() => setUndoable(null)}
           />
         )}

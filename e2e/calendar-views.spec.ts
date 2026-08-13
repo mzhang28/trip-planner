@@ -751,6 +751,101 @@ test.describe('filling an event in gradually', () => {
   });
 });
 
+test.describe('moving an event in the week', () => {
+  /**
+   * Drags a card to a time on a day, by pixels worked out from the column.
+   *
+   * The press lands on the middle of the card and the card keeps its position
+   * under the hand, so the pointer has to finish half a card below the time
+   * being aimed at.
+   */
+  async function dragTo(page: Page, name: string, day: string, hour: number) {
+    const card = page.getByTestId('week-event').filter({ hasText: name });
+    const column = page.locator(`[data-week-column="${day}"]`);
+
+    const cardBox = await card.boundingBox();
+    const columnBox = await column.boundingBox();
+    if (!cardBox || !columnBox) throw new Error('no week bounds to drag between');
+
+    const perMinute = columnBox.height / (WEEK_HOURS * 60);
+    const targetTop = columnBox.y + (hour - WEEK_START_HOUR) * 60 * perMinute;
+
+    await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+    await page.mouse.down();
+    // More than one step: a single jump can arrive before the drag has begun.
+    await page.mouse.move(columnBox.x + columnBox.width / 2, targetTop + cardBox.height / 2, {
+      steps: 8,
+    });
+    await page.mouse.up();
+  }
+
+  test('an event can be dragged to another time and put back', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-08-10', '2026-08-16');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    await page.getByTestId('go-to-date').fill(ON);
+    await switchTo(page, 'Week');
+
+    const card = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
+    await expect(card).toContainText('09:00');
+
+    // Dropped at half past one, which is a time somebody would say. Anything
+    // between 13:15 and 13:44 lands here: the half hour is the grain.
+    await dragTo(page, 'Fushimi Inari', ON, 13.5);
+    await expect(card).toContainText('13:30');
+
+    // Ctrl+Z, which is where a hand goes first after a drag that missed.
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(card).toContainText('09:00');
+
+    // And the same thing from the toolbar, for a hand that does not know that.
+    await dragTo(page, 'Fushimi Inari', ON, 13.5);
+    await expect(card).toContainText('13:30');
+    await expect(page.getByTestId('undo-last')).toHaveAccessibleName(
+      'Undo: Moved Fushimi Inari',
+    );
+    await page.getByTestId('undo-last').click();
+    await expect(card).toContainText('09:00');
+  });
+
+  test('dragging sideways moves an event to another day', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-08-10', '2026-08-16');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    await page.getByTestId('go-to-date').fill(ON);
+    await switchTo(page, 'Week');
+
+    const next = '2026-08-13';
+    await dragTo(page, 'Fushimi Inari', next, 11);
+
+    // In the next day's column, at the hour it was dropped on.
+    const moved = page.locator(`[data-week-column="${next}"]`).getByTestId('week-event');
+    await expect(moved).toContainText('Fushimi Inari');
+    await expect(moved).toContainText('11:00');
+
+    // A click after a drag opens nothing: the release that ended the drag also
+    // fires one, and the move was the whole gesture.
+    await expect(page.getByTestId('event-editor')).toHaveCount(0);
+  });
+
+  test('a click on an event still opens it', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    await page.getByTestId('go-to-date').fill(ON);
+    await switchTo(page, 'Week');
+
+    await page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' }).click();
+    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+  });
+});
+
 test.describe('making an event from the calendar', () => {
   test('clicking a day in the month makes an event on that day', async ({ page }) => {
     await page.goto('/');
