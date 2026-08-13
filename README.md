@@ -3,6 +3,20 @@
 I made this app to plan a trip to Japan with my partner.
 Your mileage may vary.
 
+## How to use
+
+```
+docker compose up -d
+```
+
+Starts on port 8787.
+Modify `PUBLIC_URL` environment variable if ur running this publicly, put it behind a TLS proxy yada yada yada.
+
+## How to develop
+
+Open claude code / codex / your choice of agent.
+I literally have not looked at the code.
+
 ## Features
 
 - Offline mobile PWA support
