@@ -29,6 +29,15 @@ test('work made while away is kept when the trip has to be reloaded', async ({ p
   await expect(page.getByTestId('event')).toHaveCount(2);
 
   await context.setOffline(false);
+
+  /*
+   * Let the device finish reconnecting before the sweep, so the sweep is later
+   * than anything this device knows about. Racing them decides the test:
+   * a sync that lands after the sweep leaves the device newer than it, which
+   * the server admits, and then there is nothing to recover from.
+   */
+  await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
+
   // The server now refuses anything older than this moment, which is what a
   // device that has been away past the tombstone horizon looks like.
   await page.request.post(`/api/test/force-resync/${trip.id}`);

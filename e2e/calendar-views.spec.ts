@@ -804,70 +804,162 @@ test.describe('booking somewhere to sleep from the week', () => {
     return new Date(at).toISOString().slice(0, 10);
   }
 
-  test('a week with no hotel offers the nights, and naming one books them', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page, 'Japan, April');
-    await setTripDates(page, '2026-09-01', '2026-09-05');
-    await switchTo(page, 'Week');
+  function night(page: Page, day: string) {
+    return page.locator(`[data-testid="week-add-lodging"][data-day="${day}"]`);
+  }
 
-    // Nothing is booked, so one offer covers every night of the trip rather
-    // than the rail sitting empty with an instruction in it.
-    const offer = page.getByTestId('week-add-lodging');
-    await expect(offer).toHaveCount(1);
-    await expect(offer).toHaveAttribute('data-from', '2026-09-01');
-    await expect(offer).toHaveAttribute('data-to', '2026-09-05');
+  /** Presses one night and lets go on another, as a finger or a mouse would. */
+  async function dragAcross(page: Page, from: string, to: string) {
+    const start = await night(page, from).boundingBox();
+    const end = await night(page, to).boundingBox();
+    if (!start || !end) throw new Error('a night to drag between was not on screen');
 
-    const firstNight = '2026-09-01';
-    const lastNight = '2026-09-05';
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, { steps: 10 });
+    await page.mouse.up();
+  }
 
-    await offer.click();
-
-    const draft = page.getByTestId('week-event-draft');
-    const name = draft.getByRole('textbox', { name: 'Hotel name' });
+  async function nameIt(page: Page, hotel: string) {
+    const name = page.getByTestId('week-event-draft').getByRole('textbox', { name: 'Hotel name' });
     await expect(name).toBeFocused();
-    await name.fill('Ryokan Kyoto');
+    await name.fill(hotel);
     await name.press('Enter');
+  }
 
-    // The bar replaces the offer in place, without leaving the week.
-    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
-    const bar = page.getByTestId('week-lodging').filter({ hasText: 'Ryokan Kyoto' });
-    await expect(bar).toBeVisible();
-    await expect(page.getByTestId('week-add-lodging')).toHaveCount(0);
-
-    // The dates are the nights that were offered, with checkout the morning
-    // after the last of them.
-    await bar.click();
+  /** Reads the dates back off the stay itself, which is what was booked. */
+  async function datesOf(page: Page, hotel: string) {
+    await page.getByTestId('week-lodging').filter({ hasText: hotel }).click();
     const editor = page.getByTestId('event-editor');
     await expect(editor).toBeVisible();
-    await expect(editor.getByTestId('check-in')).toHaveValue(firstNight);
-    await expect(editor.getByTestId('check-out')).toHaveValue(nextDay(lastNight));
-  });
 
-  test('the nights already booked are not offered again', async ({ page }) => {
+    return {
+      checkIn: await editor.getByTestId('check-in').inputValue(),
+      checkOut: await editor.getByTestId('check-out').inputValue(),
+    };
+  }
+
+  test('every night with no hotel is offered on its own', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await setTripDates(page, '2026-09-01', '2026-09-05');
     await switchTo(page, 'Week');
 
-    await page.getByTestId('week-add-lodging').click();
-    const name = page.getByTestId('week-event-draft').getByRole('textbox', { name: 'Hotel name' });
-    await name.fill('Ryokan Kyoto');
-    await name.press('Enter');
+    // One per night rather than one across the week, so a single night can be
+    // booked without first narrowing something wider.
+    await expect(page.getByTestId('week-add-lodging')).toHaveCount(5);
+    await expect(night(page, '2026-09-03')).toBeVisible();
+  });
 
-    // Hand back the last two nights by checking out earlier. What is left has
-    // to come back as an offer, and only for the nights actually given up.
-    await page.getByTestId('week-lodging').filter({ hasText: 'Ryokan Kyoto' }).click();
-    await page.getByTestId('check-out').fill('2026-09-04');
-    await page.getByTestId('close-editor').click();
+  test('pressing one night books that night alone', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-09-01', '2026-09-05');
+    await switchTo(page, 'Week');
+
+    await night(page, '2026-09-03').click();
+    await nameIt(page, 'Ryokan Kyoto');
+
+    // Booking stays in the week rather than opening the day editor.
+    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    await expect(
+      page.getByTestId('week-lodging').filter({ hasText: 'Ryokan Kyoto' }),
+    ).toBeVisible();
+
+    // The other four nights are still on offer.
+    await expect(page.getByTestId('week-add-lodging')).toHaveCount(4);
+
+    expect(await datesOf(page, 'Ryokan Kyoto')).toEqual({
+      checkIn: '2026-09-03',
+      checkOut: nextDay('2026-09-03'),
+    });
+  });
+
+  test('dragging along the rail books every night it covers', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-09-01', '2026-09-05');
+    await switchTo(page, 'Week');
+
+    await dragAcross(page, '2026-09-02', '2026-09-04');
+    await nameIt(page, 'Ryokan Kyoto');
+
+    // Three nights in one gesture, and the two it never reached still offered.
+    await expect(page.getByTestId('week-add-lodging')).toHaveCount(2);
+    await expect(night(page, '2026-09-01')).toBeVisible();
+    await expect(night(page, '2026-09-05')).toBeVisible();
+
+    expect(await datesOf(page, 'Ryokan Kyoto')).toEqual({
+      checkIn: '2026-09-02',
+      checkOut: nextDay('2026-09-04'),
+    });
+  });
+
+  test('dragging backwards works the same as dragging forwards', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-09-01', '2026-09-05');
+    await switchTo(page, 'Week');
+
+    await dragAcross(page, '2026-09-04', '2026-09-02');
+    await nameIt(page, 'Ryokan Kyoto');
+
+    expect(await datesOf(page, 'Ryokan Kyoto')).toEqual({
+      checkIn: '2026-09-02',
+      checkOut: nextDay('2026-09-04'),
+    });
+  });
+
+  test('a drag stops at a night that already has a hotel', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-09-01', '2026-09-05');
+    await switchTo(page, 'Week');
+
+    // Take the middle night, leaving a free night either side of it.
+    await night(page, '2026-09-03').click();
+    await nameIt(page, 'Ryokan Kyoto');
+    await switchTo(page, 'Week');
+
+    // Now drag from the first night towards the last, straight over the hotel.
+    await dragAcross(page, '2026-09-01', '2026-09-05');
+    await nameIt(page, 'Guest house');
+
+    // It stopped where the hotel starts rather than booking over it, so the
+    // two nights past the hotel are still on offer.
+    expect(await datesOf(page, 'Guest house')).toEqual({
+      checkIn: '2026-09-01',
+      checkOut: '2026-09-03',
+    });
 
     await switchTo(page, 'Week');
-    const remaining = page.getByTestId('week-add-lodging');
-    await expect(remaining).toHaveCount(1);
-    await expect(remaining).toHaveAttribute('data-from', '2026-09-04');
-    await expect(remaining).toHaveAttribute('data-to', '2026-09-05');
+    await expect(page.getByTestId('week-add-lodging')).toHaveCount(2);
+    await expect(night(page, '2026-09-04')).toBeVisible();
+    await expect(night(page, '2026-09-05')).toBeVisible();
+  });
 
-    // And the hotel still holds the nights it kept.
-    await expect(page.getByTestId('week-lodging')).toHaveCount(1);
+  test('a tap books a night where a drag would scroll the week @touch', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await switchTo(page, 'Week');
+
+    // Whichever nights this trip works out for itself. One of them is all this
+    // needs: the point here is the gesture, not the range.
+    const offer = page.getByTestId('week-add-lodging').first();
+    await expect(offer).toBeVisible();
+    const day = await offer.getAttribute('data-day');
+    if (!day) throw new Error('the offer did not say which night it covers');
+
+    await offer.tap();
+    await nameIt(page, 'Ryokan Kyoto');
+
+    await expect(
+      page.getByTestId('week-lodging').filter({ hasText: 'Ryokan Kyoto' }),
+    ).toBeVisible();
+    expect(await datesOf(page, 'Ryokan Kyoto')).toEqual({
+      checkIn: day,
+      checkOut: nextDay(day),
+    });
   });
 
   test('a viewer is not offered nights they could not book', async ({ page, browser }) => {

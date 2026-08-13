@@ -341,46 +341,69 @@ function nightsLabel(from: DayKey, to: DayKey): string {
 }
 
 /**
- * An offer to fill a run of nights that nothing covers.
+ * One night with nowhere to sleep, offered on its own.
  *
- * Dashed rather than solid, because it stands for something that is not there
- * yet. It takes the width of the nights it would cover, so the rail reads as a
- * whole week whether or not anywhere is booked, and pressing it asks for a name
- * where the stay will sit instead of moving to another screen for it.
+ * Dotted rather than solid, because it stands for something that is not there
+ * yet. There is one of these per empty night rather than one per stretch of
+ * them: a press books the night it is on, and dragging along the rail books
+ * every night the drag covers, the same gesture the columns above use to make
+ * an event over a stretch of hours.
  */
 function AddLodging({
-  from,
-  to,
-  nights,
-  gridColumn,
-  onStart,
+  day,
+  column,
+  selected,
+  onPress,
+  onEnter,
+  onTap,
 }: {
-  from: DayKey;
-  to: DayKey;
-  nights: number;
-  gridColumn: string;
-  onStart: () => void;
+  day: DayKey;
+  column: number;
+  selected: boolean;
+  onPress: (touch: boolean) => void;
+  onEnter: () => void;
+  onTap: () => void;
 }) {
   return (
     <button
       type="button"
       data-testid="week-add-lodging"
-      data-from={from}
-      data-to={to}
-      onClick={onStart}
-      aria-label={`Add a hotel for ${nights === 1 ? 'the night of' : `${nights} nights,`} ${nightsLabel(from, to)}`}
-      style={{ gridColumn, gridRow: 1 }}
+      data-day={day}
+      data-selected={selected ? 'true' : 'false'}
+      /*
+       * A mouse press starts a drag here rather than waiting for a click, so
+       * the one press can run along the rail and pick several nights.
+       *
+       * A finger cannot: dragging along the rail and scrolling the week
+       * sideways are the same gesture, and taking it for booking would make
+       * the week unscrollable wherever a night is free. A tap still books,
+       * through the click below, which the browser withholds if the touch
+       * turned out to be a scroll.
+       */
+      onPointerDown={(event) => {
+        const touch = event.pointerType === 'touch';
+        if (!touch) event.preventDefault();
+        onPress(touch);
+      }}
+      onPointerEnter={onEnter}
+      onClick={onTap}
+      aria-label={`Add a hotel for the night of ${nightsLabel(day, day)}`}
+      style={{ gridColumn: column, gridRow: 1 }}
       className={cn(
+        '@container min-w-0 rounded-full border border-dotted text-left text-2xs',
+        'focus-visible:outline-focus focus-visible:outline-2',
         // Stronger than the solid bars beside it, because a dotted line of the
         // same weight all but disappears against the page.
-        'min-w-0 rounded-full border border-dotted border-line-strong text-left text-2xs',
-        'text-ink-muted hover:border-accent hover:bg-sunken hover:text-ink',
-        'focus-visible:outline-focus focus-visible:outline-2',
+        selected
+          ? 'border-accent bg-accent-soft text-ink'
+          : 'border-line-strong text-ink-muted hover:border-accent hover:bg-sunken hover:text-ink',
       )}
     >
-      <span className="sticky left-[calc(2.5rem+0.5rem)] flex w-max max-w-[calc(100%-1rem)] items-center gap-1.5 px-2 py-1">
+      <span className="flex w-full items-center justify-center gap-1.5 px-2 py-1 @min-[5rem]:justify-start">
         <Plus className="size-3 shrink-0" />
-        <span className="truncate">Add hotel</span>
+        {/* Only where the column is wide enough to read it. A day this narrow
+            shows the mark alone rather than a clipped word. */}
+        <span className="hidden truncate @min-[5rem]:inline">Add hotel</span>
       </span>
     </button>
   );
@@ -591,8 +614,59 @@ export function WeekView({
     name: string;
   } | null>(null);
 
-  /** The run of empty nights being named, once its offer has been pressed. */
+  /**
+   * The nights being dragged over in the rail.
+   *
+   * `anchor` is where the press landed and stays put; `from` and `to` are what
+   * has been picked so far, already held in order and already kept inside the
+   * run of empty nights the press started in.
+   */
+  const [bedDrag, setBedDrag] = useState<{
+    anchor: DayKey;
+    from: DayKey;
+    to: DayKey;
+  } | null>(null);
+
+  /** The run of empty nights being named, once a drag has finished on it. */
   const [bedDraft, setBedDraft] = useState<{ from: DayKey; to: DayKey; name: string } | null>(null);
+
+  /**
+   * Whether the press the next click belongs to came from a mouse.
+   *
+   * A mouse press is already a drag by the time its click arrives, so the
+   * click has nothing left to do. A tap never started one, so its click is
+   * what books the night. Set on every press, which is what keeps the answer
+   * about the press the click actually follows.
+   */
+  const bedPressWasMouse = useRef(false);
+
+  /*
+   * The drag ends wherever the pointer is let go, not only over a night.
+   *
+   * Someone picking the last few nights of a week runs off the end of the rail
+   * as often as not, and a release the rail never hears about would leave the
+   * selection stuck to the pointer with nothing to end it.
+   */
+  useEffect(() => {
+    if (!bedDrag) return;
+
+    const finish = () => {
+      setBedDraft({ from: bedDrag.from, to: bedDrag.to, name: '' });
+      setBedDrag(null);
+    };
+
+    // A cancelled pointer is the system taking the gesture away -- a scroll
+    // that turned out to be a scroll -- so it picks nothing.
+    const abandon = () => setBedDrag(null);
+
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', abandon);
+
+    return () => {
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', abandon);
+    };
+  }, [bedDrag]);
 
   const selecting = drag
     ? {
@@ -628,6 +702,30 @@ export function WeekView({
     onCreateLodging(bedDraft.from, bedDraft.to, name);
     setBedDraft(null);
   }
+
+  /**
+   * Widens the drag to take in another night, as far as it may go.
+   *
+   * A drag is held inside the run of empty nights it began in, so passing over
+   * a hotel that is already booked stops at it rather than jumping the gap and
+   * offering to book a second bed for nights that have one.
+   */
+  function dragOver(day: DayKey) {
+    setBedDrag((current) => {
+      if (!current) return current;
+
+      const run = empties.find((gap) => current.anchor >= gap.from && current.anchor <= gap.to);
+      if (!run) return current;
+
+      const reach = day < run.from ? run.from : day > run.to ? run.to : day;
+
+      return {
+        anchor: current.anchor,
+        from: reach < current.anchor ? reach : current.anchor,
+        to: reach > current.anchor ? reach : current.anchor,
+      };
+    });
+  }
   const calendarByDay = eventsByDay(
     events.filter((event) => event.kind !== 'lodging'),
     homeTimezone,
@@ -636,7 +734,19 @@ export function WeekView({
   const citiesByDay = cityDaySegments(events, days, homeTimezone);
   const hasCities = Array.from(citiesByDay.values()).some((bands) => bands.length > 0);
   const beds = lodgingSpans(events, homeTimezone).filter((span) => spanWithin(span, days));
+
+  /*
+   * The empty nights twice over: as runs, which is what holds a drag inside the
+   * stretch it started in, and one by one, which is what the rail draws.
+   */
   const empties = nightsWithoutLodging(beds, days);
+
+  /** Which grid column a day sits in. The first is the sticky time gutter. */
+  const columnOf = (day: DayKey) => days.indexOf(day) + 2;
+
+  const emptyNights = empties.flatMap((gap) =>
+    days.slice(gap.start, gap.start + gap.length).map((day) => ({ day, column: columnOf(day) })),
+  );
 
   // Split off the ones on a day but not at an hour. They belong to the day and
   // to no point in it, so they get a row of their own above the grid.
@@ -1024,36 +1134,54 @@ export function WeekView({
                 })}
 
                 {/*
-                 * The nights nothing covers, offered rather than left blank. An
-                 * empty stretch of rail said only that a hotel would be drawn
-                 * here if one existed, and left making it to another screen.
+                 * The nights nothing covers, offered one by one rather than
+                 * left blank. An empty stretch of rail said only that a hotel
+                 * would be drawn here if one existed, and left making it to
+                 * another screen.
                  */}
                 {!readOnly &&
-                  empties.map((gap) =>
-                    bedDraft?.from === gap.from ? (
-                      <InlineEventDraft
-                        key={gap.from}
-                        name={bedDraft.name}
-                        label="Hotel name"
-                        onChange={(name) =>
-                          setBedDraft((current) => (current ? { ...current, name } : current))
-                        }
-                        onCommit={commitLodging}
-                        onCancel={() => setBedDraft(null)}
-                        className="rounded-full"
-                        style={{ gridColumn: `${gap.start + 2} / span ${gap.length}`, gridRow: 1 }}
-                      />
-                    ) : (
+                  emptyNights.map(({ day, column }) => {
+                    // The nights being named are one input across all of them,
+                    // so the offers underneath it stand down.
+                    if (bedDraft && day >= bedDraft.from && day <= bedDraft.to) return null;
+
+                    return (
                       <AddLodging
-                        key={gap.from}
-                        from={gap.from}
-                        to={gap.to}
-                        nights={gap.length}
-                        gridColumn={`${gap.start + 2} / span ${gap.length}`}
-                        onStart={() => setBedDraft({ from: gap.from, to: gap.to, name: '' })}
+                        key={day}
+                        day={day}
+                        column={column}
+                        selected={bedDrag !== null && day >= bedDrag.from && day <= bedDrag.to}
+                        onPress={(touch) => {
+                          // Remembered so the click that follows knows whether
+                          // the drag above has already dealt with this press.
+                          bedPressWasMouse.current = !touch;
+                          if (!touch) setBedDrag({ anchor: day, from: day, to: day });
+                        }}
+                        onEnter={() => dragOver(day)}
+                        onTap={() => {
+                          if (bedPressWasMouse.current) return;
+                          setBedDraft({ from: day, to: day, name: '' });
+                        }}
                       />
-                    ),
-                  )}
+                    );
+                  })}
+
+                {bedDraft && !readOnly && (
+                  <InlineEventDraft
+                    name={bedDraft.name}
+                    label="Hotel name"
+                    onChange={(name) =>
+                      setBedDraft((current) => (current ? { ...current, name } : current))
+                    }
+                    onCommit={commitLodging}
+                    onCancel={() => setBedDraft(null)}
+                    className="rounded-full"
+                    style={{
+                      gridColumn: `${columnOf(bedDraft.from)} / ${columnOf(bedDraft.to) + 1}`,
+                      gridRow: 1,
+                    }}
+                  />
+                )}
               </div>
             )}
           </section>
