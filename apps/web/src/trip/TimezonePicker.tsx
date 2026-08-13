@@ -86,7 +86,18 @@ export function TimezonePicker({
   const role = useRole(context, { role: 'dialog' });
   const { getReferenceProps, getFloatingProps } = useInteractions([click, dismiss, role]);
 
+  /*
+   * Described only once the list is open.
+   *
+   * There are around 400 zones and describing one means reading its
+   * abbreviation and its offset, so this is the expensive part of the control
+   * by a wide margin. It used to run on mount, which was invisible while there
+   * was one of these on screen -- the week now puts one on every day, and
+   * opening the view spent seconds describing zones nobody had asked to see.
+   */
   const options = useMemo<ZoneOption[]>(() => {
+    if (!open) return [];
+
     const zones = knownTimeZones();
     const withCurrent = zones.includes(value) ? zones : [value, ...zones];
 
@@ -96,7 +107,7 @@ export function TimezonePicker({
       aliases: timeZoneSearchAbbreviations(at, id),
       offset: timeZoneOffset(at, id),
     }));
-  }, [at, value]);
+  }, [open, at, value]);
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();

@@ -22,7 +22,7 @@ import {
   spanWithin,
 } from '../lib/calendar';
 import { eventsBySlot, zoneRuns, type DaySlot, type ZoneRun } from '../lib/dayZones';
-import { formatTime, timeZoneAbbreviation } from '../lib/time';
+import { formatTime, minutesSinceMidnight, timeZoneAbbreviation } from '../lib/time';
 import { TimezonePicker } from './TimezonePicker';
 import { EventKindIcon } from './EventKind';
 import { useCalendarDisplaySettings } from './useCalendarDisplaySettings';
@@ -44,19 +44,6 @@ interface PositionedEvent {
   outsideBefore: boolean;
   /** Runs past the last hour the week draws, so it stops at the bottom. */
   outsideAfter: boolean;
-}
-
-function minutesSinceMidnight(at: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone,
-  }).formatToParts(at);
-  const value = (part: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((candidate) => candidate.type === part)?.value ?? '0');
-
-  return (value('hour') % 24) * 60 + value('minute');
 }
 
 /**

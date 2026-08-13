@@ -12,6 +12,36 @@ export function zoneFor(eventTimezone: string | undefined, homeTimezone: string)
   return eventTimezone ?? homeTimezone;
 }
 
+/**
+ * Formatters, kept rather than rebuilt.
+ *
+ * `new Intl.DateTimeFormat` is one of the most expensive calls in the browser:
+ * it resolves a locale and loads the zone's rules. Every helper below used to
+ * build one per call, on paths that run per event per render -- laying out a
+ * week of a busy trip built thousands, and opening the view took seconds.
+ *
+ * A formatter is immutable and depends only on its locale and options, so one
+ * per combination is all anybody needs. The cache is unbounded on purpose:
+ * there are around 400 zones and a handful of shapes, so it settles at a few
+ * hundred entries and never grows again.
+ */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+function formatter(
+  locale: string | string[] | undefined,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = `${Array.isArray(locale) ? locale.join(',') : (locale ?? '')}|${JSON.stringify(options)}`;
+
+  let found = formatters.get(key);
+  if (!found) {
+    found = new Intl.DateTimeFormat(locale, options);
+    formatters.set(key, found);
+  }
+
+  return found;
+}
+
 /** Whether the browser can format a time in this zone. */
 export function isTimeZone(candidate: string): boolean {
   try {
@@ -103,10 +133,7 @@ export function timeZoneAbbreviation(at: Instant, timeZone: string): string {
   )?.[1];
   if (friendly) return friendly;
 
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    timeZoneName: 'short',
-  }).formatToParts(at);
+  const parts = formatter('en-US', { timeZone, timeZoneName: 'short' }).formatToParts(at);
 
   return parts.find((part) => part.type === 'timeZoneName')?.value ?? timeZone;
 }
@@ -120,12 +147,33 @@ export function timeZoneSearchAbbreviations(at: Instant, timeZone: string): stri
 }
 
 export function formatTime(at: Instant, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
+  return formatter('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
     timeZone,
   }).format(at);
+}
+
+/**
+ * How far into its local day an instant falls, in minutes.
+ *
+ * What a timetable column is drawn from: the same instant is a different
+ * position in the day depending on the clock the column is on.
+ */
+export function minutesSinceMidnight(at: Instant, timeZone: string): number {
+  const parts = formatter('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone,
+  }).formatToParts(at);
+
+  const value = (part: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((candidate) => candidate.type === part)?.value ?? '0');
+
+  // Midnight reads as 24 in some locales' two-digit hour.
+  return (value('hour') % 24) * 60 + value('minute');
 }
 
 /** A stored minute count as the hours and minutes a person plans with. */
@@ -144,7 +192,7 @@ export function formatDayHeading(
   timeZone: string,
   locale?: string | string[],
 ): string {
-  return new Intl.DateTimeFormat(locale, {
+  return formatter(locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
@@ -162,7 +210,7 @@ export function formatDayHeading(
  * though they are two hours apart.
  */
 export function dayKey(at: Instant, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
+  return formatter('en-CA', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -221,7 +269,7 @@ export function endTimeFromClock(
 export function moveToDay(at: Instant, timeZone: string, targetDay: string): Instant | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDay)) return null;
 
-  const time = new Intl.DateTimeFormat('en-GB', {
+  const time = formatter('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -236,7 +284,7 @@ export function moveToDay(at: Instant, timeZone: string, targetDay: string): Ins
 
 /** How far ahead of UTC the zone is at that instant, in milliseconds. */
 function offsetAt(at: Instant, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
+  const parts = formatter('en-US', {
     timeZone,
     hour12: false,
     year: 'numeric',
