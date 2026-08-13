@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Whether an event is flexible or confirmed, shown three ways: a spine down the edge of a card, a dot inside a chip, and a pin on the map. Each state has its own pattern as well as its own colour.',
+          'Whether an event is flexible or confirmed, shown three ways: a spine down the edge of a card, a dot inside a chip, and a pin on the map. All three are solid and differ by colour; the chip carries the word.',
       },
     },
   },
@@ -67,12 +67,18 @@ export const OnCards: Story = {
   ),
 };
 
+/**
+ * With the colour taken away, the spines are two greys and say little. That is
+ * the cost of drawing both as solid bars, and it is why the chip is beside the
+ * spine on every card rather than instead of it: the words are what the status
+ * is carried by, and they survive anything done to the colour.
+ */
 export const WithoutColour: Story = {
   render: () => (
     <div className="max-w-md">
       <p className="mb-4 text-sm text-ink-secondary">
-        The same two cards with colour removed. The status still reads, which is the test the
-        pattern exists to pass.
+        The same two cards with colour removed. The spine no longer tells them apart on its own;
+        the chip does.
       </p>
       <div className="flex flex-col gap-2" style={{ filter: 'grayscale(1)' }}>
         {[
@@ -81,7 +87,10 @@ export const WithoutColour: Story = {
         ].map((event) => (
           <Card key={event.name} className="flex overflow-hidden">
             <StatusSpine status={event.status} />
-            <div className="px-3 py-2.5 text-sm text-ink">{event.name}</div>
+            <div className="flex flex-1 items-center justify-between gap-3 px-3 py-2.5">
+              <span className="text-sm text-ink">{event.name}</span>
+              <StatusChip status={event.status} />
+            </div>
           </Card>
         ))}
       </div>

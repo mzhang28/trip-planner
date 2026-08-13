@@ -8,36 +8,24 @@
    * The status spine: a vertical bar down the left edge of an event card, and
    * the same treatment on its map pin.
    *
-   * Each status gets its own pattern as well as its own colour. Someone who
-   * cannot see the colour difference can still tell a solid bar from a broken
-   * one, which is the difference between the spine carrying the status and
-   * merely decorating it.
+   * Both statuses are a solid bar and differ by colour alone. Flexible used to
+   * be drawn broken, so that the two could be told apart without seeing the
+   * colour — at four pixels wide, down the edge of a card, that read as a
+   * rendering fault more than as a meaning. The words are what carry the status
+   * now: every card has the chip beside it, and it says Flexible or Confirmed
+   * outright.
    */
   .status-spine {
     border-radius: var(--radius-full);
-    background-repeat: repeat;
   }
 
-  /* Confirmed: unbroken. */
+  /* Confirmed. */
   .status-spine[data-status='booked'] {
     background-color: var(--status-booked);
   }
 
-  /* Flexible: broken, the way a route is drawn before it is fixed. */
+  /* Flexible: grey, which is the colour of a decision not made yet. */
   .status-spine[data-status='idea'] {
-    background-image: repeating-linear-gradient(
-      to bottom,
-      var(--status-idea) 0 5px,
-      transparent 5px 10px
-    );
-  }
-
-  /* Horizontal runs use the same patterns turned through 90 degrees. */
-  .status-spine[data-orientation='horizontal'][data-status='idea'] {
-    background-image: repeating-linear-gradient(
-      to right,
-      var(--status-idea) 0 5px,
-      transparent 5px 10px
-    );
+    background-color: var(--status-idea);
   }
 }

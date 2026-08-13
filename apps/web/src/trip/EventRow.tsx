@@ -408,26 +408,31 @@ export function EventRow({
      * bottom edge -- which is exactly the part that is off screen.
      */
     <Card className={cn('relative', isOpen ? 'overflow-visible' : 'overflow-hidden')}>
-      {isOpen && (
-        <span
-          className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
-          style={{ borderRadius: 'inherit' }}
-        >
-          <StatusSpine
-            status={event.booking.status}
-            className="absolute inset-y-0 left-0"
-          />
-        </span>
-      )}
+      {/*
+        Laid over the card rather than sitting in the header row.
+
+        As a flex child of the header it was only as tall as the header, so a
+        transit card -- which carries its journey summary underneath -- had a
+        spine down two thirds of it and bare card below. The status belongs to
+        the whole event, so the mark runs the whole height whatever the card
+        has grown to hold.
+      */}
+      <span
+        className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+        style={{ borderRadius: 'inherit' }}
+      >
+        <StatusSpine status={event.booking.status} className="absolute inset-y-0 left-0" />
+      </span>
 
       <div
         className={cn(
-          'event-row-header group/event-row flex transition-colors duration-100',
-          isOpen && 'rounded-t-lg pl-1',
+          // `pl-1` stands in for the width the spine used to take as a flex
+          // child, so nothing in the header moves.
+          'event-row-header group/event-row flex pl-1 transition-colors duration-100',
+          isOpen && 'rounded-t-lg',
         )}
         style={coloredSurfaceStyle(event.color)}
       >
-        {!isOpen && <StatusSpine status={event.booking.status} />}
 
         {!readOnly && (
           <label
