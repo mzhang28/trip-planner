@@ -1,6 +1,6 @@
 import type { Decorator, Preview } from '@storybook/react-vite';
 import type { ReactNode } from 'react';
-import '../src/styles/index.css';
+import './storybook.css';
 
 function ThemePane({ theme, label, children }: { theme: string; label?: string; children: ReactNode }) {
   return (

@@ -1,0 +1,20 @@
+/*
+ * The app's stylesheet, not the design system's.
+ *
+ * It pulls in @trip/ui itself and adds apps/web as a Tailwind source, so the
+ * classes used by an event card or a week column are generated here as well.
+ * Importing @trip/ui directly would leave every app component styled by
+ * whichever of its classes the design system happened to use too.
+ */
+@import '../../../apps/web/src/styles.css';
+
+/*
+ * The app fixes the document and scrolls inside a route. A catalogue is a page
+ * of examples and scrolls as one, so that is handed back here — the rule the
+ * app sets is on html and body, which no story can opt out of on its own.
+ */
+html,
+body {
+  block-size: auto;
+  overflow: visible;
+}

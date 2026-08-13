@@ -17,6 +17,10 @@ Modify `PUBLIC_URL` environment variable if ur running this publicly, put it beh
 Open claude code / codex / your choice of agent.
 I literally have not looked at the code.
 
+`pnpm storybook` catalogues the design system and the app's own components
+against a fixed trip and a stubbed server, so you can look at a week that
+crosses three time zones without booking anything.
+
 ## Features
 
 - Offline mobile PWA support
