@@ -221,6 +221,15 @@ export interface TripMeta {
   endsAt?: Instant;
   /** Used for any event that does not name its own zone. */
   homeTimezone: string;
+  /**
+   * Zones set by hand for particular days, keyed `YYYY-MM-DD`.
+   *
+   * A day's zone is normally worked out from where the trip has flown to by
+   * then, which is right whenever the journeys are recorded and wrong when they
+   * are not. This is the correction, and it is in the document rather than in
+   * one browser because the day is the same day for everybody on the trip.
+   */
+  dayZones?: Record<string, string>;
 }
 
 /*

@@ -22,6 +22,7 @@ import {
   restoreField,
   setCityColor,
   setCustomField,
+  setDayZone,
   tripFiles,
   updateEvent,
   updateFieldOption,
@@ -579,6 +580,29 @@ describe('a patch carrying an object', () => {
     );
 
     expect(doc.events.e1!.location).toEqual({ label: 'Kyoto Station', lat: 34.98, lng: 135.75 });
+  });
+});
+
+describe('a day fixed to a zone by hand', () => {
+  it('keeps two people correcting different days', () => {
+    const [mine, theirs] = fork(trip());
+
+    const a = setDayZone(mine, '2026-09-05', 'Pacific/Honolulu');
+    const b = setDayZone(theirs, '2026-09-08', 'Asia/Tokyo');
+
+    for (const merged of bothWays(a, b)) {
+      expect(merged.meta.dayZones).toEqual({
+        '2026-09-05': 'Pacific/Honolulu',
+        '2026-09-08': 'Asia/Tokyo',
+      });
+    }
+  });
+
+  it('lets a day go back to being worked out', () => {
+    let doc = setDayZone(trip(), '2026-09-05', 'Pacific/Honolulu');
+    doc = setDayZone(doc, '2026-09-05', undefined);
+
+    expect(doc.meta.dayZones).toEqual({});
   });
 });
 

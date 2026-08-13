@@ -37,6 +37,7 @@ export {
   removeFieldOption,
   setCityColor,
   setCustomField,
+  setDayZone,
   tripFiles,
   updateTripMeta,
   updateTodo,

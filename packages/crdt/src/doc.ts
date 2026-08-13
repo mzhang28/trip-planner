@@ -39,7 +39,10 @@ function stamp(event: TripEvent, author: Author): void {
 
 export function createTrip(name: string, homeTimezone: string): Doc {
   return A.from<TripDoc>({
-    meta: { name, homeTimezone },
+    // `dayZones` is created here rather than on first use. Two people fixing
+    // different days at once would otherwise each make a map of their own, and
+    // merging two maps keeps one -- taking the other's correction with it.
+    meta: { name, homeTimezone, dayZones: {} },
     files: {},
     fieldDefs: {},
     events: {},
@@ -142,6 +145,28 @@ export function updateTripMeta(doc: Doc, patch: Partial<TripMeta>): Doc {
       if (value === undefined) delete d.meta[key];
       else d.meta[key] = value;
     }
+  });
+}
+
+/**
+ * Fixes a day to a zone, or lets it go back to being worked out.
+ *
+ * Keyed by day rather than held as a run, so two people correcting different
+ * days both keep their correction: a run would be one value, and the later
+ * write would take the other's day with it.
+ */
+export function setDayZone(doc: Doc, day: string, timezone: string | undefined): Doc {
+  return A.change(doc, (d) => {
+    if (timezone === undefined) {
+      if (d.meta.dayZones) delete d.meta.dayZones[day];
+      return;
+    }
+
+    // Older documents predate the map. One made here can still be lost to a
+    // concurrent one, which costs a correction rather than anything of the
+    // trip; documents made since carry it from the start.
+    d.meta.dayZones ??= {};
+    d.meta.dayZones[day] = timezone;
   });
 }
 
