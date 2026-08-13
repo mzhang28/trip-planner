@@ -349,8 +349,17 @@ function InlineEventDraft({
  * which the subtraction below does not try to account for: the alternative is
  * columns that change width as the trip crosses a zone.
  */
-const COLUMN_WIDTH = 'max(5.5rem, calc((100cqw - 2.5rem - 7px) / 7))';
-const RAIL_WIDTH = '2.5rem';
+const COLUMN_WIDTH = 'max(6.5rem, calc((100cqw - 3.25rem - 7px) / 7))';
+
+/*
+ * Wide enough for "09:00" with air on both sides. At the old width the numbers
+ * were pressed against the first column of the run, and a trip changing zone
+ * every day drew that seam three times across one screen.
+ */
+const RAIL_WIDTH = '3.25rem';
+
+/** The gutter before a run's rail, so one run reads as ending and another beginning. */
+const RUN_GAP = '0.75rem';
 
 /**
  * One row of the week, drawn run by run with a rail in front of each.
@@ -422,15 +431,22 @@ function RunRows({
 
   return (
     <div ref={root} className={cn('flex', className)} data-testid={testId}>
-      {runs.map((run) => (
+      {runs.map((run, index) => (
         <section
           key={`${run.zone}:${run.days[0]!.day}`}
           data-week-run={run.days[0]!.day}
           data-zone={run.zone}
           className="flex min-w-0"
+          // Air before each rail but the first, which is already at the edge.
+          style={index === 0 ? undefined : { paddingLeft: RUN_GAP }}
         >
+          {/*
+            The line is what separates the hours from the day beside them. Space
+            alone left the numbers reading as though they belonged to the first
+            column, and every run of days repeated that ambiguity.
+          */}
           <div
-            className="sticky left-0 z-20 shrink-0 bg-page"
+            className="sticky left-0 z-20 shrink-0 border-r border-line bg-page"
             style={{ width: RAIL_WIDTH }}
           >
             {rail(run)}
@@ -1045,7 +1061,7 @@ export function WeekView({
               className="rounded-t-lg border border-line bg-line"
               rowClassName="bg-line"
               rail={(run) => (
-                <div className="flex h-full items-end justify-end bg-page pr-0.5 pb-1">
+                <div className="flex h-full items-center justify-center bg-page px-1 py-1.5">
                   <ZoneTag
                     zone={run.zone}
                     at={run.days[0]!.startsAt}
@@ -1073,7 +1089,7 @@ export function WeekView({
                   <div
                     key={day}
                     data-week-day={day}
-                    className="group/day relative min-w-0 bg-card px-1 py-1.5 text-center"
+                    className="group/day relative min-w-0 bg-card px-1.5 py-2 text-center"
                   >
                     {/*
                       Where the trip moves, said on the day it moves. A zone set
@@ -1154,7 +1170,7 @@ export function WeekView({
                 className="border-x border-line bg-line"
                 rowClassName="bg-line"
                 rail={() => (
-                  <div className="bg-page py-0.5 pr-1 text-right text-2xs text-ink-muted">Any</div>
+                  <div className="bg-page py-1 pr-2 text-right text-2xs text-ink-muted">Any</div>
                 )}
               >
                 {(run) =>
@@ -1232,7 +1248,7 @@ export function WeekView({
                           : (hour - displaySettings.weekStartHour) * HOUR_HEIGHT,
                       }}
                       className={cn(
-                        'absolute right-1 tabular',
+                        'absolute right-2 tabular',
                         hour === displaySettings.weekEndHour
                           ? '-translate-y-full'
                           : '-translate-y-1/2',
