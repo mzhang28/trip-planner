@@ -146,13 +146,20 @@ export function DayMap({ events, selectedId, onSelect }: DayMapProps) {
     );
   }
 
+  /*
+   * `isolate` keeps Leaflet's stacking inside this box. Its panes carry z-index
+   * 400 and its controls 800, and with nothing to contain them those numbers
+   * compete against the app's own — the toolbar sits at 10, so its settings
+   * popover opened underneath the map. An isolated box makes those internals
+   * relative to the map alone, and the panel orders against the map as a whole.
+   */
   return (
     <div
       ref={container}
       data-testid="day-map"
       role="application"
       aria-label="Map of this day"
-      className="h-full min-h-0 w-full rounded-lg border border-line sm:min-h-64"
+      className="isolate h-full min-h-0 w-full rounded-lg border border-line sm:min-h-64"
     />
   );
 }
