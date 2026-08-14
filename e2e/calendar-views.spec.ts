@@ -931,6 +931,54 @@ test.describe('making an event from the calendar', () => {
     await expect(editor.getByRole('textbox', { name: 'Ends' })).toHaveValue('12:00');
     await expect(editor.getByText('Duration: 2 hr')).toBeVisible();
   });
+
+  test('a column on another clock makes the event on that clock', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Pacific crossing');
+    await switchTo(page, 'Week');
+
+    /*
+     * The trip is kept in Tokyo, and these days are spent in London. Set from
+     * the rail rather than worked out from a flight, which is the same override
+     * either way and does not make the test depend on the flight fields.
+     */
+    const rail = page.getByTestId('week-zone-tag').first();
+    await rail.getByRole('button').click();
+    await page.getByRole('searchbox', { name: /^Search zone for these days/i }).fill('London');
+    await page.getByRole('option', { name: /Europe\/London/ }).first().click();
+    await expect(rail).toHaveAttribute('data-zone', 'Europe/London');
+
+    const column = page.locator('[data-testid^="day-2"]').first();
+    await column.scrollIntoViewIfNeeded();
+
+    const box = await column.boundingBox();
+    if (!box) throw new Error('no week column to drag on');
+
+    const at = (hour: number) => box.y + ((hour - WEEK_START_HOUR) / WEEK_HOURS) * box.height;
+
+    await page.mouse.move(box.x + box.width / 2, at(10));
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, at(12), { steps: 10 });
+    await page.mouse.up();
+
+    const name = page.getByTestId('week-event-draft').getByRole('textbox', { name: 'Event name' });
+    await name.fill('Borough Market');
+    await name.press('Enter');
+
+    /*
+     * Ten o'clock where the day is spent. Made on the home clock instead, this
+     * would be two in the morning in London -- above the hours the week draws,
+     * so the event would not even be in the column it was dragged out of.
+     */
+    const created = page.getByTestId('week-event').filter({ hasText: 'Borough Market' });
+    await expect(created).toBeVisible();
+    await created.click();
+
+    const editor = page.getByTestId('event-editor');
+    await expect(editor.getByRole('textbox', { name: 'Time' })).toHaveValue('10:00');
+    await expect(editor.getByRole('textbox', { name: 'Ends' })).toHaveValue('12:00');
+    await expect(editor.getByRole('button', { name: 'Time zone: Europe/London' })).toBeVisible();
+  });
 });
 
 test.describe('booking somewhere to sleep from the week', () => {

@@ -55,7 +55,7 @@ import {
   tripDateRange,
   type DayKey,
 } from '../lib/calendar';
-import { daySlots, slotForInstant, type DaySlot } from '../lib/dayZones';
+import { daySlots, slotForInstant, zoneOfDay, type DaySlot } from '../lib/dayZones';
 import { DayMap } from '../trip/DayMap';
 import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
 import { useUploadFlush } from '../trip/Attachments';
@@ -559,22 +559,30 @@ export function TripView() {
     const id = `e_${randomId()}`;
 
     /*
-     * The minutes come from the grid, which is drawn in the zone the trip is
-     * shown in -- so they are a wall-clock time there, not an offset from
-     * midnight UTC. Treating them as the latter put a nine o'clock drag at six
-     * in the evening in Tokyo.
+     * The zone is the day's, not the home one, the same as it is when a card is
+     * dragged. A week that crosses into Tokyo draws its Tokyo columns on Tokyo
+     * time, so nine on one of them means nine there; making the event on the
+     * home clock filed it eight hours from where it was drawn.
+     */
+    const zone = zoneOfDay(slots, day, homeTimezone);
+
+    /*
+     * The minutes come from the grid, which is drawn in the day's own zone --
+     * so they are a wall-clock time there, not an offset from midnight UTC.
+     * Treating them as the latter put a nine o'clock drag at six in the evening
+     * in Tokyo.
      *
      * A tap on a day says nothing about the hour, and the event records that
      * rather than being given one.
      */
-    const onThatDay = setDay(undefined, homeTimezone, day);
+    const onThatDay = setDay(undefined, zone, day);
     const minutes = options.startMinutes;
     const startsAt =
       onThatDay === null || minutes === undefined
         ? onThatDay
         : setTimeOfDay(
             onThatDay,
-            homeTimezone,
+            zone,
             `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`,
           );
 
@@ -587,7 +595,7 @@ export function TripView() {
         {
           ...(startsAt === null ? {} : { startsAt }),
           ...(minutes === undefined ? { timeUndecided: true } : {}),
-          timezone: homeTimezone,
+          timezone: zone,
           // How long only when the gesture said so. A tap on a day says which
           // day and nothing about length.
           ...(options.endMinutes !== undefined && options.startMinutes !== undefined
@@ -622,12 +630,17 @@ export function TripView() {
   function createLodging(firstNight: DayKey, lastNight: DayKey, name: string) {
     if (!store || readOnly) return;
 
-    const checkInDay = setDay(undefined, homeTimezone, firstNight);
-    const checkOutDay = setDay(undefined, homeTimezone, addDays(lastNight, 1));
+    // Three in the afternoon at the hotel, which is where the first night is
+    // spent. Checkout is at the same hotel, so it reads on that clock too even
+    // if the trip has moved on by the morning it happens.
+    const zone = zoneOfDay(slots, firstNight, homeTimezone);
+
+    const checkInDay = setDay(undefined, zone, firstNight);
+    const checkOutDay = setDay(undefined, zone, addDays(lastNight, 1));
     if (checkInDay === null || checkOutDay === null) return;
 
-    const checkIn = setTimeOfDay(checkInDay, homeTimezone, '15:00');
-    const checkOut = setTimeOfDay(checkOutDay, homeTimezone, '10:00');
+    const checkIn = setTimeOfDay(checkInDay, zone, '15:00');
+    const checkOut = setTimeOfDay(checkOutDay, zone, '10:00');
     if (checkIn === null || checkOut === null) return;
 
     const id = `e_${randomId()}`;
@@ -643,7 +656,7 @@ export function TripView() {
           lodging: { checkIn, checkOut },
           startsAt: checkIn,
           durationMinutes: Math.round((checkOut - checkIn) / 60_000),
-          timezone: homeTimezone,
+          timezone: zone,
           timeUndecided: undefined,
         },
         { userId: 'me' },
@@ -669,7 +682,7 @@ export function TripView() {
       const event = events.find((candidate) => candidate.id === eventId);
       if (!event) return;
 
-      const zone = slots.find((slot) => slot.day === day)?.zone ?? homeTimezone;
+      const zone = zoneOfDay(slots, day, homeTimezone);
       const midnight = setDay(undefined, zone, day);
       if (midnight === null) return;
 
