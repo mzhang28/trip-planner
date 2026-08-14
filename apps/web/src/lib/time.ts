@@ -213,11 +213,7 @@ export function formatHourLabel(hour: number, locale?: string | string[]): strin
  * Telling somebody on a twelve-hour clock to write 17:30 asks them to convert
  * something their device never shows them.
  */
-export function clockExample(
-  hour: number,
-  minute: number,
-  locale?: string | string[],
-): string {
+export function clockExample(hour: number, minute: number, locale?: string | string[]): string {
   return formatTime(Date.UTC(2026, 0, 1, hour, minute), 'UTC', locale);
 }
 

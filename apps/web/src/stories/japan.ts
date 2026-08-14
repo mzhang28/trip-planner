@@ -696,6 +696,10 @@ export function japanSlots(overrides?: Record<string, string>): DaySlot[] {
 /*
  * A forecast that never changes, rather than one fetched from a server. Codes
  * are WMO: 0 clear, 2 partly cloudy, 3 overcast, 61 rain, 80 showers.
+ *
+ * The 29th is the day the trip leaves Kyoto for Osaka, so it carries both
+ * cities and a range wide enough to cover them -- which is what a day spent in
+ * two places reads as.
  */
 const FORECAST: Array<[DayKey, number, number, number, string]> = [
   ['2026-05-19', 2, 21, 12, 'Boston'],
@@ -708,7 +712,7 @@ const FORECAST: Array<[DayKey, number, number, number, string]> = [
   ['2026-05-26', 0, 26, 16, 'Kyoto'],
   ['2026-05-27', 0, 27, 17, 'Kyoto'],
   ['2026-05-28', 2, 26, 18, 'Kyoto'],
-  ['2026-05-29', 61, 24, 19, 'Osaka'],
+  ['2026-05-29', 61, 26, 17, 'Kyoto and Osaka'],
   ['2026-05-30', 2, 25, 18, 'Onomichi'],
   ['2026-05-31', 0, 27, 19, 'Hiroshima'],
   ['2026-06-01', 3, 26, 20, 'Hiroshima'],

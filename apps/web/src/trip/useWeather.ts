@@ -13,9 +13,10 @@ export interface DailyWeather {
 }
 
 /** A place asked about once, however many days or events sit on it. */
-interface Spot {
+export interface Spot {
   lat: number;
   lng: number;
+  /** The city, so a day that touches two of them can name both. */
   label: string;
 }
 
@@ -45,13 +46,82 @@ export function weatherGlyph(code: number): { icon: string; label: string } {
 }
 
 /**
- * The forecast for each day, where that day is.
+ * One reading for a day, from every city that day is spent in.
  *
- * A trip moves. The first pinned place in the whole trip used to answer for
- * every day of it, so a week in Kyoto followed by a week in Sapporo showed
- * Kyoto's weather throughout -- and nothing on screen said which city the
- * numbers were for. Each day now takes the first pinned place on that day, and
- * carries its name.
+ * The high is the highest of them and the low the lowest, because what the
+ * numbers are for is knowing what to carry. A morning in Sapporo and an evening
+ * in Naha is both a cold day and a warm one, and a person packs for both; the
+ * warmer city's low says nothing about the morning.
+ */
+export function combineForecasts(date: DayKey, found: DailyWeather[]): DailyWeather {
+  const cities: string[] = [];
+  for (const one of found) {
+    if (one.place && !cities.includes(one.place)) cities.push(one.place);
+  }
+
+  return {
+    date,
+    max: Math.max(...found.map((one) => one.max)),
+    min: Math.min(...found.map((one) => one.min)),
+    /*
+     * WMO codes climb with how much the weather is worth knowing about, from 0
+     * for a clear sky to the nineties for a thunderstorm, so the highest of
+     * them is the one worth putting on the day. Rain in the city you land in
+     * is the thing to know, whatever it was doing in the one you left.
+     */
+    code: Math.max(...found.map((one) => one.code)),
+    place: cities.length > 1 ? `${cities.slice(0, -1).join(', ')} and ${cities.at(-1)}` : cities[0],
+  };
+}
+
+/**
+ * Every city each day is spent in, and the places to ask the forecast of.
+ *
+ * A day is listed against a city rather than against each pinned place, so a
+ * day with three stops around Kyoto asks once and says "Kyoto" rather than
+ * naming three temples. An event that never named a city falls back to what its
+ * pin is called.
+ *
+ * `spots` is capped, so a long trip asks about the first several places it
+ * meets and the rest of its days go without. A day whose cities are all past
+ * the cap shows nothing, which is what it showed before there was a cap.
+ */
+export function placesByDay(
+  events: TripEvent[],
+  homeTimezone: string,
+): { daySpots: Map<DayKey, Spot[]>; spots: Map<string, Spot> } {
+  const daySpots = new Map<DayKey, Spot[]>();
+  const spots = new Map<string, Spot>();
+
+  for (const event of events) {
+    const place = event.location;
+    if (event.startsAt === undefined || place?.lat === undefined || place.lng === undefined) {
+      continue;
+    }
+
+    const label = event.city || place.label;
+    const day = dayKey(event.startsAt, event.timezone ?? homeTimezone);
+
+    const onThatDay = daySpots.get(day) ?? [];
+    if (onThatDay.some((candidate) => candidate.label === label)) continue;
+
+    const spot: Spot = { lat: place.lat, lng: place.lng, label };
+    onThatDay.push(spot);
+    daySpots.set(day, onThatDay);
+    if (spots.size < MOST_SPOTS) spots.set(spotKey(spot.lat, spot.lng), spot);
+  }
+
+  return { daySpots, spots };
+}
+
+/**
+ * The forecast for each day, from wherever that day is spent.
+ *
+ * A trip moves, and it can move inside one day. Each day asks about every city
+ * it touches and reports the range across all of them, so a day that flies from
+ * Sapporo to Naha reads as the cold morning and the warm evening it was. Taking
+ * the first place on the day, which is what this did, described the morning and
+ * called it the day.
  *
  * Beyond the forecast horizon there is nothing to show and nothing is shown: a
  * made-up number for a date three months out would look exactly like a real one.
@@ -62,31 +132,10 @@ export function useWeather(
 ): Map<DayKey, DailyWeather> {
   const [bySpot, setBySpot] = useState<Map<string, DailyWeather[]>>(new Map());
 
-  /** Which place each day asks about, and the set of places to ask about. */
-  const { dayToSpot, spots } = useMemo(() => {
-    const dayToSpot = new Map<DayKey, Spot>();
-    const spots = new Map<string, Spot>();
-
-    for (const event of events) {
-      const place = event.location;
-      if (
-        event.startsAt === undefined ||
-        place?.lat === undefined ||
-        place.lng === undefined
-      ) {
-        continue;
-      }
-
-      const day = dayKey(event.startsAt, event.timezone ?? homeTimezone);
-      if (dayToSpot.has(day)) continue;
-
-      const spot: Spot = { lat: place.lat, lng: place.lng, label: place.label };
-      dayToSpot.set(day, spot);
-      if (spots.size < MOST_SPOTS) spots.set(spotKey(spot.lat, spot.lng), spot);
-    }
-
-    return { dayToSpot, spots };
-  }, [events, homeTimezone]);
+  const { daySpots, spots } = useMemo(
+    () => placesByDay(events, homeTimezone),
+    [events, homeTimezone],
+  );
 
   // A stable list, so the effect runs when the places change rather than on
   // every render of every event.
@@ -128,14 +177,18 @@ export function useWeather(
   return useMemo(() => {
     const byDay = new Map<DayKey, DailyWeather>();
 
-    for (const [day, spot] of dayToSpot) {
-      const forecast = bySpot
-        .get(spotKey(spot.lat, spot.lng))
-        ?.find((candidate) => candidate.date === day);
+    for (const [day, onThatDay] of daySpots) {
+      // A city whose forecast has not arrived, or that fell outside the places
+      // this view asks about, leaves the rest of the day's cities to answer.
+      const found = onThatDay
+        .map((spot) =>
+          bySpot.get(spotKey(spot.lat, spot.lng))?.find((candidate) => candidate.date === day),
+        )
+        .filter((forecast): forecast is DailyWeather => forecast !== undefined);
 
-      if (forecast) byDay.set(day, forecast);
+      if (found.length > 0) byDay.set(day, combineForecasts(day, found));
     }
 
     return byDay;
-  }, [dayToSpot, bySpot]);
+  }, [daySpots, bySpot]);
 }
