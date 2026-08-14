@@ -28,6 +28,14 @@ export default defineConfig({
     baseURL: WEB_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+
+    /*
+     * Times are shown on the clock the visitor's locale uses, so an unpinned
+     * browser would read 09:00 or 9:00 AM depending on the machine the suite
+     * runs on. Pinned here to the 24-hour reading the assertions below are
+     * written in; the twelve-hour one has a test of its own.
+     */
+    locale: 'en-GB',
   },
 
   /*

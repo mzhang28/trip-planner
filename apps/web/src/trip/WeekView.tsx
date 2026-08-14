@@ -22,7 +22,12 @@ import {
   spanWithin,
 } from '../lib/calendar';
 import { eventsBySlot, zoneRuns, type DaySlot, type ZoneRun } from '../lib/dayZones';
-import { formatTime, minutesSinceMidnight, timeZoneAbbreviation } from '../lib/time';
+import {
+  formatHourLabel,
+  formatTime,
+  minutesSinceMidnight,
+  timeZoneAbbreviation,
+} from '../lib/time';
 import { TimezonePicker } from './TimezonePicker';
 import { EventKindIcon } from './EventKind';
 import { useCalendarDisplaySettings } from './useCalendarDisplaySettings';
@@ -1365,7 +1370,7 @@ export function WeekView({
                           : '-translate-y-1/2',
                       )}
                     >
-                      {hour === 24 ? '00:00' : `${String(hour).padStart(2, '0')}:00`}
+                      {formatHourLabel(hour)}
                     </span>
                   ))}
                 </div>

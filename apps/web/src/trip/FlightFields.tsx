@@ -2,7 +2,7 @@ import type { TransitDetails, TripEvent } from '@trip/crdt';
 import { useState } from 'react';
 import { TextField, cn } from '@trip/ui';
 import { Plane, PlaneLanding, PlaneTakeoff } from 'lucide-react';
-import { formatTime, setDay, setTimeOfDay, toDateInput } from '../lib/time';
+import { clockExample, formatTime, setDay, setTimeOfDay, toDateInput, toTimeInput } from '../lib/time';
 import { AirportPicker } from './AirportPicker';
 import { TimeField } from './TimeField';
 import { RouteCityField, TransitSummary } from './TransitFields';
@@ -156,7 +156,7 @@ export function FlightFields({
     if (event.startsAt === undefined) return 'Pick the departure date first.';
 
     const at = setTimeOfDay(event.startsAt, departsTz, raw);
-    if (at === null) return 'Use a 24-hour time, like 17:05';
+    if (at === null) return `Use a time like ${clockExample(17, 5)}`;
 
     onPatch({
       startsAt: at,
@@ -192,7 +192,7 @@ export function FlightFields({
     if (!day) return onPatch({ durationMinutes: undefined });
     if (event.startsAt === undefined) return;
 
-    const clock = formatTime(arrivesAt ?? event.startsAt, arrivesTz);
+    const clock = toTimeInput(arrivesAt ?? event.startsAt, arrivesTz);
     const onDay = setDay(undefined, arrivesTz, day);
     const at = onDay === null ? null : setTimeOfDay(onDay, arrivesTz, clock);
     if (at !== null) setArrivalProblem(commitArrival(at));
@@ -206,7 +206,7 @@ export function FlightFields({
     }
 
     let at = setTimeOfDay(arrivesAt ?? event.startsAt, arrivesTz, raw);
-    if (at === null) return 'Use a 24-hour time, like 09:20';
+    if (at === null) return `Use a time like ${clockExample(9, 20)}`;
 
     /*
      * An hour earlier than departure, on the day the flight leaves, means the
@@ -394,7 +394,7 @@ export function FlightFields({
 /** Moves a local date and clock reading into another zone. */
 function moveWallClock(at: number, fromZone: string, toZone: string): number | null {
   const onDay = setDay(undefined, toZone, toDateInput(at, fromZone));
-  return onDay === null ? null : setTimeOfDay(onDay, toZone, formatTime(at, fromZone));
+  return onDay === null ? null : setTimeOfDay(onDay, toZone, toTimeInput(at, fromZone));
 }
 
 /**

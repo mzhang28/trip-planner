@@ -11,12 +11,14 @@ import { Button, ColorPicker, CustomFieldInput, SegmentedControl, TextField, cn 
 import { Plus, Trash2, X } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import {
+  clockExample,
   endTimeFromClock,
   formatDuration,
   formatTime,
   setDay,
   setTimeOfDay,
   toDateInput,
+  toTimeInput,
   zoneFor,
 } from '../lib/time';
 import { TimeField } from './TimeField';
@@ -197,7 +199,7 @@ export function EventEditor({
 
                 const next = event.timeUndecided
                   ? onDay
-                  : setTimeOfDay(onDay, timezone, formatTime(event.startsAt, zone));
+                  : setTimeOfDay(onDay, timezone, toTimeInput(event.startsAt, zone));
                 if (next !== null) onPatch({ startsAt: next, timezone });
               }}
               hint={
@@ -220,7 +222,7 @@ export function EventEditor({
                 }
 
                 const next = setTimeOfDay(event.startsAt ?? Date.now(), zone, raw);
-                if (next === null) return 'Use a 24-hour time, like 09:00';
+                if (next === null) return `Use a time like ${clockExample(9, 0)}`;
 
                 onPatch({ startsAt: next, timezone: zone, timeUndecided: undefined });
                 return null;
@@ -260,7 +262,7 @@ export function EventEditor({
 
                 if (!hasStart) return 'Set a start time first.';
                 const end = endTimeFromClock(event.startsAt!, zone, raw);
-                if (end === null) return 'Use a 24-hour time, like 17:30';
+                if (end === null) return `Use a time like ${clockExample(17, 30)}`;
 
                 onPatch({ durationMinutes: Math.round((end - event.startsAt!) / 60_000) });
                 return null;

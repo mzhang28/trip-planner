@@ -23,12 +23,21 @@ import {
 import { FileText, Paperclip } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { Button, Dialog, DialogTrigger, Popover } from 'react-aria-components';
-import { formatTime } from '../lib/time';
+import { formatTime, usesTwelveHourClock } from '../lib/time';
 import { useDisplayZone } from './useDisplayZone';
 import { EventDetails } from './EventDetails';
 import { EventEditor } from './EventEditor';
 import { EVENT_KIND_LABEL, EVENT_KIND_OPTIONS, EventKindIcon } from './EventKind';
 import { JourneySummary } from './FlightFields';
+
+/**
+ * The width of the time down the left of every row.
+ *
+ * One width for the whole list, so the names beside the times start on the same
+ * line rather than stepping in and out with the length of each clock. A
+ * twelve-hour reading carries AM or PM and needs the wider of the two.
+ */
+const TIME_COLUMN = usesTwelveHourClock() ? 'w-16' : 'w-11';
 
 export interface EventRowProps {
   event: TripEvent;
@@ -473,7 +482,7 @@ export function EventRow({
           <div data-testid="event" className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
             {/* Keeps row lookup and announcements useful while the visible name is an input. */}
             <span className="sr-only">{event.name || 'Unnamed'}</span>
-            <span className="tabular w-11 shrink-0 text-xs text-ink-muted">
+            <span className={cn('tabular shrink-0 text-xs text-ink-muted', TIME_COLUMN)}>
               {time ?? '--:--'}
             </span>
             <EventKindPicker
@@ -508,7 +517,9 @@ export function EventRow({
                 'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-2',
               )}
             >
-              <span className="tabular w-11 shrink-0 text-xs text-ink-muted">{time ?? '--:--'}</span>
+              <span className={cn('tabular shrink-0 text-xs text-ink-muted', TIME_COLUMN)}>
+                {time ?? '--:--'}
+              </span>
 
               <span className="min-w-0 flex-1">
                 {/* An event made by picking a day is real before it is named. */}

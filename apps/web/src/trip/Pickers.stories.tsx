@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { Place } from '@trip/crdt';
 import { useState } from 'react';
+import { clockExample } from '../lib/time';
 import { HOME_TIMEZONE, TOKYO } from '../stories/japan';
 import { Example } from '../stories/harness';
 import { AirportPicker } from './AirportPicker';
@@ -117,7 +118,7 @@ export const Time: Story = {
           <TimeField
             label="Starts"
             value="25:00"
-            hint="24-hour, like 09:30"
+            hint={`A time like ${clockExample(9, 30)}`}
             onCommit={() => 'That is not a time of day.'}
           />
         </Example>

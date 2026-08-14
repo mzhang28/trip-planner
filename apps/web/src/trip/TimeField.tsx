@@ -1,5 +1,6 @@
 import { cn } from '@trip/ui';
 import { useEffect, useId, useState, type ReactNode } from 'react';
+import { clockExample, usesTwelveHourClock } from '../lib/time';
 import { TimezonePicker } from './TimezonePicker';
 
 export interface TimeFieldProps {
@@ -59,8 +60,10 @@ export function TimeField({
           id={id}
           value={draft}
           disabled={disabled}
-          placeholder="09:00"
-          inputMode="numeric"
+          placeholder={clockExample(9, 0)}
+          // A twelve-hour clock needs letters typed after the digits, and a
+          // numeric keypad has none.
+          inputMode={usesTwelveHourClock() ? 'text' : 'numeric'}
           aria-invalid={error !== null}
           aria-describedby={error || hint ? `${id}-hint` : undefined}
           onChange={(event) => setDraft(event.target.value)}

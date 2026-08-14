@@ -146,11 +146,93 @@ export function timeZoneSearchAbbreviations(at: Instant, timeZone: string): stri
   ];
 }
 
-export function formatTime(at: Instant, timeZone: string): string {
+const twelveHourClocks = new Map<string, boolean>();
+
+/**
+ * Whether clocks read as twelve hours here, with AM and PM.
+ *
+ * The browser answers this from the visitor's locale and, where the system
+ * exposes it, from their clock setting: somebody on en-US who has switched
+ * their device to a 24-hour clock resolves to h23. Asking it rather than
+ * keeping a setting of our own means times read the way the rest of their
+ * device reads.
+ */
+export function usesTwelveHourClock(locale?: string | string[]): boolean {
+  const key = Array.isArray(locale) ? locale.join(',') : (locale ?? '');
+
+  let found = twelveHourClocks.get(key);
+  if (found === undefined) {
+    const cycle = formatter(locale, { hour: 'numeric' }).resolvedOptions().hourCycle;
+    found = cycle === 'h11' || cycle === 'h12';
+    twelveHourClocks.set(key, found);
+  }
+
+  return found;
+}
+
+/**
+ * A time of day as the person reading it writes times.
+ *
+ * The hour cycle is named rather than left to the locale so that the two ends
+ * of the day are not surprising: h23 puts midnight at 00:00 instead of 24:00,
+ * and h12 puts noon at 12 PM instead of 0 PM.
+ */
+export function formatTime(at: Instant, timeZone: string, locale?: string | string[]): string {
+  const twelveHour = usesTwelveHourClock(locale);
+
+  return formatter(locale, {
+    // A padded hour keeps a column of times aligned. There is nothing to align
+    // against once AM or PM is on the end, and "09:00 AM" is not how anybody
+    // writes it.
+    hour: twelveHour ? 'numeric' : '2-digit',
+    minute: '2-digit',
+    hourCycle: twelveHour ? 'h12' : 'h23',
+    timeZone,
+  }).format(at);
+}
+
+/**
+ * A whole hour as a timetable's axis labels it.
+ *
+ * The minutes are left off a twelve-hour label: every one of them is :00, and
+ * dropping them keeps the axis inside the width the 24-hour labels already fit
+ * in. A 24-hour label keeps them, which is the form those clocks are written
+ * in.
+ */
+export function formatHourLabel(hour: number, locale?: string | string[]): string {
+  const at = Date.UTC(2026, 0, 1, hour % 24);
+
+  return usesTwelveHourClock(locale)
+    ? formatter(locale, { hour: 'numeric', hourCycle: 'h12', timeZone: 'UTC' }).format(at)
+    : formatTime(at, 'UTC', locale);
+}
+
+/**
+ * An example of a time, for a placeholder or for saying what went wrong.
+ *
+ * Telling somebody on a twelve-hour clock to write 17:30 asks them to convert
+ * something their device never shows them.
+ */
+export function clockExample(
+  hour: number,
+  minute: number,
+  locale?: string | string[],
+): string {
+  return formatTime(Date.UTC(2026, 0, 1, hour, minute), 'UTC', locale);
+}
+
+/**
+ * The time of day of an instant, as `HH:MM`.
+ *
+ * The form times are carried in rather than shown in: it sorts, it parses, and
+ * it does not change with whoever is looking. Anything a person reads should
+ * come from `formatTime` instead.
+ */
+export function toTimeInput(at: Instant, timeZone: string): string {
   return formatter('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hourCycle: 'h23',
     timeZone,
   }).format(at);
 }
@@ -219,22 +301,54 @@ export function dayKey(at: Instant, timeZone: string): string {
 }
 
 /**
- * Reads `HH:MM` in the given zone and returns the instant on the same day.
+ * Reads a typed clock, on either a twelve- or a 24-hour one.
+ *
+ * Both are read wherever a time is typed, whichever the browser shows, so a
+ * time copied from somewhere else is understood without being converted first.
+ * The AM or PM may be spaced, dotted, or in either case, because all of those
+ * get typed; `Intl` itself separates them with a narrow no-break space.
+ *
+ * Minutes are required on a bare number, so that tabbing out of a half-typed
+ * "9" is an error rather than a silent 09:00. "9 PM" leaves nothing half-typed
+ * and is allowed.
+ */
+function parseClock(text: string): { hours: number; minutes: number } | null {
+  const trimmed = text.trim();
+
+  const halfDay = /^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?\s*m\.?$/i.exec(trimmed);
+  if (halfDay) {
+    const hours = Number(halfDay[1]);
+    const minutes = halfDay[2] === undefined ? 0 : Number(halfDay[2]);
+    if (hours < 1 || hours > 12 || minutes > 59) return null;
+
+    const afternoon = halfDay[3]?.toLowerCase() === 'p';
+    return { hours: (hours % 12) + (afternoon ? 12 : 0), minutes };
+  }
+
+  const wholeDay = /^(\d{1,2}):(\d{2})$/.exec(trimmed);
+  if (!wholeDay) return null;
+
+  const hours = Number(wholeDay[1]);
+  const minutes = Number(wholeDay[2]);
+  if (hours > 23 || minutes > 59) return null;
+
+  return { hours, minutes };
+}
+
+/**
+ * Reads a clock in the given zone and returns the instant on the same day.
  *
  * Works by measuring how far the zone is from UTC at that moment and shifting
  * by it. That has to be measured at the target instant rather than assumed,
  * because the offset changes across a daylight-saving boundary.
  */
-export function setTimeOfDay(at: Instant, timeZone: string, hhmm: string): Instant | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
-  if (!match) return null;
-
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) return null;
+export function setTimeOfDay(at: Instant, timeZone: string, clock: string): Instant | null {
+  const parsed = parseClock(clock);
+  if (!parsed) return null;
 
   const day = dayKey(at, timeZone);
-  const asUtc = Date.parse(`${day}T${String(hours).padStart(2, '0')}:${match[2]}:00Z`);
+  const hhmm = `${String(parsed.hours).padStart(2, '0')}:${String(parsed.minutes).padStart(2, '0')}`;
+  const asUtc = Date.parse(`${day}T${hhmm}:00Z`);
 
   return asUtc - offsetAt(asUtc, timeZone);
 }
@@ -248,15 +362,15 @@ export function setTimeOfDay(at: Instant, timeZone: string, hhmm: string): Insta
 export function endTimeFromClock(
   startsAt: Instant,
   timeZone: string,
-  hhmm: string,
+  clock: string,
 ): Instant | null {
-  const sameDay = setTimeOfDay(startsAt, timeZone, hhmm);
+  const sameDay = setTimeOfDay(startsAt, timeZone, clock);
   if (sameDay === null || sameDay > startsAt) return sameDay;
 
   const day = new Date(`${dayKey(startsAt, timeZone)}T12:00:00Z`);
   day.setUTCDate(day.getUTCDate() + 1);
   const nextDay = moveToDay(startsAt, timeZone, day.toISOString().slice(0, 10));
-  return nextDay === null ? null : setTimeOfDay(nextDay, timeZone, hhmm);
+  return nextDay === null ? null : setTimeOfDay(nextDay, timeZone, clock);
 }
 
 /**
@@ -269,14 +383,7 @@ export function endTimeFromClock(
 export function moveToDay(at: Instant, timeZone: string, targetDay: string): Instant | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDay)) return null;
 
-  const time = formatter('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone,
-  }).format(at);
-
-  const asUtc = Date.parse(`${targetDay}T${time}:00Z`);
+  const asUtc = Date.parse(`${targetDay}T${toTimeInput(at, timeZone)}:00Z`);
   if (Number.isNaN(asUtc)) return null;
 
   return asUtc - offsetAt(asUtc, timeZone);

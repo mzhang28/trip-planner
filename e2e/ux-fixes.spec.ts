@@ -112,7 +112,7 @@ test.describe('putting an event on a chosen day', () => {
 
     // Keeping the text and saying what is wrong is the difference between a
     // correction and a silent loss.
-    await expect(page.getByText('Use a 24-hour time, like 09:00')).toBeVisible();
+    await expect(page.getByText('Use a time like 09:00')).toBeVisible();
     await expect(time).toHaveValue('nine-ish');
   });
 });
@@ -306,7 +306,7 @@ test.describe('what a field does with input it cannot use', () => {
     // The text stays put with the reason beside it, rather than being dropped
     // on the floor and leaving the old value looking accepted.
     await expect(ends).toHaveValue('later');
-    await expect(page.getByText('Use a 24-hour time')).toBeVisible();
+    await expect(page.getByText('Use a time like 17:30')).toBeVisible();
 
     await ends.fill('21:00');
     await ends.blur();

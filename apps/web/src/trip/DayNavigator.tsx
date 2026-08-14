@@ -2,6 +2,7 @@ import { IconButton, cn } from '@trip/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { DayKey } from '../lib/calendar';
 import { addDays, clampDay } from '../lib/calendar';
+import { formatHourLabel } from '../lib/time';
 import {
   setCalendarDisplaySettings,
   useCalendarDisplaySettings,
@@ -126,7 +127,7 @@ export function DayNavigator({ view, anchor, tripStart, tripEnd, onChange }: Day
               >
                 {Array.from({ length: 24 }, (_, hour) => (
                   <option key={hour} value={hour} disabled={hour >= display.weekEndHour}>
-                    {String(hour).padStart(2, '0')}:00
+                    {formatHourLabel(hour)}
                   </option>
                 ))}
               </select>
@@ -145,7 +146,7 @@ export function DayNavigator({ view, anchor, tripStart, tripEnd, onChange }: Day
               >
                 {Array.from({ length: 24 }, (_, index) => index + 1).map((hour) => (
                   <option key={hour} value={hour} disabled={hour <= display.weekStartHour}>
-                    {hour === 24 ? '00:00 (next day)' : `${String(hour).padStart(2, '0')}:00`}
+                    {hour === 24 ? `${formatHourLabel(24)} (next day)` : formatHourLabel(hour)}
                   </option>
                 ))}
               </select>
