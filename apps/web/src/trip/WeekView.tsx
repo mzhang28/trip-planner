@@ -29,6 +29,7 @@ import {
   timeZoneAbbreviation,
 } from '../lib/time';
 import { TimezonePicker } from './TimezonePicker';
+import { ConfirmMove, type MoveInQuestion } from './ConfirmMove';
 import { EventKindIcon } from './EventKind';
 import { useCalendarDisplaySettings } from './useCalendarDisplaySettings';
 import { useDisplayZone } from './useDisplayZone';
@@ -884,15 +885,30 @@ export function WeekView({
    * position under the hand rather than jumping its top to the pointer.
    * `travelled` is what tells a move from a click: a press that never went
    * anywhere is somebody opening the event.
+   *
+   * `name`, `confirmed` and `from` are read off the card at the press and kept
+   * here, so the question a confirmed move asks can be put in words without
+   * going back to the document for an event that is halfway through moving.
    */
   const [carry, setCarry] = useState<{
     id: string;
+    name: string;
+    confirmed: boolean;
     minutes: number;
     length: number;
     day: DayKey;
+    from: { day: DayKey; minutes: number };
     grab: number;
     travelled: boolean;
   } | null>(null);
+
+  /**
+   * A move of a confirmed event, held until somebody says yes.
+   *
+   * The drag itself is over by the time this is set: a popup during the drag
+   * would have to be dismissed with the same button that is holding the card.
+   */
+  const [pendingMove, setPendingMove] = useState<MoveInQuestion | null>(null);
 
   /*
    * Held in a ref as well, because the click that follows a drag arrives after
@@ -943,10 +959,30 @@ export function WeekView({
 
     function drop() {
       setCarry((current) => {
-        if (current?.travelled) {
-          dropped.current = true;
+        if (!current?.travelled) return null;
+
+        dropped.current = true;
+
+        /*
+         * A confirmed event asks before it moves, unless it came back to the
+         * time it started at. It is one press away from a booked flight
+         * landing on another day, and the drag is the whole gesture: by the
+         * time a slip is visible it has already been written.
+         */
+        const landsElsewhere =
+          current.day !== current.from.day || current.minutes !== current.from.minutes;
+
+        if (current.confirmed && landsElsewhere) {
+          setPendingMove({
+            id: current.id,
+            name: current.name,
+            from: current.from,
+            to: { day: current.day, minutes: current.minutes },
+          });
+        } else {
           onMoveEvent(current.id, current.day, current.minutes);
         }
+
         return null;
       });
     }
@@ -1450,11 +1486,19 @@ export function WeekView({
                             if (event.startsAt === undefined) return;
 
                             const card = e.currentTarget.getBoundingClientRect();
+                            const startsAtMinutes = minutesSinceMidnight(
+                              event.startsAt,
+                              columnZone(zone),
+                            );
+
                             setDrag(null);
                             setCarry({
                               id: event.id,
+                              name: event.name,
+                              confirmed: event.booking.status === 'booked',
                               day,
-                              minutes: minutesSinceMidnight(event.startsAt, columnZone(zone)),
+                              minutes: startsAtMinutes,
+                              from: { day, minutes: startsAtMinutes },
                               length: Math.max(
                                 SNAP_MINUTES,
                                 event.durationMinutes ?? DEFAULT_EVENT_MINUTES,
@@ -1684,6 +1728,18 @@ export function WeekView({
           </section>
         </div>
       </div>
+
+      {pendingMove && (
+        <ConfirmMove
+          move={pendingMove}
+          onConfirm={() => {
+            onMoveEvent(pendingMove.id, pendingMove.to.day, pendingMove.to.minutes);
+            setPendingMove(null);
+          }}
+          // Nothing was written, so the event is still where it was drawn.
+          onCancel={() => setPendingMove(null)}
+        />
+      )}
     </div>
   );
 }

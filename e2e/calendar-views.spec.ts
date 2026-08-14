@@ -832,6 +832,50 @@ test.describe('moving an event in the week', () => {
     await expect(page.getByTestId('event-editor')).toHaveCount(0);
   });
 
+  /** Marks the trip's only event Confirmed, from the picker on its row. */
+  async function markConfirmed(page: Page) {
+    await page.getByTestId('booking-status-button').click();
+    await page
+      .getByRole('dialog', { name: 'Booking status' })
+      .getByRole('button', { name: 'Confirmed' })
+      .click();
+    await expect(page.getByTestId('booking-status-button')).toHaveAccessibleName(
+      'Change booking status, currently Confirmed',
+    );
+  }
+
+  test('a confirmed event asks before a drag moves it', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await setTripDates(page, '2026-08-10', '2026-08-16');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+    await markConfirmed(page);
+
+    await page.getByTestId('go-to-date').fill(ON);
+    await switchTo(page, 'Week');
+
+    const card = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
+    await expect(card).toContainText('09:00');
+
+    // Dropped, and nothing written yet: the question says both times, so the
+    // hand that slipped can see which one it meant.
+    await dragTo(page, 'Fushimi Inari', ON, 13.5);
+    const asked = page.getByTestId('confirm-move');
+    await expect(asked).toContainText('Wednesday 12 August, 09:00');
+    await expect(asked).toContainText('Wednesday 12 August, 13:30');
+
+    await page.getByTestId('confirm-move-cancel').click();
+    await expect(asked).toHaveCount(0);
+    await expect(card).toContainText('09:00');
+
+    // And agreed to, which is the same move the flexible one makes on its own.
+    await dragTo(page, 'Fushimi Inari', ON, 13.5);
+    await page.getByTestId('confirm-move-ok').click();
+    await expect(page.getByTestId('confirm-move')).toHaveCount(0);
+    await expect(card).toContainText('13:30');
+    await expect(page.getByTestId('undo-last')).toHaveAccessibleName('Undo: Moved Fushimi Inari');
+  });
+
   test('a click on an event still opens it', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');

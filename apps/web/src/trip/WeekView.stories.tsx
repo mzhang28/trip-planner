@@ -31,7 +31,8 @@ function clockOf(minutes: number): string {
  * The hours down the side belong to a run of days rather than to the week, so
  * a week that crosses the Pacific gets one rail per zone and each sticks while
  * its own days are on screen. Cards can be dragged to another half hour or
- * another day; dragging an empty column makes an event over the hours drawn.
+ * another day, and a confirmed one asks before it moves; dragging an empty
+ * column makes an event over the hours drawn.
  */
 const meta = {
   title: 'Calendar/Week',
@@ -156,6 +157,9 @@ export const InTokyo: Story = {
 /**
  * The week the trip crosses the Pacific. Three zones, three rails, and the
  * day of the flight staying on the clock it began on.
+ *
+ * Both flights here are Confirmed, so dragging one puts the question up before
+ * anything is written.
  */
 export const CrossingZones: Story = {
   name: 'Crossing zones',
