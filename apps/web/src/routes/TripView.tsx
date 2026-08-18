@@ -56,6 +56,7 @@ import {
   type DayKey,
 } from '../lib/calendar';
 import { daySlots, slotForInstant, zoneOfDay, type DaySlot } from '../lib/dayZones';
+import { PHONE, useMediaQuery } from '../lib/useMediaQuery';
 import { DayMap } from '../trip/DayMap';
 import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
 import { useUploadFlush } from '../trip/Attachments';
@@ -72,6 +73,7 @@ import { EventRow } from '../trip/EventRow';
 import { SearchBar } from '../trip/SearchBar';
 import { SyncBadge } from '../trip/SyncBadge';
 import { TripChrome } from '../trip/TripChrome';
+import { TILE } from '../trip/TripDrawer';
 import type { CommandId } from '../trip/search';
 import { useEvents, useTripState, useTripStore } from '../trip/useTrip';
 import { setZonePreference, useZonePreference } from '../trip/useDisplayZone';
@@ -131,6 +133,112 @@ function middleDay(start: DayKey, end: DayKey): DayKey {
   const dayMilliseconds = 24 * 60 * 60 * 1000;
   const duration = Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`);
   return addDays(start, Math.floor(duration / dayMilliseconds / 2));
+}
+
+/**
+ * What the itinerary adds to the phone's drawer.
+ *
+ * A phone header has room for the trip's name and whether it is saved, and the
+ * rest of it was a row of small targets along the top. Here they are one thumb
+ * away, above the links to the trip's other screens that the drawer always has.
+ */
+function PhoneActions({
+  view,
+  onChangeView,
+  readOnly,
+  onCreate,
+  canShare,
+  onShare,
+  undoLabel,
+  onUndo,
+  zonePreference,
+  onChangeZone,
+  onDone,
+}: {
+  view: CalendarView;
+  onChangeView: (view: CalendarView) => void;
+  readOnly: boolean;
+  onCreate: () => void;
+  canShare: boolean;
+  onShare: () => void;
+  /** What pressing undo would take back, or absent when there is nothing. */
+  undoLabel: string | undefined;
+  onUndo: () => void;
+  zonePreference: 'event' | 'device';
+  onChangeZone: (value: 'event' | 'device') => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <SegmentedControl
+        label="Calendar view"
+        options={VIEW_OPTIONS}
+        value={view}
+        onChange={(next) => {
+          onChangeView(next);
+          onDone();
+        }}
+      />
+
+      {!readOnly && (
+        <Button
+          variant="primary"
+          onPress={() => {
+            onCreate();
+            onDone();
+          }}
+        >
+          <Plus aria-hidden="true" className="size-4" />
+          Add event
+        </Button>
+      )}
+
+      <div className="grid grid-cols-2 gap-2">
+        {canShare && (
+          <button
+            type="button"
+            className={TILE}
+            onClick={() => {
+              onShare();
+              onDone();
+            }}
+          >
+            <Share2 aria-hidden="true" className="size-4" />
+            Share
+          </button>
+        )}
+
+        {/* Says what it would take back, because by the time somebody looks for
+            it they may no longer be sure what the last thing was. */}
+        <button
+          type="button"
+          className={TILE}
+          data-testid="undo-last"
+          disabled={undoLabel === undefined}
+          aria-label={undoLabel ? `Undo: ${undoLabel}` : 'Nothing to undo'}
+          onClick={() => {
+            onUndo();
+            onDone();
+          }}
+        >
+          <Undo2 aria-hidden="true" className="size-4" />
+          Undo
+        </button>
+      </div>
+
+      {/* A setting changes what is on the screen rather than moving off it, so
+          using one leaves the drawer where it is. */}
+      <div className="flex flex-col gap-1.5">
+        <span className="text-xs font-medium text-ink-secondary">Show times in</span>
+        <SegmentedControl
+          label="Show times in"
+          options={ZONE_OPTIONS}
+          value={zonePreference}
+          onChange={onChangeZone}
+        />
+      </div>
+    </div>
+  );
 }
 
 function HeaderActions({
@@ -473,6 +581,8 @@ export function TripView() {
     () => events.filter((event) => event.startsAt === undefined),
     [events],
   );
+
+  const phone = useMediaQuery(PHONE);
 
   /*
    * The day the map draws, read the same way the week reads it: by the slot the
@@ -860,6 +970,17 @@ export function TripView() {
     setSharing(true);
   }
 
+  /*
+   * Opening the month moves the anchor to the middle of the trip, so it draws
+   * the month the trip is in rather than the one today happens to fall in.
+   */
+  function changeView(next: CalendarView) {
+    if (next === 'month' && view !== 'month') {
+      moveAnchor(middleDay(tripRange.start, tripRange.end));
+    }
+    setView(next);
+  }
+
   function runCommand(command: CommandId) {
     if (command === 'new-event') {
       create();
@@ -899,35 +1020,75 @@ export function TripView() {
   }
 
   return (
-    <TripChrome tripId={tripId ?? ''} tripName={trip?.name ?? doc?.meta?.name ?? 'Trip'}>
+    <TripChrome
+      tripId={tripId ?? ''}
+      tripName={trip?.name ?? doc?.meta?.name ?? 'Trip'}
+      search={{
+        doc,
+        homeTimezone,
+        onPickEvent: focusEvent,
+        onPickDay: goToDay,
+        onRunCommand: runCommand,
+      }}
+      actions={(close) => (
+        <PhoneActions
+          view={view}
+          onChangeView={changeView}
+          readOnly={readOnly}
+          onCreate={create}
+          canShare={trip?.role === 'owner'}
+          onShare={share}
+          undoLabel={readOnly ? undefined : undos[undos.length - 1]?.message}
+          onUndo={undo}
+          zonePreference={zonePreference}
+          onChangeZone={setZonePreference}
+          onDone={close}
+        />
+      )}
+    >
       <header className="z-10 shrink-0 border-b border-line bg-page/95 backdrop-blur">
         <div
           data-testid="trip-toolbar"
           className="relative flex w-full flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8"
         >
+          {/*
+            A phone keeps the name and whether it is saved, and nothing else:
+            the rest of this row is in the drawer at the bottom edge, where a
+            thumb reaches it. Between the phone and the sidebar's breakpoint
+            these links are the only way to the trip's other screens.
+          */}
           <div className="flex min-w-0 items-center gap-3">
-            <Link to="/" className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden">
-              All trips
-            </Link>
+            {!phone && (
+              <Link
+                to="/"
+                className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+              >
+                All trips
+              </Link>
+            )}
             <h1 className="max-w-48 truncate text-lg xl:max-w-80">{trip?.name ?? 'Trip'}</h1>
-            <Link
-              to={`/t/${tripId}/todos`}
-              className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-            >
-              To-dos
-            </Link>
-            <Link
-              to={`/t/${tripId}/files`}
-              className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-            >
-              Files
-            </Link>
-            <Link
-              to={`/t/${tripId}/fields`}
-              className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-            >
-              Settings
-            </Link>
+            {!phone && (
+              <>
+                <Link
+                  to={`/t/${tripId}/todos`}
+                  className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+                >
+                  To-dos
+                </Link>
+                <Link
+                  to={`/t/${tripId}/files`}
+                  className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+                >
+                  Files
+                </Link>
+                <Link
+                  to={`/t/${tripId}/fields`}
+                  className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+                >
+                  Settings
+                </Link>
+              </>
+            )}
             <SyncBadge state={state} />
           </div>
           {/*
@@ -946,48 +1107,57 @@ export function TripView() {
               />
             </div>
           </div>
-          <div className="ml-auto flex items-center gap-3">
-            <SegmentedControl
-              label="Calendar view"
-              options={VIEW_OPTIONS}
-              value={view}
-              onChange={(nextView) => {
-                if (nextView === 'month' && view !== 'month') {
-                  moveAnchor(middleDay(tripRange.start, tripRange.end));
-                }
-                setView(nextView);
-              }}
-            />
-            {!readOnly && (
-              <Button size="sm" variant="primary" onPress={create}>
-                <Plus aria-hidden="true" className="size-4" />
-                Add event
-              </Button>
-            )}
-            <HeaderActions
-              canShare={trip?.role === 'owner'}
-              zonePreference={zonePreference}
-              undoLabel={readOnly ? undefined : undos[undos.length - 1]?.message}
-              onUndo={undo}
-              onChangeZone={setZonePreference}
-              onShare={share}
+          {!phone && (
+            <div className="ml-auto flex items-center gap-3">
+              <SegmentedControl
+                label="Calendar view"
+                options={VIEW_OPTIONS}
+                value={view}
+                onChange={changeView}
+              />
+              {!readOnly && (
+                <Button size="sm" variant="primary" onPress={create}>
+                  <Plus aria-hidden="true" className="size-4" />
+                  Add event
+                </Button>
+              )}
+              <HeaderActions
+                canShare={trip?.role === 'owner'}
+                zonePreference={zonePreference}
+                undoLabel={readOnly ? undefined : undos[undos.length - 1]?.message}
+                onUndo={undo}
+                onChangeZone={setZonePreference}
+                onShare={share}
+              />
+            </div>
+          )}
+        </div>
+
+        {/*
+          Between the phone and the large breakpoint the search box gets the
+          whole row. A phone reaches it through the drawer at the bottom edge
+          instead, and this row would be a second copy of the same field.
+        */}
+        {!phone && (
+          <div className="w-full px-4 pb-3 lg:hidden">
+            <SearchBar
+              doc={doc}
+              homeTimezone={homeTimezone}
+              onPickEvent={focusEvent}
+              onPickDay={goToDay}
+              onRunCommand={runCommand}
             />
           </div>
-        </div>
-
-        {/* Below the large breakpoint the search box gets the whole row. */}
-        <div className="w-full px-4 pb-3 lg:hidden">
-          <SearchBar
-            doc={doc}
-            homeTimezone={homeTimezone}
-            onPickEvent={focusEvent}
-            onPickDay={goToDay}
-            onRunCommand={runCommand}
-          />
-        </div>
+        )}
       </header>
 
+      {/*
+        Which calendar is drawn, said on the page itself. The switcher moves
+        between the header and the phone's drawer, so it is not always on the
+        screen to be read.
+      */}
       <main
+        data-view={view}
         className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-4 py-6 sm:px-6 lg:px-8"
       >
         <div className="shrink-0">
@@ -1300,27 +1470,32 @@ export function TripView() {
               </div>
 
               {/*
-                Beside the timeline from the large breakpoint up, and below it
-                on anything narrower. A map squeezed into a phone column shows
-                less than the list it is competing with for the space.
+                Beside the timeline from the large breakpoint up, and under it
+                between there and a phone. A phone gets no map: it has nowhere
+                to put one but under the list, where it would take a third of
+                the screen and a screenful of tiles to show pins the cards
+                already name. Left out of the tree, so Leaflet never mounts and
+                no tile is fetched.
               */}
               {/*
                 Takes its space only when there is a pin to put in it. Before
                 that the panel is one line, and the itinerary has the width.
               */}
-              <aside
-                className={
-                  mappable.some((event) => event.location?.lat !== undefined)
-                    ? 'h-48 shrink-0 sm:h-64 lg:h-full lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
-                    : 'shrink-0 lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
-                }
-              >
-                <DayMap
-                  events={mappable}
-                  selectedId={highlighted}
-                  onSelect={focusEvent}
-                />
-              </aside>
+              {!phone && (
+                <aside
+                  className={
+                    mappable.some((event) => event.location?.lat !== undefined)
+                      ? 'h-64 shrink-0 lg:h-full lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
+                      : 'shrink-0 lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
+                  }
+                >
+                  <DayMap
+                    events={mappable}
+                    selectedId={highlighted}
+                    onSelect={focusEvent}
+                  />
+                </aside>
+              )}
             </div>
           )}
         </DndContext>
@@ -1362,6 +1537,7 @@ export function TripView() {
           />
         )}
       </main>
+
     </TripChrome>
   );
 }

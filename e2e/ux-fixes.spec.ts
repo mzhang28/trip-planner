@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, goToScreen, switchView } from './helpers';
 
 async function newTrip(page: Page, name = 'Japan, April') {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -85,10 +85,7 @@ test.describe('putting an event on a chosen day', () => {
     await newTrip(page);
 
     for (const view of ['Day', 'Week', 'Month'] as const) {
-      await page
-        .getByRole('radiogroup', { name: 'Calendar view' })
-        .getByText(view, { exact: true })
-        .click();
+      await switchView(page, view);
 
       await expect(page.getByTestId('go-to-date')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Earlier' })).toBeVisible();
@@ -145,10 +142,7 @@ test.describe('custom colors', () => {
 
     await page.getByTestId('close-editor').click();
     await page.getByTestId('go-to-date').fill('2026-09-03');
-    await page
-      .getByRole('radiogroup', { name: 'Calendar view' })
-      .getByText('Month', { exact: true })
-      .click();
+    await switchView(page, 'Month');
 
     const cityRibbon = page.getByText('Kyoto', { exact: true }).first();
     await expect(cityRibbon).toHaveCSS('background-color', 'rgb(254, 246, 213)');
@@ -376,6 +370,120 @@ test.describe('searching', () => {
     await search.press('Enter');
     await expect(page.getByTestId('event-editor')).toBeVisible();
   });
+
+  test('a phone searches from a drawer at the bottom, not a row at the top', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await newTrip(page);
+
+    await addNewEvent(page, 'Fushimi Inari');
+
+    // No field in the header: the itinerary has that row back.
+    await expect(page.getByRole('combobox', { name: 'Search this trip' })).toHaveCount(0);
+
+    const opener = page.getByTestId('open-drawer');
+    const list = page.getByTestId('day-list-scroll');
+
+    // The bar is in the layout rather than over it, so the day list ends above
+    // it instead of running underneath.
+    const listBox = (await list.boundingBox())!;
+    const openerBox = (await opener.boundingBox())!;
+    expect(openerBox.y).toBeGreaterThanOrEqual(listBox.y + listBox.height);
+
+    await opener.click();
+    await expect(page.getByTestId('trip-drawer')).toBeVisible();
+
+    // Typing goes straight into the field the drawer opened for.
+    await page.keyboard.type('Fushimi');
+    const search = page.getByRole('combobox', { name: 'Search this trip' });
+    await expect(search).toHaveValue('Fushimi');
+
+    await page.getByRole('option').first().click();
+
+    // Picking a result puts the drawer away, leaving what it went to in view.
+    await expect(page.getByTestId('trip-drawer')).toHaveCount(0);
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+  });
+
+  test('dragging the bar up brings the header controls within reach', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await newTrip(page);
+
+    // The phone header keeps the name and whether it is saved. Everything else
+    // that was along the top is in the drawer.
+    await expect(page.getByRole('heading', { name: 'Japan, April' })).toBeVisible();
+    await expect(page.getByTestId('sync-status')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add event' })).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: 'Week' })).toHaveCount(0);
+
+    const opener = page.getByTestId('open-drawer');
+    const bar = (await opener.boundingBox())!;
+
+    async function drag(fromY: number, toY: number) {
+      await page.mouse.move(bar.x + bar.width / 2, fromY);
+      await page.mouse.down();
+      await page.mouse.move(bar.x + bar.width / 2, (fromY + toY) / 2, { steps: 4 });
+      await page.mouse.move(bar.x + bar.width / 2, toY, { steps: 4 });
+      await page.mouse.up();
+    }
+
+    await drag(bar.y + bar.height / 2, bar.y - 120);
+
+    const drawer = page.getByTestId('trip-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(page.getByTestId('drawer-controls')).toBeVisible();
+
+    // Dragged open rather than tapped, so the drawer is not asking to be typed
+    // into and the keyboard stays down.
+    await expect(page.getByRole('combobox', { name: 'Search this trip' })).not.toBeFocused();
+
+    // Pulling it back down by its top edge closes it again.
+    const top = (await drawer.boundingBox())!.y;
+    await drag(top + 30, top + 230);
+    await expect(drawer).toHaveCount(0);
+
+    // The controls do what the header's did, and the drawer goes when one is used.
+    await drag(bar.y + bar.height / 2, bar.y - 120);
+    await page
+      .getByRole('radiogroup', { name: 'Calendar view' })
+      .getByText('Week', { exact: true })
+      .click();
+    await expect(drawer).toHaveCount(0);
+    await expect(page.getByTestId('week-add-lodging').first()).toBeVisible();
+
+    await drag(bar.y + bar.height / 2, bar.y - 120);
+    await page.getByRole('button', { name: 'Add event' }).click();
+    await expect(drawer).toHaveCount(0);
+    await expect(page.getByTestId('event-editor')).toBeVisible();
+  });
+
+  test('every screen of the trip has the same drawer', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await newTrip(page);
+
+    await goToScreen(page, 'To-dos');
+    await expect(page.getByRole('heading', { name: 'To-dos', exact: true })).toBeVisible();
+
+    // Nothing of this screen's own to search, so the bar opens on the controls.
+    await page.getByTestId('open-drawer').click();
+    await expect(page.getByTestId('trip-drawer')).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Search this trip' })).toHaveCount(0);
+
+    // The screen being read says so, and the others are one tap away.
+    await expect(page.getByRole('link', { name: 'To-dos', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+
+    await page.getByRole('link', { name: 'Files', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Files', exact: true })).toBeVisible();
+    await expect(page.getByTestId('trip-drawer')).toHaveCount(0);
+
+    await goToScreen(page, 'Itinerary');
+    await expect(page.getByTestId('go-to-date')).toBeVisible();
+  });
 });
 
 test.describe('a day decided before an hour', () => {
@@ -398,10 +506,7 @@ test.describe('a day decided before an hour', () => {
 
     // It sits on its day all the same, above the hours rather than inside them.
     await page.getByTestId('go-to-date').fill('2026-09-03');
-    await page
-      .getByRole('radiogroup', { name: 'Calendar view' })
-      .getByText('Week', { exact: true })
-      .click();
+    await switchView(page, 'Week');
     await expect(page.getByTestId('week-untimed-event')).toContainText('Ryokan');
     await expect(page.getByTestId('week-event')).toHaveCount(0);
   });
@@ -613,10 +718,7 @@ test.describe('reaching things with a finger', () => {
     await page.goto('/');
     await newTrip(page);
 
-    await page
-      .getByRole('radiogroup', { name: 'Calendar view' })
-      .getByText('Week', { exact: true })
-      .click();
+    await switchView(page, 'Week');
 
     /*
      * A day chosen on purpose, so this does not depend on where the week
@@ -635,11 +737,11 @@ test.describe('reaching things with a finger', () => {
     await name.fill('Dinner');
     await name.press('Enter');
 
-    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'week');
     await expect(page.getByTestId('event-editor')).toHaveCount(0);
     await page.getByTestId('week-untimed-event').filter({ hasText: 'Dinner' }).click();
 
-    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     await expect(page.getByTestId('event-editor')).toBeVisible();
     await expect(page.getByTestId('event-date')).toHaveValue(today);
   });
@@ -727,10 +829,7 @@ test.describe('a stay', () => {
     await page.getByTestId('check-out').fill('2026-08-19');
     await page.getByTestId('close-editor').click();
 
-    await page
-      .getByRole('radiogroup', { name: 'Calendar view' })
-      .getByText('Week', { exact: true })
-      .click();
+    await switchView(page, 'Week');
     const hotels = page.getByTestId('week-lodging');
     await expect(hotels).toHaveCount(2);
     await expect(page.getByTestId('week-event')).toHaveCount(0);
@@ -1084,10 +1183,7 @@ test.describe('days and what has none', () => {
     await expect(eventRow(page, 'Book the ryokan')).toBeVisible();
 
     for (const view of ['Week', 'Month'] as const) {
-      await page
-        .getByRole('radiogroup', { name: 'Calendar view' })
-        .getByText(view, { exact: true })
-        .click();
+      await switchView(page, view);
 
       // Both views are drawn from dates, so an event without one was
       // invisible in them and nothing said it was waiting.

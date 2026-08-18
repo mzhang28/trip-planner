@@ -21,6 +21,7 @@ import { isTimeZone, knownTimeZones, setDay, toDateInput } from '../lib/time';
 import { CheckedField } from '../trip/CheckedField';
 import { AuditPanel } from '../trip/AuditPanel';
 import { SyncBadge } from '../trip/SyncBadge';
+import { PHONE, useMediaQuery } from '../lib/useMediaQuery';
 import { TripChrome } from '../trip/TripChrome';
 import { useTripState, useTripStore } from '../trip/useTrip';
 
@@ -50,6 +51,7 @@ export function TripFields() {
   const { tripId } = useParams<{ tripId: string }>();
   const store = useTripStore(tripId);
   const state = useTripState(store);
+  const phone = useMediaQuery(PHONE);
 
   /*
    * This screen asked nothing about the role and offered every write control to
@@ -180,28 +182,38 @@ export function TripFields() {
   return (
     <TripChrome tripId={tripId ?? ''} tripName={trip?.name ?? doc?.meta?.name ?? 'Trip'}>
       <header className="shrink-0 border-b border-line">
+        {/*
+          A phone keeps the title and whether it is saved. The way to the trip's
+          other screens, and the theme, are in the drawer at the bottom edge.
+        */}
         <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <Link
-            to={`/t/${tripId}`}
-            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-          >
-            Itinerary
-          </Link>
+          {!phone && (
+            <Link
+              to={`/t/${tripId}`}
+              className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+            >
+              Itinerary
+            </Link>
+          )}
           <h1 className="flex-1 text-lg">Trip settings</h1>
-          <Link
-            to={`/t/${tripId}/todos`}
-            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-          >
-            To-dos
-          </Link>
-          <Link
-            to={`/t/${tripId}/files`}
-            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-          >
-            Files
-          </Link>
+          {!phone && (
+            <>
+              <Link
+                to={`/t/${tripId}/todos`}
+                className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+              >
+                To-dos
+              </Link>
+              <Link
+                to={`/t/${tripId}/files`}
+                className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+              >
+                Files
+              </Link>
+            </>
+          )}
           <SyncBadge state={state} />
-          <ThemeToggle />
+          {!phone && <ThemeToggle />}
         </div>
       </header>
 

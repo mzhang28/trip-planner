@@ -20,7 +20,17 @@ function shortcutHint(): string {
 
 export interface SearchBarProps {
   doc: TripDoc | undefined;
+  /** Takes the caret on mount, for the drawer that opens with nothing else in it. */
+  autoFocus?: boolean;
+  /**
+   * Puts the results in the box rather than over the page below the field.
+   * The drawer is the box, and a list hanging off the bottom of it would hang
+   * off the bottom of the screen.
+   */
+  inlineResults?: boolean;
   homeTimezone: string;
+  /** What is being searched for, for a container that shows something else when nothing is. */
+  onQueryChange?: (query: string) => void;
   onPickEvent: (eventId: string) => void;
   onPickDay: (at: number) => void;
   onRunCommand: (command: CommandId) => void;
@@ -29,13 +39,17 @@ export interface SearchBarProps {
 /**
  * Search across everything in the trip, and the way to get anywhere in it.
  *
- * Sits in the header on every screen rather than behind a menu, because on a
- * trip of any size finding the thing you half-remember is the common move and
- * scrolling for it is the slow one.
+ * In the header from the small breakpoint up, rather than behind a menu:
+ * on a trip of any size finding the thing you half-remember is the common move
+ * and scrolling for it is the slow one. A phone reaches the same field through
+ * the drawer that opens from the bottom edge.
  */
 export function SearchBar({
   doc,
+  autoFocus = false,
+  inlineResults = false,
   homeTimezone,
+  onQueryChange,
   onPickEvent,
   onPickDay,
   onRunCommand,
@@ -54,6 +68,12 @@ export function SearchBar({
   );
 
   useEffect(() => setActive(0), [query]);
+
+  useEffect(() => onQueryChange?.(query), [query, onQueryChange]);
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -98,7 +118,14 @@ export function SearchBar({
   }
 
   return (
-    <div className="relative min-w-0 flex-1">
+    <div
+      className={cn(
+        'relative min-w-0',
+        // In a row of its own the field fills the row; in the drawer it is as
+        // tall as it needs to be, and takes the rest only to show results.
+        inlineResults ? cn('flex min-h-0 flex-col', showing && 'flex-1') : 'flex-1',
+      )}
+    >
       <div className="relative">
         <Search
           aria-hidden="true"
@@ -163,7 +190,12 @@ export function SearchBar({
           id={listId}
           role="listbox"
           aria-label="Search results"
-          className="absolute top-full right-0 left-0 z-20 mt-1 max-h-80 overflow-auto rounded-lg border border-line bg-raised py-1 shadow-lg"
+          className={cn(
+            'z-20 mt-1 overflow-auto rounded-lg border border-line bg-raised py-1 shadow-lg',
+            inlineResults
+              ? 'min-h-0 shrink'
+              : 'absolute top-full right-0 left-0 max-h-80',
+          )}
         >
           {results.length === 0 && (
             <li role="presentation" className="px-3 py-2 text-sm text-ink-secondary">

@@ -2,7 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!--
+      `interactive-widget=resizes-content` shrinks the page when the on-screen
+      keyboard opens. The app is a full-height column with its own scrolling
+      areas, so without it the keyboard covers the bottom of the screen -- and
+      the bottom of the screen is where the search drawer opens.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+    />
     <title>Trip Planner</title>
     <meta name="description" content="Plan a trip together, with or without a signal." />
 

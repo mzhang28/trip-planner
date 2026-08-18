@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, goToScreen } from './helpers';
 
 async function newTrip(page: Page) {
   await page.goto('/');
@@ -56,7 +56,7 @@ test('event todos are collected with deadlines first and remain checkable', asyn
   await addTodo(page, 'Choose a seat', '2026-09-02');
   await page.getByTestId('close-editor').click();
 
-  await page.getByRole('link', { name: 'To-dos' }).click();
+  await goToScreen(page, 'To-dos');
   await expect(page).toHaveURL(`/t/${tripId}/todos`);
 
   const rows = page.getByTestId('trip-todo');

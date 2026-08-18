@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
+import { PHONE, useMediaQuery } from '../lib/useMediaQuery';
+import { TripDrawer, type DrawerSearch } from './TripDrawer';
 
 const SIDEBAR_KEY = 'trip-planner:sidebar-collapsed';
 
@@ -24,14 +26,26 @@ function initialCollapsed(): boolean {
 export function TripChrome({
   tripId,
   tripName,
+  search,
+  actions,
   children,
 }: {
   tripId: string;
   tripName: string;
+  /** What the drawer's field searches, on the screen that has one. */
+  search?: DrawerSearch;
+  /** What this screen adds to the drawer, given the way to close it afterwards. */
+  actions?: (close: () => void) => ReactNode;
   children: ReactNode;
 }) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(initialCollapsed);
+
+  /*
+   * A phone has no sidebar and a header with room for a title, so everything
+   * else this trip can be asked to do is in the drawer at the bottom edge.
+   */
+  const phone = useMediaQuery(PHONE);
 
   const items = [
     { to: `/t/${tripId}`, label: 'Itinerary', icon: CalendarDays, exact: true },
@@ -130,7 +144,10 @@ export function TripChrome({
         </button>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {children}
+        {phone && <TripDrawer tripId={tripId} search={search} actions={actions} />}
+      </div>
     </div>
   );
 }

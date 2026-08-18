@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router';
 import { api, type TripSummary } from '../lib/api';
 import { FileDropZone, readableFileSize } from '../trip/FileDropZone';
 import { SyncBadge } from '../trip/SyncBadge';
+import { PHONE, useMediaQuery } from '../lib/useMediaQuery';
 import { TripChrome } from '../trip/TripChrome';
 import { useUploadFlush } from '../trip/Attachments';
 import { isPending, subscribeUploadQueue } from '../trip/uploads';
@@ -79,6 +80,7 @@ export function TripFiles() {
   const { tripId } = useParams<{ tripId: string }>();
   const store = useTripStore(tripId);
   const state = useTripState(store);
+  const phone = useMediaQuery(PHONE);
   const doc = state?.doc as TripDoc | undefined;
   const [trip, setTrip] = useState<TripSummary | null>(null);
 
@@ -118,28 +120,38 @@ export function TripFiles() {
   return (
     <TripChrome tripId={tripId ?? ''} tripName={trip?.name ?? doc?.meta?.name ?? 'Trip'}>
       <header className="shrink-0 border-b border-line bg-page/95 backdrop-blur">
+        {/*
+          A phone keeps the title and whether it is saved. The way to the trip's
+          other screens, and the theme, are in the drawer at the bottom edge.
+        */}
         <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
-          <Link
-            to={`/t/${tripId}`}
-            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-          >
-            Itinerary
-          </Link>
+          {!phone && (
+            <Link
+              to={`/t/${tripId}`}
+              className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+            >
+              Itinerary
+            </Link>
+          )}
           <h1 className="min-w-0 flex-1 truncate text-lg">Files</h1>
-          <Link
-            to={`/t/${tripId}/todos`}
-            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-          >
-            To-dos
-          </Link>
-          <Link
-            to={`/t/${tripId}/fields`}
-            className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
-          >
-            Settings
-          </Link>
+          {!phone && (
+            <>
+              <Link
+                to={`/t/${tripId}/todos`}
+                className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+              >
+                To-dos
+              </Link>
+              <Link
+                to={`/t/${tripId}/fields`}
+                className="text-xs text-ink-muted underline-offset-2 hover:underline md:hidden"
+              >
+                Settings
+              </Link>
+            </>
+          )}
           <SyncBadge state={state} />
-          <ThemeToggle />
+          {!phone && <ThemeToggle />}
         </div>
       </header>
 

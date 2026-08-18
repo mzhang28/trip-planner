@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, goToScreen, switchView } from './helpers';
 
 /*
  * The hours the week timetable shows out of the box. A column covers exactly
@@ -100,19 +100,12 @@ async function revealField(page: Page, key: string) {
   await chip.click();
 }
 
-async function switchTo(page: Page, view: 'Day' | 'Week' | 'Month') {
-  await page
-    .getByRole('radiogroup', { name: 'Calendar view' })
-    .getByText(view, { exact: true })
-    .click();
-}
-
 async function setTripDates(page: Page, start: string, end: string) {
-  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await goToScreen(page, 'Settings');
   await page.getByTestId('trip-start-date').fill(start);
   await page.getByTestId('trip-end-date').fill(end);
   await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
-  await page.getByRole('link', { name: 'Itinerary', exact: true }).click();
+  await goToScreen(page, 'Itinerary');
 }
 
 test.describe('week and month views', () => {
@@ -127,7 +120,7 @@ test.describe('week and month views', () => {
       await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
 
       await page.getByTestId('go-to-date').fill(ON);
-      await switchTo(page, 'Week');
+      await switchView(page, 'Week');
 
       // Both events are on the same day, so one column holds them both.
       const week = page.getByTestId('week-event');
@@ -158,7 +151,7 @@ test.describe('week and month views', () => {
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
     await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Month');
+    await switchView(page, 'Month');
 
     /*
      * Named once per week row it runs into, not once per day.
@@ -184,7 +177,7 @@ test.describe('week and month views', () => {
       await addEvent(page, 'Morning in SF', 'San Francisco', '00:00');
       await addEvent(page, 'Arrive Tokyo', 'Tokyo', '15:00');
 
-      await switchTo(page, 'Month');
+      await switchView(page, 'Month');
 
       const grid = page.getByTestId('month-grid');
       await expect(grid.locator('[data-testid^="day-"]')).toHaveCount(28);
@@ -232,7 +225,7 @@ test.describe('week and month views', () => {
     await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
 
     await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Month');
+    await switchView(page, 'Month');
     // Names, not a count: every day of a month said "2 things" and read alike.
     const cell = page.getByTestId('day-2026-08-12');
     await expect(cell).toContainText('Fushimi Inari');
@@ -241,7 +234,7 @@ test.describe('week and month views', () => {
     await cell.getByText('Fushimi Inari').click();
 
     // Clicking an event drops back into the day view with that event open.
-    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
     await expect(page.getByTestId('event-editor')).toBeVisible();
   });
@@ -265,7 +258,7 @@ test.describe('week and month views', () => {
     async function expectOpenedAndScrolled() {
       const list = page.getByTestId('day-list-scroll');
       const editor = page.getByTestId('event-editor');
-      await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+      await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
       await expect(editor).toBeVisible();
       await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
@@ -275,11 +268,11 @@ test.describe('week and month views', () => {
       expect(editorBox.y).toBeLessThan(listBox.y + listBox.height);
     }
 
-    await switchTo(page, 'Month');
+    await switchView(page, 'Month');
     await page.getByTestId('month-event').filter({ hasText: 'Tokyo dinner' }).click();
     await expectOpenedAndScrolled();
 
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
     await page.getByTestId('week-event').filter({ hasText: 'Tokyo dinner' }).click();
     await expectOpenedAndScrolled();
   });
@@ -294,7 +287,7 @@ test.describe('week and month views', () => {
       await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
       await page.getByTestId('go-to-date').fill(ON);
-      await switchTo(page, 'Week');
+      await switchView(page, 'Week');
 
       const event = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
       await expect(event).toBeInViewport();
@@ -336,7 +329,7 @@ test.describe('week and month views', () => {
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
     await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     const scroller = page.getByTestId('week-horizontal-scroll');
     const rails = page.locator('[data-week-run] > div:first-child');
@@ -375,10 +368,10 @@ test.describe('week and month views', () => {
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
     await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
     await page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' }).click();
 
-    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
   });
 
@@ -389,7 +382,7 @@ test.describe('week and month views', () => {
 
     await page.getByTestId(`day-heading-${ON}`).click();
 
-    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'week');
     await expect(page.getByTestId('go-to-date')).toHaveValue(ON);
     await expect(page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' })).toBeVisible();
   });
@@ -499,7 +492,7 @@ test.describe('flights and the map', () => {
     await editor.getByRole('textbox', { name: 'Ends' }).blur();
     await page.getByTestId('close-editor').click();
 
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
     const weekTravelDay = page.locator('[data-week-city-day="2026-08-12"]');
     await expect(
       weekTravelDay.locator('[data-testid="week-city-band"][data-city="Kyoto"]'),
@@ -508,7 +501,7 @@ test.describe('flights and the map', () => {
       weekTravelDay.locator('[data-testid="week-city-band"][data-city="Osaka"]'),
     ).toHaveAttribute('data-from-minute', '720');
 
-    await switchTo(page, 'Month');
+    await switchView(page, 'Month');
 
     await expect(
       page
@@ -538,6 +531,28 @@ test.describe('flights and the map', () => {
     // One line rather than an empty panel taking half the width to say it.
     await expect(page.getByTestId('empty-map')).toBeVisible();
     await expect(page.getByTestId('day-map')).toHaveCount(0);
+  });
+
+  test('a phone gets no map panel, and no tiles', async ({ page }) => {
+    const tiles: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().includes('tile.openstreetmap.org')) tiles.push(request.url());
+    });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    // Nothing of the panel: not the map, and not the line that stands in for it
+    // while nothing has a place. The itinerary has the screen to itself.
+    await expect(page.getByTestId('day-map')).toHaveCount(0);
+    await expect(page.getByTestId('empty-map')).toHaveCount(0);
+    expect(tiles).toEqual([]);
+
+    // It arrives when there is room for it, without a reload.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(page.getByTestId('empty-map')).toBeVisible();
   });
 });
 
@@ -786,7 +801,7 @@ test.describe('moving an event in the week', () => {
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
     await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     const card = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
     await expect(card).toContainText('09:00');
@@ -817,7 +832,7 @@ test.describe('moving an event in the week', () => {
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
     await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     const next = '2026-08-13';
     await dragTo(page, 'Fushimi Inari', next, 11);
@@ -852,7 +867,7 @@ test.describe('moving an event in the week', () => {
     await markConfirmed(page);
 
     await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     const card = page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' });
     await expect(card).toContainText('09:00');
@@ -882,10 +897,10 @@ test.describe('moving an event in the week', () => {
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
     await page.getByTestId('go-to-date').fill(ON);
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     await page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' }).click();
-    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     await expect(page.getByTestId('event-editor')).toBeVisible();
   });
 });
@@ -894,13 +909,13 @@ test.describe('making an event from the calendar', () => {
   test('clicking a day in the month makes an event on that day', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
-    await switchTo(page, 'Month');
+    await switchView(page, 'Month');
 
     const today = new Date().toISOString().slice(0, 10);
     await page.getByTestId(`add-on-${today}`).click();
 
     // It drops into the day, with the day filled in and the name waiting.
-    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     await expect(page.getByTestId('event-editor')).toBeVisible();
 
     const name = page.getByRole('textbox', { name: 'Name' });
@@ -916,11 +931,11 @@ test.describe('making an event from the calendar', () => {
     await newTrip(page, 'Japan, April');
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
 
-    await switchTo(page, 'Month');
+    await switchView(page, 'Month');
     const today = new Date().toISOString().slice(0, 10);
     await page.getByRole('button', { name: `Open ${today}` }).click();
 
-    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     // One event, not two: opening a day must not leave something behind.
     await expect(page.getByTestId('event')).toHaveCount(1);
   });
@@ -928,7 +943,7 @@ test.describe('making an event from the calendar', () => {
   test('dragging down a day in the week makes an event over that time', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     const column = page.locator('[data-testid^="day-2"]').first();
     await expect(column).toBeVisible();
@@ -960,13 +975,13 @@ test.describe('making an event from the calendar', () => {
 
     // Creation stays in the week and does not open the full editor. Clicking
     // the finished event is the explicit next step that opens its details.
-    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'week');
     await expect(page.getByTestId('event-editor')).toHaveCount(0);
     const created = page.getByTestId('week-event').filter({ hasText: 'Nishiki Market' });
     await expect(created).toBeVisible();
     await created.click();
 
-    await expect(page.getByRole('radio', { name: 'Day' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     const editor = page.getByTestId('event-editor');
     await expect(editor).toBeVisible();
 
@@ -979,7 +994,7 @@ test.describe('making an event from the calendar', () => {
   test('a column on another clock makes the event on that clock', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Pacific crossing');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     /*
      * The trip is kept in Tokyo, and these days are spent in London. Set from
@@ -1071,7 +1086,7 @@ test.describe('booking somewhere to sleep from the week', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await setTripDates(page, '2026-09-01', '2026-09-05');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     // One per night rather than one across the week, so a single night can be
     // booked without first narrowing something wider.
@@ -1083,13 +1098,13 @@ test.describe('booking somewhere to sleep from the week', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await setTripDates(page, '2026-09-01', '2026-09-05');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     await night(page, '2026-09-03').click();
     await nameIt(page, 'Ryokan Kyoto');
 
     // Booking stays in the week rather than opening the day editor.
-    await expect(page.getByRole('radio', { name: 'Week' })).toBeChecked();
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'week');
     await expect(
       page.getByTestId('week-lodging').filter({ hasText: 'Ryokan Kyoto' }),
     ).toBeVisible();
@@ -1107,7 +1122,7 @@ test.describe('booking somewhere to sleep from the week', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await setTripDates(page, '2026-09-01', '2026-09-05');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     await dragAcross(page, '2026-09-02', '2026-09-04');
     await nameIt(page, 'Ryokan Kyoto');
@@ -1127,7 +1142,7 @@ test.describe('booking somewhere to sleep from the week', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await setTripDates(page, '2026-09-01', '2026-09-05');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     await dragAcross(page, '2026-09-04', '2026-09-02');
     await nameIt(page, 'Ryokan Kyoto');
@@ -1142,12 +1157,12 @@ test.describe('booking somewhere to sleep from the week', () => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
     await setTripDates(page, '2026-09-01', '2026-09-05');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     // Take the middle night, leaving a free night either side of it.
     await night(page, '2026-09-03').click();
     await nameIt(page, 'Ryokan Kyoto');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     // Now drag from the first night towards the last, straight over the hotel.
     await dragAcross(page, '2026-09-01', '2026-09-05');
@@ -1160,7 +1175,7 @@ test.describe('booking somewhere to sleep from the week', () => {
       checkOut: '2026-09-03',
     });
 
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
     await expect(page.getByTestId('week-add-lodging')).toHaveCount(2);
     await expect(night(page, '2026-09-04')).toBeVisible();
     await expect(night(page, '2026-09-05')).toBeVisible();
@@ -1169,7 +1184,7 @@ test.describe('booking somewhere to sleep from the week', () => {
   test('a tap books a night where a drag would scroll the week @touch', async ({ page }) => {
     await page.goto('/');
     await newTrip(page, 'Japan, April');
-    await switchTo(page, 'Week');
+    await switchView(page, 'Week');
 
     // Whichever nights this trip works out for itself. One of them is all this
     // needs: the point here is the gesture, not the range.
@@ -1207,7 +1222,7 @@ test.describe('booking somewhere to sleep from the week', () => {
     const viewer = await other.newPage();
     await viewer.goto(`/join/${token}`);
     await expect(viewer).toHaveURL(new RegExp(`/t/${tripId}`));
-    await switchTo(viewer, 'Week');
+    await switchView(viewer, 'Week');
 
     await expect(viewer.getByTestId('week-add-lodging')).toHaveCount(0);
     await expect(viewer.getByText('No hotels this week')).toBeVisible();

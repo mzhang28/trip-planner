@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, switchView } from './helpers';
 
 async function newTrip(page: Page) {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -75,14 +75,23 @@ test.describe('accessibility', () => {
     await newTrip(page);
 
     for (const view of ['Week', 'Month'] as const) {
-      await page
-        .getByRole('radiogroup', { name: 'Calendar view' })
-        .getByText(view, { exact: true })
-        .click();
+      await switchView(page, view);
 
       const results = await scan(page);
       expect(describeViolations(results), `${view} view`).toBe('');
     }
+  });
+
+  test('the phone drawer has no violations, open', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await newTrip(page);
+
+    await page.getByTestId('open-drawer').click();
+    await expect(page.getByTestId('trip-drawer')).toBeVisible();
+
+    const results = await scan(page);
+    expect(describeViolations(results)).toBe('');
   });
 
   test('every control can be reached and used from the keyboard', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, goToScreen, switchView } from './helpers';
 
 /** A trip whose only event is a stay spanning three weeks. */
 async function tripWithALongStay(page: Page) {
@@ -15,10 +15,10 @@ async function tripWithALongStay(page: Page) {
   });
   await page.goto(`/t/${trip.id}`);
   await expect(page.getByTestId('sync-status')).toHaveText('Saved');
-  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await goToScreen(page, 'Settings');
   await page.getByTestId('trip-start-date').fill('2026-08-01');
   await page.getByTestId('trip-end-date').fill('2026-09-15');
-  await page.getByRole('link', { name: 'Itinerary', exact: true }).click();
+  await goToScreen(page, 'Itinerary');
 
   await addNewEvent(page, 'A deliberately named long hotel');
   await page
@@ -36,10 +36,7 @@ async function tripWithALongStay(page: Page) {
 }
 
 async function showTheWeek(page: Page) {
-  await page
-    .getByRole('radiogroup', { name: 'Calendar view' })
-    .getByText('Week', { exact: true })
-    .click();
+  await switchView(page, 'Week');
 }
 
 test('a lodging label follows a wide visible remainder and leaves a short one alone', async ({

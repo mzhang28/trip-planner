@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, switchView } from './helpers';
 
 /*
  * The rest of the suite runs on en-GB, which reads times as 24 hours. This file
@@ -106,10 +106,7 @@ test('the time on a card and on the week axis reads as twelve hours', async ({ p
 
   await expect(eventRow(page, 'Fushimi Inari')).toContainText(/9:00\sAM/);
 
-  await page
-    .getByRole('radiogroup', { name: 'Calendar view' })
-    .getByText('Week', { exact: true })
-    .click();
+  await switchView(page, 'Week');
 
   // The axis drops the minutes, which say nothing on a column of whole hours.
   const axis = page.getByTestId('week-timetable').first();
