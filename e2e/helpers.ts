@@ -5,13 +5,14 @@ function onAPhone(page: Page): boolean {
   return (page.viewportSize()?.width ?? 0) < 640;
 }
 
-/** Moves between the Day, Week and Month views, from wherever this width keeps them. */
-export async function switchView(page: Page, view: 'Day' | 'Week' | 'Month') {
-  if (onAPhone(page)) await page.getByTestId('open-drawer').click();
+/** What the switcher draws for each view where the header has room for a letter. */
+const SHORT_VIEW = { Day: 'D', Week: 'W', Month: 'M' } as const;
 
+/** Moves between the Day, Week and Month views, however this width writes them. */
+export async function switchView(page: Page, view: 'Day' | 'Week' | 'Month') {
   await page
     .getByRole('radiogroup', { name: 'Calendar view' })
-    .getByText(view, { exact: true })
+    .getByText(onAPhone(page) ? SHORT_VIEW[view] : view, { exact: true })
     .click();
 }
 

@@ -4,6 +4,8 @@ import { cn } from '../lib/cn';
 export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
+  /** A letter or two for narrow rows, where the label is the option's name. */
+  short?: string;
 }
 
 export interface SegmentedControlProps<T extends string>
@@ -12,6 +14,8 @@ export interface SegmentedControlProps<T extends string>
   options: readonly SegmentedOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** Shows each option's short form, for a row with no space for words. */
+  compact?: boolean;
   className?: string;
 }
 
@@ -29,6 +33,7 @@ export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  compact = false,
   className,
   ...props
 }: SegmentedControlProps<T>) {
@@ -44,21 +49,28 @@ export function SegmentedControl<T extends string>({
         className,
       )}
     >
-      {options.map((option) => (
-        <Radio
-          key={option.value}
-          value={option.value}
-          className={cn(
-            'cursor-pointer rounded-sm px-2.5 py-1 text-xs font-medium whitespace-nowrap',
-            'text-ink-muted transition-colors duration-100',
-            'data-hovered:text-ink',
-            'data-selected:bg-card data-selected:text-ink data-selected:shadow-xs',
-            'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-1',
-          )}
-        >
-          {option.label}
-        </Radio>
-      ))}
+      {options.map((option) => {
+        const short = compact ? option.short : undefined;
+
+        return (
+          <Radio
+            key={option.value}
+            value={option.value}
+            // The word is still the name when only a letter is drawn, so the
+            // control reads as Day, Week and Month however wide the row is.
+            aria-label={short ? option.label : undefined}
+            className={cn(
+              'cursor-pointer rounded-sm px-2.5 py-1 text-xs font-medium whitespace-nowrap',
+              'text-ink-muted transition-colors duration-100',
+              'data-hovered:text-ink',
+              'data-selected:bg-card data-selected:text-ink data-selected:shadow-xs',
+              'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-1',
+            )}
+          >
+            {short ?? option.label}
+          </Radio>
+        );
+      })}
     </RadioGroup>
   );
 }

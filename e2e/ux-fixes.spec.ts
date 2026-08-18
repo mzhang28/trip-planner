@@ -415,7 +415,15 @@ test.describe('searching', () => {
     await expect(page.getByRole('heading', { name: 'Japan, April' })).toBeVisible();
     await expect(page.getByTestId('sync-status')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add event' })).toHaveCount(0);
-    await expect(page.getByRole('radio', { name: 'Week' })).toHaveCount(0);
+
+    // Except the calendar switcher, which is asked for too often to be a drawer
+    // away. A letter each is all the room the name leaves it.
+    await expect(page.getByRole('radiogroup', { name: 'Calendar view' })).toHaveText('DWM');
+
+    await switchView(page, 'Week');
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'week');
+    await switchView(page, 'Day');
+    await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
 
     const opener = page.getByTestId('open-drawer');
     const bar = (await opener.boundingBox())!;
@@ -444,14 +452,6 @@ test.describe('searching', () => {
     await expect(drawer).toHaveCount(0);
 
     // The controls do what the header's did, and the drawer goes when one is used.
-    await drag(bar.y + bar.height / 2, bar.y - 120);
-    await page
-      .getByRole('radiogroup', { name: 'Calendar view' })
-      .getByText('Week', { exact: true })
-      .click();
-    await expect(drawer).toHaveCount(0);
-    await expect(page.getByTestId('week-add-lodging').first()).toBeVisible();
-
     await drag(bar.y + bar.height / 2, bar.y - 120);
     await page.getByRole('button', { name: 'Add event' }).click();
     await expect(drawer).toHaveCount(0);

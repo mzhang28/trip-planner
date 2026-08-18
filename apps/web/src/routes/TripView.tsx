@@ -92,9 +92,9 @@ const NOTHING_REVEALED: ReadonlySet<string> = new Set();
  * other setting is for working out whether you can call someone.
  */
 const VIEW_OPTIONS = [
-  { value: 'day', label: 'Day' },
-  { value: 'week', label: 'Week' },
-  { value: 'month', label: 'Month' },
+  { value: 'day', label: 'Day', short: 'D' },
+  { value: 'week', label: 'Week', short: 'W' },
+  { value: 'month', label: 'Month', short: 'M' },
 ] as const;
 
 const ZONE_OPTIONS = [
@@ -143,8 +143,6 @@ function middleDay(start: DayKey, end: DayKey): DayKey {
  * away, above the links to the trip's other screens that the drawer always has.
  */
 function PhoneActions({
-  view,
-  onChangeView,
   readOnly,
   onCreate,
   canShare,
@@ -155,8 +153,6 @@ function PhoneActions({
   onChangeZone,
   onDone,
 }: {
-  view: CalendarView;
-  onChangeView: (view: CalendarView) => void;
   readOnly: boolean;
   onCreate: () => void;
   canShare: boolean;
@@ -170,16 +166,6 @@ function PhoneActions({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <SegmentedControl
-        label="Calendar view"
-        options={VIEW_OPTIONS}
-        value={view}
-        onChange={(next) => {
-          onChangeView(next);
-          onDone();
-        }}
-      />
-
       {!readOnly && (
         <Button
           variant="primary"
@@ -1032,8 +1018,6 @@ export function TripView() {
       }}
       actions={(close) => (
         <PhoneActions
-          view={view}
-          onChangeView={changeView}
           readOnly={readOnly}
           onCreate={create}
           canShare={trip?.role === 'owner'}
@@ -1091,6 +1075,23 @@ export function TripView() {
             )}
             <SyncBadge state={state} />
           </div>
+
+          {/*
+            The one control a phone keeps along the top: which calendar is
+            drawn is a question asked constantly, and going through the drawer
+            for it would be two taps every time. A letter each, so it fits
+            beside the name -- and each is still named Day, Week and Month.
+          */}
+          {phone && (
+            <SegmentedControl
+              compact
+              className="ml-auto"
+              label="Calendar view"
+              options={VIEW_OPTIONS}
+              value={view}
+              onChange={changeView}
+            />
+          )}
           {/*
             In the flow of the toolbar rather than centred on top of it. While
             it was positioned absolutely it sat over the view switcher, and
