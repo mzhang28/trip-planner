@@ -110,7 +110,7 @@ export function DescriptionEditor({
           className={cn(
             'w-full resize-y rounded-md border border-line-input bg-card px-2.5 py-2 text-ink',
             'placeholder:text-ink-placeholder',
-            'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+            'focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
           )}
         />
 
@@ -193,7 +193,7 @@ export function Description({
             type="button"
             data-testid="mention"
             onClick={() => onOpenEvent(mention.id)}
-            className="rounded-sm bg-accent-soft px-1 text-accent-text hover:underline focus-visible:outline-focus focus-visible:outline-2"
+            className="rounded-sm bg-accent-soft px-1 text-accent-text hover:underline focus-visible:outline-2 focus-visible:outline-focus"
           >
             {mention.label}
           </button>

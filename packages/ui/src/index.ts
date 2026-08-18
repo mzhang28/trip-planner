@@ -1,21 +1,14 @@
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from './components/Button';
 export { Card, type CardProps } from './components/Card';
 export { ColorPicker, type ColorPickerProps } from './components/ColorPicker';
-export {
-  CustomFieldInput,
-  type CustomFieldInputProps,
-} from './components/CustomFieldInput';
+export { CustomFieldInput, type CustomFieldInputProps } from './components/CustomFieldInput';
 export { IconButton, type IconButtonProps } from './components/IconButton';
 export {
   SegmentedControl,
   type SegmentedControlProps,
   type SegmentedOption,
 } from './components/SegmentedControl';
-export {
-  BOOKING_STATUS_LABEL,
-  StatusChip,
-  type StatusChipProps,
-} from './components/StatusChip';
+export { BOOKING_STATUS_LABEL, StatusChip, type StatusChipProps } from './components/StatusChip';
 export { StatusSpine, type StatusSpineProps } from './components/StatusSpine';
 export { TextField, type TextFieldProps } from './components/TextField';
 export { ThemeToggle, type ThemeToggleProps } from './components/ThemeToggle';

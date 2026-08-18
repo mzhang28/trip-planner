@@ -158,8 +158,6 @@ export function activeMentionQuery(
 /** The plain reading of a description, for search and for a summary line. */
 export function mentionsToText(text: string, doc: TripDoc | undefined): string {
   return parseMentions(text)
-    .map((segment) =>
-      segment.type === 'text' ? segment.text : resolveMention(segment, doc).label,
-    )
+    .map((segment) => (segment.type === 'text' ? segment.text : resolveMention(segment, doc).label))
     .join('');
 }

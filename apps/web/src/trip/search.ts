@@ -1,4 +1,10 @@
-import { eventSearchText, liveEvents, type Instant, type TripDoc, type TripEvent } from '@trip/crdt';
+import {
+  eventSearchText,
+  liveEvents,
+  type Instant,
+  type TripDoc,
+  type TripEvent,
+} from '@trip/crdt';
 import MiniSearch from 'minisearch';
 import { parseDate } from './dates';
 

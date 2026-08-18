@@ -182,13 +182,7 @@ describe('event todos', () => {
   it('adds, completes, dates, and removes a todo without replacing the collection', () => {
     let doc = trip();
     doc = addTodo(doc, 'e1', 'todo-1', { text: 'Reserve the train' }, { ...ada, now: 10 });
-    doc = updateTodo(
-      doc,
-      'e1',
-      'todo-1',
-      { completed: true, deadline: '2026-09-03' },
-      ada,
-    );
+    doc = updateTodo(doc, 'e1', 'todo-1', { completed: true, deadline: '2026-09-03' }, ada);
 
     expect((doc as TripDoc).events.e1!.todos?.['todo-1']).toEqual({
       text: 'Reserve the train',
@@ -207,10 +201,11 @@ describe('event todos', () => {
     const b = addTodo(right, 'e1', 'todo-b', { text: 'Check opening hours' }, bo);
 
     for (const doc of bothWays(a, b) as TripDoc[]) {
-      expect(Object.values(doc.events.e1!.todos ?? {}).map((todo) => todo.text).sort()).toEqual([
-        'Buy tickets',
-        'Check opening hours',
-      ]);
+      expect(
+        Object.values(doc.events.e1!.todos ?? {})
+          .map((todo) => todo.text)
+          .sort(),
+      ).toEqual(['Buy tickets', 'Check opening hours']);
     }
   });
 });

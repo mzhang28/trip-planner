@@ -113,7 +113,9 @@ export function SearchBar({
   const rows: Array<{ heading?: string; result: SearchResult }> = [];
   let lastKind: SearchResult['kind'] | null = null;
   for (const result of results) {
-    rows.push(result.kind === lastKind ? { result } : { heading: GROUP_LABEL[result.kind], result });
+    rows.push(
+      result.kind === lastKind ? { result } : { heading: GROUP_LABEL[result.kind], result },
+    );
     lastKind = result.kind;
   }
 
@@ -138,9 +140,7 @@ export function SearchBar({
           aria-label="Search this trip"
           aria-expanded={showing}
           aria-controls={showing ? listId : undefined}
-          aria-activedescendant={
-            showing && results.length > 0 ? `${listId}-${active}` : undefined
-          }
+          aria-activedescendant={showing && results.length > 0 ? `${listId}-${active}` : undefined}
           aria-autocomplete="list"
           placeholder="Search or jump to a day"
           value={query}
@@ -170,7 +170,7 @@ export function SearchBar({
           className={cn(
             'h-9 w-full rounded-md border border-line-input bg-card pr-14 pl-8 text-sm text-ink',
             'placeholder:text-ink-placeholder',
-            'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+            'focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
           )}
         />
 
@@ -192,9 +192,7 @@ export function SearchBar({
           aria-label="Search results"
           className={cn(
             'z-20 mt-1 overflow-auto rounded-lg border border-line bg-raised py-1 shadow-lg',
-            inlineResults
-              ? 'min-h-0 shrink'
-              : 'absolute top-full right-0 left-0 max-h-80',
+            inlineResults ? 'min-h-0 shrink' : 'absolute top-full right-0 left-0 max-h-80',
           )}
         >
           {results.length === 0 && (

@@ -33,7 +33,13 @@ const doc = {
       name: 'Fushimi Inari',
       location: { label: 'Fushimi Inari Taisha' },
       attachments: {
-        a1: { blobHash: 'x', filename: 'tickets.pdf', mime: 'application/pdf', size: 1, addedAt: 0 },
+        a1: {
+          blobHash: 'x',
+          filename: 'tickets.pdf',
+          mime: 'application/pdf',
+          size: 1,
+          addedAt: 0,
+        },
       },
     }),
     e2: event({ id: 'e2', name: 'Nishiki Market' }),
@@ -53,15 +59,11 @@ describe('parsing mentions', () => {
   });
 
   it('handles several in a row and all three kinds', () => {
-    const segments = parseMentions(
-      '@[A](event:e1)@[B](place:e2) and @[C](file:a1)',
-    ).filter((s) => s.type === 'mention');
+    const segments = parseMentions('@[A](event:e1)@[B](place:e2) and @[C](file:a1)').filter(
+      (s) => s.type === 'mention',
+    );
 
-    expect(segments.map((s) => s.type === 'mention' && s.kind)).toEqual([
-      'event',
-      'place',
-      'file',
-    ]);
+    expect(segments.map((s) => s.type === 'mention' && s.kind)).toEqual(['event', 'place', 'file']);
   });
 
   it('leaves ordinary text with an at sign alone', () => {

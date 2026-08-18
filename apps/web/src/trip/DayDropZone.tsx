@@ -65,9 +65,7 @@ export function DraggableEvent({
 
   return (
     <div ref={setNodeRef} className={cn(isDragging && 'opacity-40')}>
-      {children(
-        disabled ? null : { ...attributes, ...listeners, ref: setActivatorNodeRef },
-      )}
+      {children(disabled ? null : { ...attributes, ...listeners, ref: setActivatorNodeRef })}
     </div>
   );
 }

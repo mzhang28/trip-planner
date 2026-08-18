@@ -16,15 +16,7 @@ const MONTHS = [
   'december',
 ];
 
-const WEEKDAYS = [
-  'sunday',
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-];
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
 export interface ParsedDate {
   /** Midday in the given zone, so a day is identified without a time meaning anything. */

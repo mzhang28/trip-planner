@@ -97,7 +97,9 @@ export function redirectIsSafe(candidate: string): boolean {
     const url = new URL(candidate);
     if (url.protocol === 'https:') return true;
 
-    return url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost');
+    return (
+      url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost')
+    );
   } catch {
     return false;
   }
@@ -243,7 +245,11 @@ export function oauthRoutes() {
       .all();
 
     return c.json({
-      client: { id: client.clientId, name: client.clientName, redirectOrigin: new URL(redirectUri).origin },
+      client: {
+        id: client.clientId,
+        name: client.clientName,
+        redirectOrigin: new URL(redirectUri).origin,
+      },
       scope,
       resource: query.resource,
       trips: mine,
@@ -489,7 +495,10 @@ interface GrantDetails {
   familyId: string;
 }
 
-function issue(c: { var: { services: { db: AppEnv['Variables']['services']['db'] } } }, grant: GrantDetails) {
+function issue(
+  c: { var: { services: { db: AppEnv['Variables']['services']['db'] } } },
+  grant: GrantDetails,
+) {
   const { db } = c.var.services;
   const now = Date.now();
 

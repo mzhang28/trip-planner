@@ -16,9 +16,8 @@ const stopSweep = scheduleSweep(db, docs, blobs);
 
 const app = createApp({ db, docs, blobs });
 
-const server = serve(
-  { fetch: app.fetch, port: config.PORT, hostname: config.HOST },
-  (info) => console.log(`api listening on http://${config.HOST}:${info.port}`),
+const server = serve({ fetch: app.fetch, port: config.PORT, hostname: config.HOST }, (info) =>
+  console.log(`api listening on http://${config.HOST}:${info.port}`),
 );
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

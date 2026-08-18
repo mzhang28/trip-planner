@@ -171,10 +171,7 @@ export function tripRoutes() {
     db.update(tripMembers)
       .set({ lastOpenedAt: Date.now() })
       .where(
-        and(
-          eq(tripMembers.tripId, membership.tripId),
-          eq(tripMembers.userId, membership.userId),
-        ),
+        and(eq(tripMembers.tripId, membership.tripId), eq(tripMembers.userId, membership.userId)),
       )
       .run();
 

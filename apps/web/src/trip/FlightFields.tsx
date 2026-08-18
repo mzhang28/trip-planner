@@ -2,7 +2,14 @@ import type { TransitDetails, TripEvent } from '@trip/crdt';
 import { useState } from 'react';
 import { TextField, cn } from '@trip/ui';
 import { Plane, PlaneLanding, PlaneTakeoff } from 'lucide-react';
-import { clockExample, formatTime, setDay, setTimeOfDay, toDateInput, toTimeInput } from '../lib/time';
+import {
+  clockExample,
+  formatTime,
+  setDay,
+  setTimeOfDay,
+  toDateInput,
+  toTimeInput,
+} from '../lib/time';
 import { AirportPicker } from './AirportPicker';
 import { TimeField } from './TimeField';
 import { RouteCityField, TransitSummary } from './TransitFields';
@@ -35,7 +42,7 @@ function DayField({
         aria-invalid={Boolean(error)}
         className={cn(
           'h-9 w-full rounded-md border bg-card px-2.5 text-ink',
-          'focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+          'focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
           error ? 'border-danger' : 'border-line-input focus:border-accent',
         )}
       />
@@ -442,9 +449,7 @@ export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeT
       </span>
       <span className="flex min-w-0 flex-col text-right">
         <span className="font-medium text-ink">{flight.to ?? '???'}</span>
-        {flight.toCity && (
-          <span className="truncate text-2xs text-ink-muted">{flight.toCity}</span>
-        )}
+        {flight.toCity && <span className="truncate text-2xs text-ink-muted">{flight.toCity}</span>}
       </span>
 
       {shift !== null && shift !== 0 && (
@@ -463,7 +468,13 @@ export function FlightSummary({ event, homeTimezone }: { event: TripEvent; homeT
  * times; every other method gets the plainer from/to line. One component so a
  * caller shows "the journey" without first asking how it is made.
  */
-export function JourneySummary({ event, homeTimezone }: { event: TripEvent; homeTimezone: string }) {
+export function JourneySummary({
+  event,
+  homeTimezone,
+}: {
+  event: TripEvent;
+  homeTimezone: string;
+}) {
   return event.transit?.method === 'flight' ? (
     <FlightSummary event={event} homeTimezone={homeTimezone} />
   ) : (
@@ -484,7 +495,13 @@ function offsetHours(at: number, timeZone: string): number {
   }).formatToParts(at);
 
   const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0');
-  const asIfUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'));
+  const asIfUtc = Date.UTC(
+    get('year'),
+    get('month') - 1,
+    get('day'),
+    get('hour') % 24,
+    get('minute'),
+  );
 
   return Math.round((asIfUtc - at) / 3_600_000);
 }

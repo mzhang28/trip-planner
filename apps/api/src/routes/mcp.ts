@@ -1,7 +1,13 @@
 import { Hono } from 'hono';
 import { config } from '../config';
 import type { AppEnv } from '../context';
-import { renderItinerary, runTool, TOOL_DEFINITIONS, toolSchemas, type ToolName } from '../mcp/server';
+import {
+  renderItinerary,
+  runTool,
+  TOOL_DEFINITIONS,
+  toolSchemas,
+  type ToolName,
+} from '../mcp/server';
 import { verifyAccessToken, type AccessContext } from './oauth';
 import { trips } from '@trip/schema';
 import { eq } from 'drizzle-orm';

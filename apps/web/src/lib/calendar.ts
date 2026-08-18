@@ -82,14 +82,16 @@ export function monthGrid(day: DayKey): DayKey[] {
   const first = `${day.slice(0, 7)}-01`;
   const start = startOfWeek(first);
 
-  const lastDay = new Date(
-    Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 0, 12),
-  )
+  const lastDay = new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 0, 12))
     .toISOString()
     .slice(0, 10);
 
   const cells: DayKey[] = [];
-  for (let cursor = start; cursor <= lastDay || cells.length % 7 !== 0; cursor = addDays(cursor, 1)) {
+  for (
+    let cursor = start;
+    cursor <= lastDay || cells.length % 7 !== 0;
+    cursor = addDays(cursor, 1)
+  ) {
     cells.push(cursor);
     if (cells.length > 42) break;
   }
@@ -120,10 +122,7 @@ export function eventDay(event: TripEvent, homeTimezone: string): DayKey | null 
   return dayKey(event.startsAt, event.timezone ?? homeTimezone);
 }
 
-export function eventsByDay(
-  events: TripEvent[],
-  homeTimezone: string,
-): Map<DayKey, TripEvent[]> {
+export function eventsByDay(events: TripEvent[], homeTimezone: string): Map<DayKey, TripEvent[]> {
   const days = new Map<DayKey, TripEvent[]>();
 
   for (const event of events) {
@@ -159,10 +158,7 @@ export interface Segment {
  * A day with no city carries on the previous one: nobody leaves a city by
  * failing to label a day.
  */
-export function citySegments(
-  byDay: Map<DayKey, TripEvent[]>,
-  days: DayKey[],
-): Segment[] {
+export function citySegments(byDay: Map<DayKey, TripEvent[]>, days: DayKey[]): Segment[] {
   const segments: Segment[] = [];
   let current: Segment | null = null;
   let carried: string | null = null;
@@ -250,9 +246,9 @@ function cityTransitions(events: TripEvent[], homeTimezone: string): CityTransit
 
     const isJourney = event.kind === 'transit';
     const departureZone = isJourney
-      ? event.transit?.departsTz ?? event.timezone ?? homeTimezone
-      : event.timezone ?? homeTimezone;
-    const fromCity = isJourney ? event.transit?.fromCity ?? event.city : event.city;
+      ? (event.transit?.departsTz ?? event.timezone ?? homeTimezone)
+      : (event.timezone ?? homeTimezone);
+    const fromCity = isJourney ? (event.transit?.fromCity ?? event.city) : event.city;
     const toCity = isJourney ? event.transit?.toCity : undefined;
 
     const departure = cityTransition(event.startsAt, departureZone, fromCity, {
@@ -274,7 +270,7 @@ function cityTransitions(events: TripEvent[], homeTimezone: string): CityTransit
     }
 
     const arrivesAt = event.startsAt + event.durationMinutes * 60_000;
-    const arrivalZone = isJourney ? event.transit?.arrivesTz ?? departureZone : departureZone;
+    const arrivalZone = isJourney ? (event.transit?.arrivesTz ?? departureZone) : departureZone;
     const arrival = cityTransition(arrivesAt, arrivalZone, toCity);
     if (arrival) transitions.push(arrival);
   }
@@ -305,17 +301,11 @@ export function cityDaySegments(
   let carried: string | null = null;
   let transitionIndex = 0;
 
-  if (
-    transitions[0]?.carriesBackward &&
-    transitions[0].day >= days[0]!
-  ) {
+  if (transitions[0]?.carriesBackward && transitions[0].day >= days[0]!) {
     carried = transitions[0].label;
   }
 
-  while (
-    transitionIndex < transitions.length &&
-    transitions[transitionIndex]!.day < days[0]!
-  ) {
+  while (transitionIndex < transitions.length && transitions[transitionIndex]!.day < days[0]!) {
     carried = transitions[transitionIndex]!.label;
     transitionIndex += 1;
   }
@@ -412,8 +402,7 @@ export function nightsWithoutLodging(
   // that closes every other one.
   for (let index = 0; index <= days.length; index++) {
     const day = days[index];
-    const empty =
-      day !== undefined && !spans.some((span) => day >= span.from && day <= span.to);
+    const empty = day !== undefined && !spans.some((span) => day >= span.from && day <= span.to);
 
     if (empty && openedAt === null) openedAt = index;
 

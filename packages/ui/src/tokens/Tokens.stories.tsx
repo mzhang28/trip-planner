@@ -59,13 +59,7 @@ function Group({ title, names, theme }: { title: string; names: string[]; theme:
 const SEMANTIC_GROUPS: Array<{ title: string; names: string[] }> = [
   {
     title: 'Surfaces',
-    names: [
-      'surface-page',
-      'surface-card',
-      'surface-raised',
-      'surface-sunken',
-      'surface-inverse',
-    ],
+    names: ['surface-page', 'surface-card', 'surface-raised', 'surface-sunken', 'surface-inverse'],
   },
   {
     title: 'Text',
@@ -130,8 +124,8 @@ export const Primitives: StoryObj = {
     return (
       <div className="max-w-5xl">
         <p className="mb-6 max-w-2xl text-sm text-ink-secondary">
-          The vocabulary the semantic layer draws from. These do not change between themes — the
-          two themes pick different steps of the same ramps.
+          The vocabulary the semantic layer draws from. These do not change between themes — the two
+          themes pick different steps of the same ramps.
         </p>
         {RAMPS.map((ramp) => {
           const steps = [...values.keys()]

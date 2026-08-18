@@ -8,8 +8,10 @@ export interface SegmentedOption<T extends string> {
   short?: string;
 }
 
-export interface SegmentedControlProps<T extends string>
-  extends Omit<RadioGroupProps, 'children' | 'value' | 'onChange'> {
+export interface SegmentedControlProps<T extends string> extends Omit<
+  RadioGroupProps,
+  'children' | 'value' | 'onChange'
+> {
   label: string;
   options: readonly SegmentedOption<T>[];
   value: T;
@@ -64,7 +66,7 @@ export function SegmentedControl<T extends string>({
               'text-ink-muted transition-colors duration-100',
               'data-hovered:text-ink',
               'data-selected:bg-card data-selected:text-ink data-selected:shadow-xs',
-              'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-1',
+              'data-focus-visible:outline-2 data-focus-visible:outline-offset-1 data-focus-visible:outline-focus',
             )}
           >
             {short ?? option.label}

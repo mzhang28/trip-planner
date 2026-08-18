@@ -192,10 +192,7 @@ export function slotForInstant(slots: DaySlot[], at: Instant): DayKey | null {
 }
 
 /** The events of each slot, in the order they happen. */
-export function eventsBySlot(
-  events: TripEvent[],
-  slots: DaySlot[],
-): Map<DayKey, TripEvent[]> {
+export function eventsBySlot(events: TripEvent[], slots: DaySlot[]): Map<DayKey, TripEvent[]> {
   const byDay = new Map<DayKey, TripEvent[]>();
 
   for (const event of events) {

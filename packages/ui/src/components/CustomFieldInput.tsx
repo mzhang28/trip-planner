@@ -42,8 +42,8 @@ export function CustomFieldInput({ def, value, onChange, isDisabled }: CustomFie
       <div className="flex flex-col gap-1">
         <span className="text-xs font-medium text-ink-secondary">{def.label}</span>
         <div className="rounded-md border border-pending bg-pending-soft px-2.5 py-2 text-xs text-pending-text">
-          This was saved as a {value.kind} before the field became a {def.type}. Clear it to enter
-          a new one.
+          This was saved as a {value.kind} before the field became a {def.type}. Clear it to enter a
+          new one.
           <button
             type="button"
             onClick={() => onChange(undefined)}
@@ -86,7 +86,9 @@ export function CustomFieldInput({ def, value, onChange, isDisabled }: CustomFie
     case 'money':
       return (
         <TextField
-          label={def.type === 'money' && def.currency ? `${def.label} (${def.currency})` : def.label}
+          label={
+            def.type === 'money' && def.currency ? `${def.label} (${def.currency})` : def.label
+          }
           description={def.type === 'number' && def.unit ? `In ${def.unit}` : undefined}
           isDisabled={isDisabled}
           inputMode="decimal"
@@ -142,7 +144,7 @@ export function CustomFieldInput({ def, value, onChange, isDisabled }: CustomFie
             className={cn(
               'flex size-4 items-center justify-center rounded-sm border border-line-input',
               'group-data-selected:border-accent group-data-selected:bg-accent',
-              'group-data-focus-visible:outline-focus group-data-focus-visible:outline-2 group-data-focus-visible:outline-offset-1',
+              'group-data-focus-visible:outline-2 group-data-focus-visible:outline-offset-1 group-data-focus-visible:outline-focus',
             )}
           >
             <svg viewBox="0 0 12 12" className="size-3 text-accent-ink" fill="none">
@@ -198,7 +200,7 @@ export function CustomFieldInput({ def, value, onChange, isDisabled }: CustomFie
                   style={coloredSurfaceStyle(option.color)}
                   className={cn(
                     'flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs',
-                    'focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-1',
+                    'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus',
                     option.color
                       ? selected[optionId]
                         ? 'ring-2 ring-current ring-offset-1 ring-offset-card'

@@ -2,21 +2,13 @@ import type { TripEvent } from '@trip/crdt';
 import { StatusSpine, cn, coloredSurfaceStyle } from '@trip/ui';
 import { useDroppable } from '@dnd-kit/core';
 import { ChevronDown, ChevronUp, Plus } from 'lucide-react';
-import {
-  useLayoutEffect,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from 'react';
+import { useLayoutEffect, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { DayKey } from '../lib/calendar';
 import {
   addDays,
   clampDay,
   cityDaySegments,
   daysInRange,
-
   lodgingSpans,
   nightsWithoutLodging,
   spanWithin,
@@ -233,7 +225,7 @@ function WeekLodging({
       }}
       className={cn(
         'min-w-0 rounded-full border border-line-default bg-sunken text-left text-2xs text-ink',
-        'hover:bg-card focus-visible:outline-focus focus-visible:outline-2',
+        'hover:bg-card focus-visible:outline-2 focus-visible:outline-focus',
       )}
     >
       <span
@@ -568,7 +560,7 @@ function AddLodging({
       style={{ gridColumn: column, gridRow: 1 }}
       className={cn(
         '@container min-w-0 rounded-full border border-dotted text-left text-2xs',
-        'focus-visible:outline-focus focus-visible:outline-2',
+        'focus-visible:outline-2 focus-visible:outline-focus',
         // Stronger than the solid bars beside it, because a dotted line of the
         // same weight all but disappears against the page.
         selected
@@ -930,7 +922,8 @@ export function WeekView({
       const bounds = under.getBoundingClientRect();
       const span = windowEnd - windowStart;
       const top = at.clientY - bounds.top - carry!.grab;
-      const minutes = windowStart + Math.round((top / bounds.height) * span / SNAP_MINUTES) * SNAP_MINUTES;
+      const minutes =
+        windowStart + Math.round(((top / bounds.height) * span) / SNAP_MINUTES) * SNAP_MINUTES;
 
       return {
         day: under.dataset.weekColumn,
@@ -1160,45 +1153,45 @@ export function WeekView({
               <RunRows runs={runs} className="pb-1" rail={() => null}>
                 {(run) =>
                   run.days.map(({ day }) => {
-                  const bands = citiesByDay.get(day) ?? [];
-                  const previousCity = citiesByDay.get(addDays(day, -1))?.at(-1)?.label;
+                    const bands = citiesByDay.get(day) ?? [];
+                    const previousCity = citiesByDay.get(addDays(day, -1))?.at(-1)?.label;
 
-                  return (
-                    <div
-                      key={day}
-                      data-week-city-day={day}
-                      className="flex min-h-5 min-w-0 overflow-hidden rounded-sm text-2xs font-medium"
-                    >
-                      {bands.map((band) => {
-                        const namesThisBand =
-                          band.fromMinute > 0 || day === tripStart || previousCity !== band.label;
+                    return (
+                      <div
+                        key={day}
+                        data-week-city-day={day}
+                        className="flex min-h-5 min-w-0 overflow-hidden rounded-sm text-2xs font-medium"
+                      >
+                        {bands.map((band) => {
+                          const namesThisBand =
+                            band.fromMinute > 0 || day === tripStart || previousCity !== band.label;
 
-                        return (
-                          <div
-                            key={`${band.label}:${band.fromMinute}`}
-                            data-testid="week-city-band"
-                            data-city={band.label}
-                            data-from-minute={band.fromMinute}
-                            data-to-minute={band.toMinute}
-                            style={{
-                              flexBasis: 0,
-                              flexGrow: band.toMinute - band.fromMinute,
-                              ...coloredSurfaceStyle(cityColors?.[band.label]),
-                            }}
-                            className={cn(
-                              'min-w-0 truncate px-1 py-0.5',
-                              cityColors?.[band.label]
-                                ? undefined
-                                : 'bg-accent-soft text-accent-text',
-                            )}
-                          >
-                            {namesThisBand ? band.label : '\u00a0'}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })
+                          return (
+                            <div
+                              key={`${band.label}:${band.fromMinute}`}
+                              data-testid="week-city-band"
+                              data-city={band.label}
+                              data-from-minute={band.fromMinute}
+                              data-to-minute={band.toMinute}
+                              style={{
+                                flexBasis: 0,
+                                flexGrow: band.toMinute - band.fromMinute,
+                                ...coloredSurfaceStyle(cityColors?.[band.label]),
+                              }}
+                              className={cn(
+                                'min-w-0 truncate px-1 py-0.5',
+                                cityColors?.[band.label]
+                                  ? undefined
+                                  : 'bg-accent-soft text-accent-text',
+                              )}
+                            >
+                              {namesThisBand ? band.label : '\u00a0'}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })
                 }
               </RunRows>
             )}
@@ -1228,81 +1221,79 @@ export function WeekView({
             >
               {(run) =>
                 run.days.map((slot) => {
-                const { day } = slot;
-                const forecast = weather.get(day);
-                const glyph = forecast ? weatherGlyph(forecast.code) : null;
+                  const { day } = slot;
+                  const forecast = weather.get(day);
+                  const glyph = forecast ? weatherGlyph(forecast.code) : null;
 
-                return (
-                  <div
-                    key={day}
-                    data-week-day={day}
-                    className="group/day relative min-w-0 bg-card px-1.5 py-2 text-center"
-                  >
-                    {/*
+                  return (
+                    <div
+                      key={day}
+                      data-week-day={day}
+                      className="group/day relative min-w-0 bg-card px-1.5 py-2 text-center"
+                    >
+                      {/*
                       Where the trip moves, said on the day it moves. A zone set
                       here holds from this morning on, so a trip whose flights
                       are not all typed in can still be told where it is -- once
                       per leg rather than once per day.
                     */}
-                    {!readOnly && (
-                      <span
-                        className={cn(
-                          'absolute top-0.5 right-0.5 z-10 flex min-w-0 items-center',
-                          // Hidden until asked for. The run's rail already says
-                          // which clock these days are on, and a chip sitting
-                          // over every date would cover the dates to repeat it.
-                          'opacity-0 transition-opacity group-hover/day:opacity-100 focus-within:opacity-100',
-                        )}
-                      >
-                        <ZoneTag
-                          zone={slot.zone}
-                          at={slot.startsAt}
-                          overridden={slot.overridden}
-                          readOnly={false}
-                          onChange={(timezone) => onSetDayZone(day, timezone)}
-                        />
-                      </span>
-                    )}
-                    <div
-                      className={cn(
-                        'text-2xs',
-                        day === today ? 'font-semibold text-now-text' : 'text-ink-muted',
-                      )}
-                    >
-                      {new Intl.DateTimeFormat('en-GB', {
-                        weekday: 'short',
-                        timeZone: 'UTC',
-                      }).format(Date.parse(`${day}T12:00:00Z`))}
-                    </div>
-                    <div
-                      className={cn(
-                        'tabular text-sm',
-                        day === today ? 'font-semibold text-now-text' : 'text-ink',
-                      )}
-                    >
-                      {Number(day.slice(8))}
-                    </div>
-                    {glyph && forecast && (
-                      <div
-                        className="truncate text-2xs text-ink-muted"
-                        title={
-                          forecast.place ? `${glyph.label} in ${forecast.place}` : glyph.label
-                        }
-                      >
-                        <span aria-hidden="true">{glyph.icon}</span>{' '}
-                        <span className="tabular hidden sm:inline">
-                          {Math.round(forecast.max)}°/{Math.round(forecast.min)}°
+                      {!readOnly && (
+                        <span
+                          className={cn(
+                            'absolute top-0.5 right-0.5 z-10 flex min-w-0 items-center',
+                            // Hidden until asked for. The run's rail already says
+                            // which clock these days are on, and a chip sitting
+                            // over every date would cover the dates to repeat it.
+                            'opacity-0 transition-opacity group-hover/day:opacity-100 focus-within:opacity-100',
+                          )}
+                        >
+                          <ZoneTag
+                            zone={slot.zone}
+                            at={slot.startsAt}
+                            overridden={slot.overridden}
+                            readOnly={false}
+                            onChange={(timezone) => onSetDayZone(day, timezone)}
+                          />
                         </span>
-                        {/* Which city these numbers are for. A trip moves, and
-                            a temperature with no place on it is a guess. */}
-                        {forecast.place && (
-                          <span className="sr-only"> in {forecast.place}</span>
+                      )}
+                      <div
+                        className={cn(
+                          'text-2xs',
+                          day === today ? 'font-semibold text-now-text' : 'text-ink-muted',
                         )}
+                      >
+                        {new Intl.DateTimeFormat('en-GB', {
+                          weekday: 'short',
+                          timeZone: 'UTC',
+                        }).format(Date.parse(`${day}T12:00:00Z`))}
                       </div>
-                    )}
-                  </div>
-                );
-              })
+                      <div
+                        className={cn(
+                          'tabular text-sm',
+                          day === today ? 'font-semibold text-now-text' : 'text-ink',
+                        )}
+                      >
+                        {Number(day.slice(8))}
+                      </div>
+                      {glyph && forecast && (
+                        <div
+                          className="truncate text-2xs text-ink-muted"
+                          title={
+                            forecast.place ? `${glyph.label} in ${forecast.place}` : glyph.label
+                          }
+                        >
+                          <span aria-hidden="true">{glyph.icon}</span>{' '}
+                          <span className="tabular hidden sm:inline">
+                            {Math.round(forecast.max)}°/{Math.round(forecast.min)}°
+                          </span>
+                          {/* Which city these numbers are for. A trip moves, and
+                            a temperature with no place on it is a guess. */}
+                          {forecast.place && <span className="sr-only"> in {forecast.place}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               }
             </RunRows>
 
@@ -1322,42 +1313,42 @@ export function WeekView({
               >
                 {(run) =>
                   run.days.map(({ day }) => (
-                  <div key={day} className="flex min-w-0 flex-col gap-0.5 bg-page p-0.5">
-                    {creating?.day === day && creating.start === undefined && (
-                      <InlineEventDraft
-                        name={creating.name}
-                        onChange={(name) =>
-                          setCreating((current) => (current ? { ...current, name } : current))
-                        }
-                        onCommit={commitCreation}
-                        onCancel={() => setCreating(null)}
-                      />
-                    )}
-                    {(untimed.get(day) ?? []).map((event) => (
-                      <button
-                        key={event.id}
-                        type="button"
-                        data-testid="week-untimed-event"
-                        onClick={() => onOpenEvent(event.id)}
-                        style={coloredSurfaceStyle(event.color)}
-                        className="flex gap-1 overflow-hidden rounded-sm border border-dashed border-line bg-card px-1 py-0.5 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
-                      >
-                        <StatusSpine status={event.booking.status} />
-                        <EventKindIcon
-                          kind={event.kind}
-                          className="size-3 shrink-0 text-ink-muted"
+                    <div key={day} className="flex min-w-0 flex-col gap-0.5 bg-page p-0.5">
+                      {creating?.day === day && creating.start === undefined && (
+                        <InlineEventDraft
+                          name={creating.name}
+                          onChange={(name) =>
+                            setCreating((current) => (current ? { ...current, name } : current))
+                          }
+                          onCommit={commitCreation}
+                          onCancel={() => setCreating(null)}
                         />
-                        <span
-                          className={cn(
-                            'min-w-0 flex-1 truncate text-xs',
-                            event.name ? 'text-ink' : 'text-ink-placeholder italic',
-                          )}
+                      )}
+                      {(untimed.get(day) ?? []).map((event) => (
+                        <button
+                          key={event.id}
+                          type="button"
+                          data-testid="week-untimed-event"
+                          onClick={() => onOpenEvent(event.id)}
+                          style={coloredSurfaceStyle(event.color)}
+                          className="flex gap-1 overflow-hidden rounded-sm border border-dashed border-line bg-card px-1 py-0.5 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus"
                         >
-                          {event.name || 'Unnamed'}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                          <StatusSpine status={event.booking.status} />
+                          <EventKindIcon
+                            kind={event.kind}
+                            className="size-3 shrink-0 text-ink-muted"
+                          />
+                          <span
+                            className={cn(
+                              'min-w-0 flex-1 truncate text-xs',
+                              event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                            )}
+                          >
+                            {event.name || 'Unnamed'}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   ))
                 }
               </RunRows>
@@ -1375,9 +1366,7 @@ export function WeekView({
               'min-h-0 rounded-b-lg border-x border-b border-line',
               displaySettings.weekFitToView && 'flex-1',
             )}
-            style={
-              displaySettings.weekFitToView ? undefined : { height: timetableHeight }
-            }
+            style={displaySettings.weekFitToView ? undefined : { height: timetableHeight }}
           >
             <RunRows
               runs={runs}
@@ -1400,7 +1389,7 @@ export function WeekView({
                           : (hour - displaySettings.weekStartHour) * HOUR_HEIGHT,
                       }}
                       className={cn(
-                        'absolute right-2 tabular',
+                        'tabular absolute right-2',
                         hour === displaySettings.weekEndHour
                           ? '-translate-y-full'
                           : '-translate-y-1/2',
@@ -1414,202 +1403,202 @@ export function WeekView({
             >
               {(run) =>
                 run.days.map(({ day, zone }) => {
-                const positioned = positionEvents(
-                  calendarByDay.get(day) ?? [],
-                  columnZone(zone),
-                  windowStart,
-                  windowEnd,
-                  displaySettings.weekFitToView,
-                );
+                  const positioned = positionEvents(
+                    calendarByDay.get(day) ?? [],
+                    columnZone(zone),
+                    windowStart,
+                    windowEnd,
+                    displaySettings.weekFitToView,
+                  );
 
-                return (
-                  <DayColumn
-                    key={day}
-                    day={day}
-                    disabled={readOnly}
-                    selected={false}
-                    /*
+                  return (
+                    <DayColumn
+                      key={day}
+                      day={day}
+                      disabled={readOnly}
+                      selected={false}
+                      /*
                       One band, whether it is a time being dragged out or an
                       event being carried onto this day. They cannot happen at
                       once -- a press either lands on a card or on the sheet --
                       and both answer the same question about where a thing
                       would go.
                     */
-                    band={landing(
-                      selecting && selecting.day === day
-                        ? { start: selecting.start, end: selecting.end }
-                        : carry?.travelled && carry.day === day
-                          ? { start: carry.minutes, end: carry.minutes + carry.length }
-                          : null,
-                    )}
-                    onStart={(minutes) => {
-                      setCreating(null);
-                      setDrag({ day, from: minutes, to: minutes });
-                    }}
-                    onMove={(minutes) =>
-                      setDrag((current) =>
-                        current && current.day === day ? { ...current, to: minutes } : current,
-                      )
-                    }
-                    onFinish={finishDrag}
-                    onAdd={() => setCreating({ day, name: '' })}
-                    windowStart={windowStart}
-                    windowEnd={windowEnd}
-                    fitToView={displaySettings.weekFitToView}
-                  >
-                    {positioned.map(
-                      ({ event, top, height, column, columns, outsideBefore, outsideAfter }) => (
-                        <button
-                          key={event.id}
-                          type="button"
-                          data-testid="week-event"
-                          data-event-id={event.id}
-                          onClick={() => {
-                            // The release that ended a drag also fires a click.
-                            // Moving the event was the whole gesture; opening it
-                            // as well would bury the move under an editor.
-                            if (dropped.current) {
-                              dropped.current = false;
-                              return;
-                            }
-                            onOpenEvent(event.id);
-                          }}
-                          /*
-                           * A mouse may carry an event to another time. A finger
-                           * may not: dragging a card and scrolling the week are
-                           * the same gesture, and taking it for a move would
-                           * make a week of events unscrollable. Opening the
-                           * event and editing its time still works there.
-                           */
-                          onPointerDown={(e) => {
-                            if (readOnly || e.pointerType === 'touch') return;
-                            if (event.startsAt === undefined) return;
+                      band={landing(
+                        selecting && selecting.day === day
+                          ? { start: selecting.start, end: selecting.end }
+                          : carry?.travelled && carry.day === day
+                            ? { start: carry.minutes, end: carry.minutes + carry.length }
+                            : null,
+                      )}
+                      onStart={(minutes) => {
+                        setCreating(null);
+                        setDrag({ day, from: minutes, to: minutes });
+                      }}
+                      onMove={(minutes) =>
+                        setDrag((current) =>
+                          current && current.day === day ? { ...current, to: minutes } : current,
+                        )
+                      }
+                      onFinish={finishDrag}
+                      onAdd={() => setCreating({ day, name: '' })}
+                      windowStart={windowStart}
+                      windowEnd={windowEnd}
+                      fitToView={displaySettings.weekFitToView}
+                    >
+                      {positioned.map(
+                        ({ event, top, height, column, columns, outsideBefore, outsideAfter }) => (
+                          <button
+                            key={event.id}
+                            type="button"
+                            data-testid="week-event"
+                            data-event-id={event.id}
+                            onClick={() => {
+                              // The release that ended a drag also fires a click.
+                              // Moving the event was the whole gesture; opening it
+                              // as well would bury the move under an editor.
+                              if (dropped.current) {
+                                dropped.current = false;
+                                return;
+                              }
+                              onOpenEvent(event.id);
+                            }}
+                            /*
+                             * A mouse may carry an event to another time. A finger
+                             * may not: dragging a card and scrolling the week are
+                             * the same gesture, and taking it for a move would
+                             * make a week of events unscrollable. Opening the
+                             * event and editing its time still works there.
+                             */
+                            onPointerDown={(e) => {
+                              if (readOnly || e.pointerType === 'touch') return;
+                              if (event.startsAt === undefined) return;
 
-                            const card = e.currentTarget.getBoundingClientRect();
-                            const startsAtMinutes = minutesSinceMidnight(
-                              event.startsAt,
-                              columnZone(zone),
-                            );
+                              const card = e.currentTarget.getBoundingClientRect();
+                              const startsAtMinutes = minutesSinceMidnight(
+                                event.startsAt,
+                                columnZone(zone),
+                              );
 
-                            setDrag(null);
-                            setCarry({
-                              id: event.id,
-                              name: event.name,
-                              confirmed: event.booking.status === 'booked',
-                              day,
-                              minutes: startsAtMinutes,
-                              from: { day, minutes: startsAtMinutes },
-                              length: Math.max(
-                                SNAP_MINUTES,
-                                event.durationMinutes ?? DEFAULT_EVENT_MINUTES,
-                              ),
-                              grab: e.clientY - card.top,
-                              travelled: false,
-                            });
-                          }}
-                          style={{
-                            ...coloredSurfaceStyle(event.color),
-                            top,
-                            height,
-                            left: `calc(${(column / columns) * 100}% + 2px)`,
-                            width: `calc(${100 / columns}% - 4px)`,
-                          }}
-                          className={cn(
-                            'week-event-card absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2',
-                            // A cut edge, so a pinned event does not read as one that
-                            // really starts or ends at the hour it is resting on.
-                            outsideBefore && 'border-t-ink-muted [border-top-style:dashed]',
-                            outsideAfter && 'border-b-ink-muted [border-bottom-style:dashed]',
-                            !readOnly && 'cursor-grab',
-                            // Left where it was, faded, while its shadow shows
-                            // where it would land. Hiding it would make the week
-                            // reflow around a gap that is about to be filled.
-                            carry?.id === event.id && carry.travelled && 'opacity-40',
-                          )}
-                        >
-                          <StatusSpine status={event.booking.status} />
-                          <span className="week-event-content min-w-0 flex-1">
-                            {event.startsAt !== undefined && (
-                              <span className="week-event-time tabular flex items-center gap-0.5 text-2xs text-ink-muted">
-                                {outsideBefore && (
-                                  <ChevronUp aria-hidden="true" className="size-3" />
-                                )}
-                                {formatTime(
-                                  event.startsAt,
-                                  displayZone(event.timezone, homeTimezone),
-                                )}
-                                {/*
+                              setDrag(null);
+                              setCarry({
+                                id: event.id,
+                                name: event.name,
+                                confirmed: event.booking.status === 'booked',
+                                day,
+                                minutes: startsAtMinutes,
+                                from: { day, minutes: startsAtMinutes },
+                                length: Math.max(
+                                  SNAP_MINUTES,
+                                  event.durationMinutes ?? DEFAULT_EVENT_MINUTES,
+                                ),
+                                grab: e.clientY - card.top,
+                                travelled: false,
+                              });
+                            }}
+                            style={{
+                              ...coloredSurfaceStyle(event.color),
+                              top,
+                              height,
+                              left: `calc(${(column / columns) * 100}% + 2px)`,
+                              width: `calc(${100 / columns}% - 4px)`,
+                            }}
+                            className={cn(
+                              'week-event-card absolute flex gap-1.5 overflow-hidden rounded-sm border border-line bg-card px-1 py-1 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus',
+                              // A cut edge, so a pinned event does not read as one that
+                              // really starts or ends at the hour it is resting on.
+                              outsideBefore && '[border-top-style:dashed] border-t-ink-muted',
+                              outsideAfter && '[border-bottom-style:dashed] border-b-ink-muted',
+                              !readOnly && 'cursor-grab',
+                              // Left where it was, faded, while its shadow shows
+                              // where it would land. Hiding it would make the week
+                              // reflow around a gap that is about to be filled.
+                              carry?.id === event.id && carry.travelled && 'opacity-40',
+                            )}
+                          >
+                            <StatusSpine status={event.booking.status} />
+                            <span className="week-event-content min-w-0 flex-1">
+                              {event.startsAt !== undefined && (
+                                <span className="week-event-time tabular flex items-center gap-0.5 text-2xs text-ink-muted">
+                                  {outsideBefore && (
+                                    <ChevronUp aria-hidden="true" className="size-3" />
+                                  )}
+                                  {formatTime(
+                                    event.startsAt,
+                                    displayZone(event.timezone, homeTimezone),
+                                  )}
+                                  {/*
                                   Named only where it differs from the column
                                   it is drawn in. A flight out of Tokyo keeps
                                   its 09:00 in a column that is on another
                                   clock, and without the tag that reads as an
                                   event three hours from where it is drawn.
                                 */}
-                                {foreignZone(event, zone) && (
-                                  <span className="text-ink-muted">
-                                    {timeZoneAbbreviation(
-                                      event.startsAt,
-                                      displayZone(event.timezone, homeTimezone),
-                                    )}
-                                  </span>
-                                )}
-                                {outsideAfter && !outsideBefore && (
-                                  <ChevronDown aria-hidden="true" className="size-3" />
-                                )}
-                                {(outsideBefore || outsideAfter) && (
-                                  <span className="sr-only">
-                                    {outsideBefore
-                                      ? ', earlier than the hours shown'
-                                      : ', later than the hours shown'}
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                            <span
-                              data-testid="week-event-name"
-                              className="week-event-name flex min-w-0 items-center gap-1"
-                            >
-                              <EventKindIcon
-                                kind={event.kind}
-                                className="size-3 shrink-0 text-ink-muted"
-                              />
+                                  {foreignZone(event, zone) && (
+                                    <span className="text-ink-muted">
+                                      {timeZoneAbbreviation(
+                                        event.startsAt,
+                                        displayZone(event.timezone, homeTimezone),
+                                      )}
+                                    </span>
+                                  )}
+                                  {outsideAfter && !outsideBefore && (
+                                    <ChevronDown aria-hidden="true" className="size-3" />
+                                  )}
+                                  {(outsideBefore || outsideAfter) && (
+                                    <span className="sr-only">
+                                      {outsideBefore
+                                        ? ', earlier than the hours shown'
+                                        : ', later than the hours shown'}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
                               <span
-                                className={cn(
-                                  'truncate text-xs',
-                                  event.name ? 'text-ink' : 'text-ink-placeholder italic',
-                                )}
+                                data-testid="week-event-name"
+                                className="week-event-name flex min-w-0 items-center gap-1"
                               >
-                                {event.name || 'Unnamed'}
+                                <EventKindIcon
+                                  kind={event.kind}
+                                  className="size-3 shrink-0 text-ink-muted"
+                                />
+                                <span
+                                  className={cn(
+                                    'truncate text-xs',
+                                    event.name ? 'text-ink' : 'text-ink-placeholder italic',
+                                  )}
+                                >
+                                  {event.name || 'Unnamed'}
+                                </span>
                               </span>
                             </span>
-                          </span>
-                        </button>
-                      ),
-                    )}
-                    {creating?.day === day &&
-                      creating.start !== undefined &&
-                      creating.end !== undefined && (
-                        <InlineEventDraft
-                          name={creating.name}
-                          onChange={(name) =>
-                            setCreating((current) => (current ? { ...current, name } : current))
-                          }
-                          onCommit={commitCreation}
-                          onCancel={() => setCreating(null)}
-                          className="absolute inset-x-0.5"
-                          style={{
-                            top: displaySettings.weekFitToView
-                              ? `${((creating.start - windowStart) / (windowEnd - windowStart)) * 100}%`
-                              : (creating.start - windowStart) * MINUTE_HEIGHT,
-                            height: displaySettings.weekFitToView
-                              ? `max(30px, calc(${((creating.end - creating.start) / (windowEnd - windowStart)) * 100}% - 2px))`
-                              : Math.max(30, (creating.end - creating.start) * MINUTE_HEIGHT - 2),
-                          }}
-                        />
+                          </button>
+                        ),
                       )}
-                  </DayColumn>
-                );
-              })
+                      {creating?.day === day &&
+                        creating.start !== undefined &&
+                        creating.end !== undefined && (
+                          <InlineEventDraft
+                            name={creating.name}
+                            onChange={(name) =>
+                              setCreating((current) => (current ? { ...current, name } : current))
+                            }
+                            onCommit={commitCreation}
+                            onCancel={() => setCreating(null)}
+                            className="absolute inset-x-0.5"
+                            style={{
+                              top: displaySettings.weekFitToView
+                                ? `${((creating.start - windowStart) / (windowEnd - windowStart)) * 100}%`
+                                : (creating.start - windowStart) * MINUTE_HEIGHT,
+                              height: displaySettings.weekFitToView
+                                ? `max(30px, calc(${((creating.end - creating.start) / (windowEnd - windowStart)) * 100}% - 2px))`
+                                : Math.max(30, (creating.end - creating.start) * MINUTE_HEIGHT - 2),
+                            }}
+                          />
+                        )}
+                    </DayColumn>
+                  );
+                })
               }
             </RunRows>
           </div>

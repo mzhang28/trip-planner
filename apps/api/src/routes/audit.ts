@@ -76,7 +76,9 @@ export function auditRoutes() {
     if (!current) return c.json({ error: 'no_such_trip' }, 404);
 
     const args = JSON.parse(entry.argsJson) as { eventId?: string };
-    const before = entry.beforeJson ? (JSON.parse(entry.beforeJson) as Record<string, unknown>) : null;
+    const before = entry.beforeJson
+      ? (JSON.parse(entry.beforeJson) as Record<string, unknown>)
+      : null;
 
     let next = current;
 
@@ -88,12 +90,9 @@ export function auditRoutes() {
 
       next = deleteEvent(current, id, { userId: membership.userId });
     } else if (args.eventId && before) {
-      next = updateEvent(
-        current,
-        args.eventId,
-        before as Partial<EditableEventFields>,
-        { userId: membership.userId },
-      );
+      next = updateEvent(current, args.eventId, before as Partial<EditableEventFields>, {
+        userId: membership.userId,
+      });
     } else {
       return c.json({ error: 'nothing_to_undo' }, 409);
     }

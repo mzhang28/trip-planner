@@ -9,7 +9,13 @@ import type { Context } from 'hono';
 import { logger } from 'hono/logger';
 import { config } from './config';
 import type { AppEnv, Services } from './context';
-import { closeRegistration, isAdmin, openRegistration, registrationIsOpen, renameUser } from './identity';
+import {
+  closeRegistration,
+  isAdmin,
+  openRegistration,
+  registrationIsOpen,
+  renameUser,
+} from './identity';
 import { requireMembership, requireSession, withIdentity, withServices } from './middleware';
 import { airportRoutes } from './routes/airports';
 import { archiveRoutes } from './routes/archive';
@@ -169,7 +175,7 @@ export function createApp(services: Services) {
    * Uploading is guarded by trip membership when the client says which trip it
    * is for. Reading is not: a blob is named by its own hash, so knowing the
    * name is already knowing the contents.
-  */
+   */
   app.route('/api/airports', airportRoutes());
   app.route('/api/blobs', blobRoutes());
   // Handing out credentials is not something a request that arrived without a

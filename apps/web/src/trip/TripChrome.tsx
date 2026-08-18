@@ -75,7 +75,9 @@ export function TripChrome({
           collapsed ? 'w-14' : 'w-52',
         )}
       >
-        <div className={cn('flex h-14 items-center border-b border-line', collapsed ? 'px-2' : 'px-3')}>
+        <div
+          className={cn('flex h-14 items-center border-b border-line', collapsed ? 'px-2' : 'px-3')}
+        >
           <Link
             to="/"
             title={collapsed ? 'All trips' : undefined}
@@ -116,7 +118,7 @@ export function TripChrome({
                   'flex h-9 items-center gap-2.5 rounded-md px-2 text-sm transition-colors',
                   collapsed && 'justify-center',
                   active
-                    ? 'bg-accent-soft font-medium text-accent-strong'
+                    ? 'text-accent-strong bg-accent-soft font-medium'
                     : 'text-ink-secondary hover:bg-sunken hover:text-ink',
                 )}
               >
@@ -131,7 +133,7 @@ export function TripChrome({
           type="button"
           onClick={toggle}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="m-2 flex h-9 items-center justify-center rounded-md text-ink-muted hover:bg-sunken hover:text-ink focus-visible:outline-focus focus-visible:outline-2"
+          className="m-2 flex h-9 items-center justify-center rounded-md text-ink-muted hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
         >
           {collapsed ? (
             <ChevronRight aria-hidden="true" className="size-4" />

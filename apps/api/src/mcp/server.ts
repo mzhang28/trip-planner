@@ -47,9 +47,7 @@ const instant = z.union([z.number().int(), z.string()]).transform((value, ctx) =
  * the traveller reads it, so it carries no time and no zone. YYYY-MM-DD is the
  * form the document stores and the app shows.
  */
-const isoDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'a date as YYYY-MM-DD');
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'a date as YYYY-MM-DD');
 
 /**
  * A transit journey's own fields, all optional, none of them times.
@@ -239,7 +237,10 @@ export const TOOL_DEFINITIONS = [
   { name: 'list_trips', description: 'Trips this client was granted.' },
   { name: 'list_events', description: 'Events on a trip, earliest first.' },
   { name: 'get_event', description: 'Everything about one event.' },
-  { name: 'search_events', description: 'Find events by any of their text, including custom fields.' },
+  {
+    name: 'search_events',
+    description: 'Find events by any of their text, including custom fields.',
+  },
   { name: 'create_event', description: 'Add an event. Only a name is required.' },
   {
     name: 'update_event',
@@ -251,18 +252,20 @@ export const TOOL_DEFINITIONS = [
   { name: 'add_link', description: 'Attach a web address to an event.' },
   {
     name: 'add_todo',
-    description: "Add a to-do to an event. The event's to-dos come back in get_event and list_events.",
+    description:
+      "Add a to-do to an event. The event's to-dos come back in get_event and list_events.",
   },
   {
     name: 'update_todo',
-    description: 'Change a to-do: its text, whether it is done, or its deadline. Needs the todoId from the event.',
+    description:
+      'Change a to-do: its text, whether it is done, or its deadline. Needs the todoId from the event.',
   },
   { name: 'remove_todo', description: 'Delete a to-do from an event.' },
   { name: 'list_field_defs', description: "The trip's custom fields." },
   {
     name: 'list_files',
     description:
-      "Files on a trip: tickets, confirmations, scans. Each carries a link you can fetch to read it.",
+      'Files on a trip: tickets, confirmations, scans. Each carries a link you can fetch to read it.',
   },
 ] as const;
 
@@ -323,7 +326,11 @@ export const toolSchemas = {
 
 export type ToolName = keyof typeof toolSchemas;
 
-export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown): Promise<unknown> {
+export async function runTool(
+  ctx: ToolContext,
+  name: ToolName,
+  rawArgs: unknown,
+): Promise<unknown> {
   const args = toolSchemas[name].parse(rawArgs ?? {});
   const { db, docs } = ctx.services;
 
@@ -389,9 +396,13 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
 
       const eventId = `e_${token(12)}`;
       withDoc(ctx, a.tripId, (doc) => {
-        let next = addEvent(doc as never, { id: eventId, name: a.name, kind: a.kind }, {
-          userId: ctx.access.userId,
-        });
+        let next = addEvent(
+          doc as never,
+          { id: eventId, name: a.name, kind: a.kind },
+          {
+            userId: ctx.access.userId,
+          },
+        );
         if (a.city || a.startsAt !== undefined || a.timezone) {
           next = updateEvent(
             next,
@@ -441,7 +452,10 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
        * caller nor the stored value does, it is the unspecific one.
        */
       if (a.transit !== undefined) {
-        const merged = { ...describeTransit(existing.transit ?? { method: 'other' }), ...a.transit };
+        const merged = {
+          ...describeTransit(existing.transit ?? { method: 'other' }),
+          ...a.transit,
+        };
         if (merged.method === undefined) merged.method = 'other';
         patch.transit = merged;
       }
@@ -457,8 +471,10 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
         ]),
       );
 
-      withDoc(ctx, a.tripId, (d) =>
-        updateEvent(d as never, a.eventId, patch, { userId: ctx.access.userId }) as never,
+      withDoc(
+        ctx,
+        a.tripId,
+        (d) => updateEvent(d as never, a.eventId, patch, { userId: ctx.access.userId }) as never,
       );
 
       record(ctx, a.tripId, name, a, before, `Changed “${existing.name}”`);
@@ -473,8 +489,10 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       const existing = doc?.events[a.eventId];
       if (!existing) throw new Error('No such event');
 
-      withDoc(ctx, a.tripId, (d) =>
-        deleteEvent(d as never, a.eventId, { userId: ctx.access.userId }) as never,
+      withDoc(
+        ctx,
+        a.tripId,
+        (d) => deleteEvent(d as never, a.eventId, { userId: ctx.access.userId }) as never,
       );
 
       record(ctx, a.tripId, name, a, { deletedAt: undefined }, `Deleted “${existing.name}”`);
@@ -492,13 +510,16 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       const before = { booking: { ...existing.booking } };
       const status = a.status === 'confirmed' ? 'booked' : 'idea';
 
-      withDoc(ctx, a.tripId, (d) =>
-        updateEvent(
-          d as never,
-          a.eventId,
-          { booking: { ...existing.booking, status, note: a.note } },
-          { userId: ctx.access.userId },
-        ) as never,
+      withDoc(
+        ctx,
+        a.tripId,
+        (d) =>
+          updateEvent(
+            d as never,
+            a.eventId,
+            { booking: { ...existing.booking, status, note: a.note } },
+            { userId: ctx.access.userId },
+          ) as never,
       );
 
       record(
@@ -517,10 +538,19 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       authorize(ctx, a.tripId, true);
 
       const linkId = `l_${token(12)}`;
-      withDoc(ctx, a.tripId, (d) =>
-        addLink(d as never, a.eventId, linkId, { url: a.url, title: a.title }, {
-          userId: ctx.access.userId,
-        }) as never,
+      withDoc(
+        ctx,
+        a.tripId,
+        (d) =>
+          addLink(
+            d as never,
+            a.eventId,
+            linkId,
+            { url: a.url, title: a.title },
+            {
+              userId: ctx.access.userId,
+            },
+          ) as never,
       );
 
       record(ctx, a.tripId, name, a, undefined, `Added a link`);
@@ -536,10 +566,19 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       if (!existing || existing.deletedAt !== undefined) throw new Error('No such event');
 
       const todoId = `todo_${token(12)}`;
-      withDoc(ctx, a.tripId, (d) =>
-        addTodo(d as never, a.eventId, todoId, { text: a.text, deadline: a.deadline }, {
-          userId: ctx.access.userId,
-        }) as never,
+      withDoc(
+        ctx,
+        a.tripId,
+        (d) =>
+          addTodo(
+            d as never,
+            a.eventId,
+            todoId,
+            { text: a.text, deadline: a.deadline },
+            {
+              userId: ctx.access.userId,
+            },
+          ) as never,
       );
 
       // The whole to-do map as it was, which undo writes back over the event's
@@ -547,7 +586,14 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       // per-tool undo path is generic, so `before` has to be a set of event
       // fields, and `todos` is one; a bare list of changed to-do fields would be
       // written onto the event as stray keys instead.
-      record(ctx, a.tripId, name, a, { todos: existing.todos ?? {} }, `Added a to-do to “${existing.name}”`);
+      record(
+        ctx,
+        a.tripId,
+        name,
+        a,
+        { todos: existing.todos ?? {} },
+        `Added a to-do to “${existing.name}”`,
+      );
       return { todoId };
     }
 
@@ -569,13 +615,25 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
 
       if (Object.keys(patch).length === 0) return { ok: true, changed: 0 };
 
-      withDoc(ctx, a.tripId, (d) =>
-        updateTodo(d as never, a.eventId, a.todoId, patch, { userId: ctx.access.userId }) as never,
+      withDoc(
+        ctx,
+        a.tripId,
+        (d) =>
+          updateTodo(d as never, a.eventId, a.todoId, patch, {
+            userId: ctx.access.userId,
+          }) as never,
       );
 
       // The map as it was, so undo restores this to-do's old fields. See add_todo
       // for why undo takes a set of event fields rather than to-do fields.
-      record(ctx, a.tripId, name, a, { todos: existing.todos ?? {} }, `Changed a to-do on “${existing.name}”`);
+      record(
+        ctx,
+        a.tripId,
+        name,
+        a,
+        { todos: existing.todos ?? {} },
+        `Changed a to-do on “${existing.name}”`,
+      );
       return { ok: true };
     }
 
@@ -588,13 +646,22 @@ export async function runTool(ctx: ToolContext, name: ToolName, rawArgs: unknown
       const todo = existing?.todos?.[a.todoId];
       if (!existing || !todo) throw new Error('No such to-do');
 
-      withDoc(ctx, a.tripId, (d) =>
-        removeTodo(d as never, a.eventId, a.todoId, { userId: ctx.access.userId }) as never,
+      withDoc(
+        ctx,
+        a.tripId,
+        (d) => removeTodo(d as never, a.eventId, a.todoId, { userId: ctx.access.userId }) as never,
       );
 
       // The map with the to-do still in it, so undo puts it back whole -- its id,
       // its text, and when it was added.
-      record(ctx, a.tripId, name, a, { todos: existing.todos ?? {} }, `Removed a to-do from “${existing.name}”`);
+      record(
+        ctx,
+        a.tripId,
+        name,
+        a,
+        { todos: existing.todos ?? {} },
+        `Removed a to-do from “${existing.name}”`,
+      );
       return { ok: true };
     }
 
@@ -707,9 +774,7 @@ export function renderItinerary(doc: TripDoc, tripName: string, homeTimezone: st
     lines.push(`## ${day}`, '');
     for (const event of dayEvents.sort((a, b) => (a.startsAt ?? 0) - (b.startsAt ?? 0))) {
       const time =
-        event.startsAt === undefined
-          ? 'No time yet'
-          : isoInZone(event.startsAt, zoneOf(event));
+        event.startsAt === undefined ? 'No time yet' : isoInZone(event.startsAt, zoneOf(event));
 
       const status = normalizeBookingStatus(event.booking.status);
       lines.push(`- **${time}** ${event.name} — ${BOOKING_STATUS_LABEL[status]}`);

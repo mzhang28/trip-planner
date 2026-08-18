@@ -126,10 +126,7 @@ export function placesByDay(
  * Beyond the forecast horizon there is nothing to show and nothing is shown: a
  * made-up number for a date three months out would look exactly like a real one.
  */
-export function useWeather(
-  events: TripEvent[],
-  homeTimezone: string,
-): Map<DayKey, DailyWeather> {
+export function useWeather(events: TripEvent[], homeTimezone: string): Map<DayKey, DailyWeather> {
   const [bySpot, setBySpot] = useState<Map<string, DailyWeather[]>>(new Map());
 
   const { daySpots, spots } = useMemo(

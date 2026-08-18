@@ -149,7 +149,7 @@ describe('uploading through the API', () => {
      */
     const response = await asMe(`/api/blobs/${wrong}`, { method: 'PUT', body: bytes });
     expect(response.status).toBe(400);
-    expect(((await response.json()) as { error: string }).error).toBe("hash_mismatch");
+    expect(((await response.json()) as { error: string }).error).toBe('hash_mismatch');
 
     expect((await asMe(`/api/blobs/${wrong}`)).status).toBe(404);
   });

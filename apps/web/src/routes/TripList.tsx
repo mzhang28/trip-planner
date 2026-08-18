@@ -278,10 +278,7 @@ export function TripList() {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {trips?.map((trip) => (
             <Card key={trip.id}>
-              <Link
-                to={`/t/${trip.id}`}
-                className="flex flex-col gap-1 px-3 py-3 hover:bg-sunken"
-              >
+              <Link to={`/t/${trip.id}`} className="flex flex-col gap-1 px-3 py-3 hover:bg-sunken">
                 <span className="flex items-baseline justify-between gap-3">
                   <span className="min-w-0 truncate font-medium">{trip.name}</span>
                   <span className="shrink-0 text-2xs text-ink-muted">{trip.role}</span>

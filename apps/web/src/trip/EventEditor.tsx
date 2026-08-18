@@ -130,7 +130,6 @@ export function EventEditor({
   const [linkTitle, setLinkTitle] = useState('');
   const [linkError, setLinkError] = useState<string | null>(null);
 
-
   const applicable = fieldDefs.filter(
     (def) => !def.appliesTo || def.appliesTo.includes(event.kind),
   );
@@ -176,7 +175,7 @@ export function EventEditor({
                 }}
                 className={cn(
                   'h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-ink',
-                  'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                  'focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
                 )}
               />
             </label>
@@ -386,7 +385,7 @@ export function EventEditor({
                       type="button"
                       aria-label={`Remove ${link.title ?? link.url}`}
                       onClick={() => onRemoveLink(linkId)}
-                      className="text-ink-muted hover:text-danger focus-visible:outline-focus focus-visible:outline-2"
+                      className="text-ink-muted hover:text-danger focus-visible:outline-2 focus-visible:outline-focus"
                     >
                       <Trash2 aria-hidden="true" className="size-3.5" />
                     </button>
@@ -587,7 +586,7 @@ export function EventEditor({
                     }}
                     className={cn(
                       'h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-ink',
-                      'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                      'focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
                     )}
                   />
                 </label>
@@ -618,7 +617,7 @@ export function EventEditor({
                     }}
                     className={cn(
                       'h-9 w-full rounded-md border bg-card px-2.5 text-ink',
-                      'focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                      'focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
                       wrongWayRound ? 'border-danger' : 'border-line-input focus:border-accent',
                     )}
                   />
@@ -779,7 +778,7 @@ export function EventEditor({
                 'absolute -top-1 -right-1 rounded-full border border-line bg-card p-1',
                 'text-ink-muted shadow-xs',
                 'opacity-0 transition-opacity group-hover/field:opacity-100',
-                'focus-visible:opacity-100 focus-visible:outline-focus focus-visible:outline-2',
+                'focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-focus',
                 'hover:border-danger hover:text-danger',
                 '[@media(hover:none)]:opacity-100',
               )}

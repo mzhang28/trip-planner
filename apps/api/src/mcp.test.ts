@@ -145,7 +145,9 @@ describe('the remote MCP server', () => {
   it('publishes both discovery documents', async () => {
     const resource = await app.request('/.well-known/oauth-protected-resource');
     expect(resource.status).toBe(200);
-    expect(((await resource.json()) as { authorization_servers: string[] }).authorization_servers).toHaveLength(1);
+    expect(
+      ((await resource.json()) as { authorization_servers: string[] }).authorization_servers,
+    ).toHaveLength(1);
 
     const server = await app.request('/.well-known/oauth-authorization-server');
     const metadata = (await server.json()) as Record<string, string[]>;
@@ -451,7 +453,7 @@ describe('the remote MCP server', () => {
     expect(event.endsAt).toBe(Date.parse('2026-08-21T13:39:00-07:00'));
   });
 
-  it('lists a trip\'s files, and the link it hands back fetches the bytes', async () => {
+  it("lists a trip's files, and the link it hands back fetches the bytes", async () => {
     const { accessToken, tripId } = await connect();
 
     // A file the way the app stores one: bytes under their own hash, and an
@@ -471,7 +473,13 @@ describe('the remote MCP server', () => {
       before,
       eventId,
       'a_1',
-      { blobHash: hash, filename: 'confirmation.pdf', mime: 'application/pdf', size: bytes.length, addedAt: Date.now() },
+      {
+        blobHash: hash,
+        filename: 'confirmation.pdf',
+        mime: 'application/pdf',
+        size: bytes.length,
+        addedAt: Date.now(),
+      },
       { userId: 'u1', now: Date.now() },
     );
     docs.commit(tripId, after, A.getChanges(before, after), 'u1');
@@ -521,7 +529,13 @@ describe('the remote MCP server', () => {
       before,
       eventId,
       'a_1',
-      { blobHash: hash, filename: 'ticket.pdf', mime: 'application/pdf', size: bytes.length, addedAt: Date.now() },
+      {
+        blobHash: hash,
+        filename: 'ticket.pdf',
+        mime: 'application/pdf',
+        size: bytes.length,
+        addedAt: Date.now(),
+      },
       { userId: 'u1', now: Date.now() },
     );
     docs.commit(tripId, after, A.getChanges(before, after), 'u1');
@@ -659,7 +673,12 @@ describe('the OAuth server', () => {
     return res.body.clientId as string;
   }
 
-  async function authorize(browser: Browser, clientId: string, challenge: string, tripIds: string[]) {
+  async function authorize(
+    browser: Browser,
+    clientId: string,
+    challenge: string,
+    tripIds: string[],
+  ) {
     const consent = await browser.request('/oauth/authorize/consent', {
       method: 'POST',
       body: JSON.stringify({
@@ -1150,7 +1169,9 @@ describe('the OAuth server', () => {
     const stranger = new Browser(app);
     await stranger.request('/api/me');
     expect((await stranger.request('/api/clients')).body.clients).toEqual([]);
-    expect((await stranger.request(`/api/clients/${clientId}`, { method: 'DELETE' })).status).toBe(404);
+    expect((await stranger.request(`/api/clients/${clientId}`, { method: 'DELETE' })).status).toBe(
+      404,
+    );
 
     expect((await mine.request(`/api/clients/${clientId}`, { method: 'DELETE' })).status).toBe(200);
     expect((await mine.request('/api/clients')).body.clients).toEqual([]);
@@ -1180,7 +1201,9 @@ describe('the OAuth server', () => {
     const accessToken = token.body.access_token as string;
     expect((await rpc(app, accessToken, 'tools/list')).status).toBe(200);
 
-    expect((await browser.request(`/api/clients/${clientId}`, { method: 'DELETE' })).status).toBe(200);
+    expect((await browser.request(`/api/clients/${clientId}`, { method: 'DELETE' })).status).toBe(
+      200,
+    );
 
     /*
      * Nothing on the MCP path reads the client table, so deleting the row alone
@@ -1494,7 +1517,11 @@ describe('undoing what an agent did', () => {
       }),
     });
 
-    return { browser, tripId: trip.body.id as string, accessToken: token.body.access_token as string };
+    return {
+      browser,
+      tripId: trip.body.id as string,
+      accessToken: token.body.access_token as string,
+    };
   }
 
   it('puts back the value an agent replaced, and says who did it', async () => {
@@ -1574,7 +1601,9 @@ describe('undoing what an agent did', () => {
     });
 
     const log = await browser.request(`/api/audit/${tripId}`);
-    await browser.request(`/api/audit/${tripId}/${log.body.entries[0].id}/undo`, { method: 'POST' });
+    await browser.request(`/api/audit/${tripId}/${log.body.entries[0].id}/undo`, {
+      method: 'POST',
+    });
 
     const events = await rpc(app, accessToken, 'tools/call', {
       name: 'list_events',

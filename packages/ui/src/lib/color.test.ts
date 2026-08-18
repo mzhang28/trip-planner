@@ -51,7 +51,9 @@ describe('default color palette', () => {
     for (const color of DEFAULT_COLOR_PALETTE) {
       expect(contrastBetween(color.boldDark, DARK_PAGE), color.name).toBeGreaterThanOrEqual(3);
       expect(contrastBetween(color.boldDark, DARK_CARD), color.name).toBeGreaterThanOrEqual(3);
-      expect(contrastBetween(color.boldDark, color.mutedDark), color.name).toBeGreaterThanOrEqual(2);
+      expect(contrastBetween(color.boldDark, color.mutedDark), color.name).toBeGreaterThanOrEqual(
+        2,
+      );
     }
   });
 
@@ -69,10 +71,9 @@ describe('default color palette', () => {
       // A surface stays close to the sheet it sits on, in either direction.
       expect(onWhite, `${color.name} muted`).toBeLessThan(2);
       expect(onDark, `${color.name} mutedDark`).toBeLessThan(3);
-      expect(
-        contrastBetween(color.boldDark, DARK_PAGE)!,
-        `${color.name} boldDark`,
-      ).toBeGreaterThan(contrastBetween(color.bold, DARK_PAGE)!);
+      expect(contrastBetween(color.boldDark, DARK_PAGE)!, `${color.name} boldDark`).toBeGreaterThan(
+        contrastBetween(color.bold, DARK_PAGE)!,
+      );
     }
   });
 

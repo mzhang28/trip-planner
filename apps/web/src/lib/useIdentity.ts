@@ -12,9 +12,7 @@ export interface Identity {
 export class RegistrationClosed extends Error {}
 
 export type IdentityState =
-  | { status: 'loading' }
-  | { status: 'ready'; identity: Identity }
-  | { status: 'closed' };
+  { status: 'loading' } | { status: 'ready'; identity: Identity } | { status: 'closed' };
 
 let pending: Promise<Identity> | null = null;
 

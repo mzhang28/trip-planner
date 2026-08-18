@@ -154,78 +154,81 @@ const fieldDef = z.object({
   deletedAt: instant.optional(),
 });
 
-const tripEvent = z.preprocess(migrateLegacyEvent, z.object({
-  id: z.string(),
-  kind: eventKind,
-  name: z.string(),
-  color: z.string().optional(),
-  city: z.string().optional(),
-  location: place.optional(),
-  startsAt: instant.optional(),
-  timeUndecided: z.boolean().optional(),
-  timezone: z.string().optional(),
-  durationMinutes: z.number().optional(),
-  transitIn: z
-    .object({ minutes: z.number(), mode: transitMode, note: z.string().optional() })
-    .optional(),
-  booking: z.object({
-    /*
-     * Taken as any string and mapped, the same as a document arriving from an
-     * old replica. An archive written before `in_progress` was removed is a
-     * real thing someone may still have on disk, and it describes a trip that
-     * is otherwise perfectly readable.
-     */
-    status: z.unknown().transform(normalizeBookingStatus),
-    note: z.string().optional(),
-    confirmationCode: z.string().optional(),
-  }),
-  description: z.string().optional(),
-  links: z.record(
-    z.string(),
-    z.object({ url: z.string(), title: z.string().optional(), addedAt: instant }),
-  ),
-  attachments: z.record(z.string(), tripFile),
-  todos: z
-    .record(
+const tripEvent = z.preprocess(
+  migrateLegacyEvent,
+  z.object({
+    id: z.string(),
+    kind: eventKind,
+    name: z.string(),
+    color: z.string().optional(),
+    city: z.string().optional(),
+    location: place.optional(),
+    startsAt: instant.optional(),
+    timeUndecided: z.boolean().optional(),
+    timezone: z.string().optional(),
+    durationMinutes: z.number().optional(),
+    transitIn: z
+      .object({ minutes: z.number(), mode: transitMode, note: z.string().optional() })
+      .optional(),
+    booking: z.object({
+      /*
+       * Taken as any string and mapped, the same as a document arriving from an
+       * old replica. An archive written before `in_progress` was removed is a
+       * real thing someone may still have on disk, and it describes a trip that
+       * is otherwise perfectly readable.
+       */
+      status: z.unknown().transform(normalizeBookingStatus),
+      note: z.string().optional(),
+      confirmationCode: z.string().optional(),
+    }),
+    description: z.string().optional(),
+    links: z.record(
       z.string(),
-      z.object({
-        text: z.string(),
-        completed: z.boolean(),
-        deadline: z.string().optional(),
-        addedAt: instant,
-      }),
-    )
-    .optional(),
-  customFields: z.record(z.string(), customValue),
-  transit: z
-    .object({
-      method: transitMethod,
-      operator: z.string().optional(),
-      number: z.string().optional(),
-      from: z.string().optional(),
-      to: z.string().optional(),
-      fromCity: z.string().optional(),
-      toCity: z.string().optional(),
-      departsTz: z.string().optional(),
-      arrivesTz: z.string().optional(),
-      seat: z.string().optional(),
-      terminal: z.string().optional(),
-      gate: z.string().optional(),
-      platform: z.string().optional(),
-      coach: z.string().optional(),
-    })
-    .optional(),
-  lodging: z
-    .object({
-      checkIn: instant.optional(),
-      checkOut: instant.optional(),
-      address: z.string().optional(),
-    })
-    .optional(),
-  deletedAt: instant.optional(),
-  updatedAt: instant,
-  updatedBy: z.string(),
-}));
+      z.object({ url: z.string(), title: z.string().optional(), addedAt: instant }),
+    ),
+    attachments: z.record(z.string(), tripFile),
+    todos: z
+      .record(
+        z.string(),
+        z.object({
+          text: z.string(),
+          completed: z.boolean(),
+          deadline: z.string().optional(),
+          addedAt: instant,
+        }),
+      )
+      .optional(),
+    customFields: z.record(z.string(), customValue),
+    transit: z
+      .object({
+        method: transitMethod,
+        operator: z.string().optional(),
+        number: z.string().optional(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+        fromCity: z.string().optional(),
+        toCity: z.string().optional(),
+        departsTz: z.string().optional(),
+        arrivesTz: z.string().optional(),
+        seat: z.string().optional(),
+        terminal: z.string().optional(),
+        gate: z.string().optional(),
+        platform: z.string().optional(),
+        coach: z.string().optional(),
+      })
+      .optional(),
+    lodging: z
+      .object({
+        checkIn: instant.optional(),
+        checkOut: instant.optional(),
+        address: z.string().optional(),
+      })
+      .optional(),
+    deletedAt: instant.optional(),
+    updatedAt: instant,
+    updatedBy: z.string(),
+  }),
+);
 
 export const tripDocSchema = z.object({
   meta: z.object({

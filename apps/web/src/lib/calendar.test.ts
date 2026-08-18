@@ -390,10 +390,7 @@ describe('which day a trip opens on', () => {
   const TODAY = '2026-08-14';
 
   it('opens on today when something is happening today', () => {
-    const byDay = [
-      event({ startsAt: at('2026-08-10') }),
-      event({ startsAt: at('2026-08-14') }),
-    ];
+    const byDay = [event({ startsAt: at('2026-08-10') }), event({ startsAt: at('2026-08-14') })];
     expect(openingDay(byDay, TOKYO, TODAY)).toBe(TODAY);
   });
 

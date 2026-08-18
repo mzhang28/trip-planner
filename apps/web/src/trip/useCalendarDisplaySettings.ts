@@ -19,9 +19,9 @@ const listeners = new Set<() => void>();
 
 function read(): CalendarDisplaySettings {
   try {
-    const value = JSON.parse(localStorage.getItem(KEY) ?? 'null') as
-      | Partial<CalendarDisplaySettings>
-      | null;
+    const value = JSON.parse(
+      localStorage.getItem(KEY) ?? 'null',
+    ) as Partial<CalendarDisplaySettings> | null;
     const start = value?.weekStartHour;
     const end = value?.weekEndHour;
     if (
@@ -69,5 +69,9 @@ export function setCalendarDisplaySettings(next: CalendarDisplaySettings): void 
 }
 
 export function useCalendarDisplaySettings(): CalendarDisplaySettings {
-  return useSyncExternalStore(subscribe, () => settings, () => DEFAULT);
+  return useSyncExternalStore(
+    subscribe,
+    () => settings,
+    () => DEFAULT,
+  );
 }

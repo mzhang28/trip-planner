@@ -29,8 +29,10 @@ describe.each(themes)('%s theme', (theme) => {
       expect(bg, `--${background} is not defined`).toBeDefined();
 
       const ratio = contrastBetween(fg!, bg!);
-      expect(ratio, `--${foreground} (${fg}) or --${background} (${bg}) is not an opaque colour`)
-        .not.toBeNull();
+      expect(
+        ratio,
+        `--${foreground} (${fg}) or --${background} (${bg}) is not an opaque colour`,
+      ).not.toBeNull();
 
       // Reported to two places so a failure says how far off it is.
       expect(Number(ratio!.toFixed(2))).toBeGreaterThanOrEqual(minRatio);
@@ -55,9 +57,10 @@ describe('token hygiene', () => {
       const { values, references } = resolveTokens(primitivesCss, semanticCss, theme);
       for (const name of references.keys()) {
         expect(values.has(name), `--${name} does not resolve in the ${theme} theme`).toBe(true);
-        expect(values.get(name), `--${name} still contains a var() in the ${theme} theme`).not.toMatch(
-          /var\(/,
-        );
+        expect(
+          values.get(name),
+          `--${name} still contains a var() in the ${theme} theme`,
+        ).not.toMatch(/var\(/);
       }
     }
   });

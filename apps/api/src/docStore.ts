@@ -102,7 +102,10 @@ export class DocStore {
       .all();
 
     if (pending.length > 0) {
-      doc = A.applyChanges(doc, pending.map((p) => new Uint8Array(p.change)))[0];
+      doc = A.applyChanges(
+        doc,
+        pending.map((p) => new Uint8Array(p.change)),
+      )[0];
     }
 
     const beforeNormalization = doc;

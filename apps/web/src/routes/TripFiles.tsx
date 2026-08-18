@@ -12,13 +12,7 @@ import { useUploadFlush } from '../trip/Attachments';
 import { isPending, subscribeUploadQueue } from '../trip/uploads';
 import { useTripState, useTripStore } from '../trip/useTrip';
 
-function FileRow({
-  file,
-  eventNames,
-}: {
-  file: TripFile;
-  eventNames: string[];
-}) {
+function FileRow({ file, eventNames }: { file: TripFile; eventNames: string[] }) {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -95,10 +89,7 @@ export function TripFiles() {
   useEffect(load, [load]);
   useUploadFlush();
 
-  const files = useMemo(
-    () => tripFiles(doc).sort((a, b) => b.addedAt - a.addedAt),
-    [doc],
-  );
+  const files = useMemo(() => tripFiles(doc).sort((a, b) => b.addedAt - a.addedAt), [doc]);
 
   const usage = useMemo(() => {
     const byHash = new Map<string, Map<string, string>>();
@@ -166,9 +157,7 @@ export function TripFiles() {
         {!readOnly ? (
           <div className="mb-8">
             <FileDropZone
-              onUploaded={(file) =>
-                store?.change((current) => addTripFile(current, file))
-              }
+              onUploaded={(file) => store?.change((current) => addTripFile(current, file))}
             />
           </div>
         ) : trip?.role === 'viewer' ? (

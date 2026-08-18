@@ -38,7 +38,7 @@ export function Button({ variant = 'secondary', size = 'md', className, ...props
         'transition-colors duration-100',
         // Only set when focus arrived by keyboard, so pointer users never see a
         // ring and keyboard users always do.
-        'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-2',
+        'data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-focus',
         'data-disabled:cursor-not-allowed data-disabled:opacity-45',
         VARIANTS[variant],
         SIZES[size],

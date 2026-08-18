@@ -37,8 +37,7 @@ export function DayNavigator({ view, anchor, tripStart, tripEnd, onChange }: Day
   const step = view === 'month' ? 28 : view === 'week' ? 7 : 1;
   const display = useCalendarDisplaySettings();
   const bounded = view === 'week' && tripStart && tripEnd;
-  const move = (day: DayKey) =>
-    onChange(bounded ? clampDay(day, tripStart, tripEnd) : day);
+  const move = (day: DayKey) => onChange(bounded ? clampDay(day, tripStart, tripEnd) : day);
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -75,7 +74,7 @@ export function DayNavigator({ view, anchor, tripStart, tripEnd, onChange }: Day
               'h-7 w-33 rounded-none border border-line-default bg-card px-2 text-xs text-ink',
               // Above its neighbours, so a focused field's ring is not clipped
               // by the button sitting on top of its edge.
-              'focus:relative focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+              'focus:relative focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
             )}
           />
         </label>
@@ -94,7 +93,7 @@ export function DayNavigator({ view, anchor, tripStart, tripEnd, onChange }: Day
 
       {view === 'week' && (
         <details className="relative">
-          <summary className="h-7 cursor-pointer rounded-md border border-line-input bg-card px-2 text-xs leading-7 text-ink hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2">
+          <summary className="h-7 cursor-pointer rounded-md border border-line-input bg-card px-2 text-xs leading-7 text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus">
             Display
           </summary>
           {/*

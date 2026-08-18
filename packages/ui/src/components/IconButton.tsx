@@ -42,7 +42,7 @@ export function IconButton({
       className={cn(
         'relative inline-flex cursor-pointer items-center justify-center rounded-md',
         'transition-colors duration-100 [&_svg]:size-4',
-        'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-2',
+        'data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-focus',
         'data-disabled:cursor-not-allowed data-disabled:opacity-45',
         VARIANTS[variant],
         SIZES[size],

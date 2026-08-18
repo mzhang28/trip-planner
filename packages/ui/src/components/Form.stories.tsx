@@ -25,7 +25,11 @@ export const Fields: Story = {
         value=""
         errorMessage="Give the event a name. Everything else can wait."
       />
-      <TextField label="Notes" multiline placeholder="Bring cash, the tea house has no card reader" />
+      <TextField
+        label="Notes"
+        multiline
+        placeholder="Bring cash, the tea house has no card reader"
+      />
       <TextField label="Trip name" value="Japan, April" isDisabled />
     </div>
   ),

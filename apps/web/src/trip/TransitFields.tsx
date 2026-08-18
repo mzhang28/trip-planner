@@ -3,9 +3,9 @@ import { ColorPicker, SegmentedControl, TextField } from '@trip/ui';
 import { ArrowRight } from 'lucide-react';
 import { EventKindIcon, TRANSIT_METHOD_LABEL } from './EventKind';
 
-const METHOD_OPTIONS = (
-  ['flight', 'train', 'bus', 'car', 'ferry', 'other'] as const
-).map((value) => ({ value, label: TRANSIT_METHOD_LABEL[value] }));
+const METHOD_OPTIONS = (['flight', 'train', 'bus', 'car', 'ferry', 'other'] as const).map(
+  (value) => ({ value, label: TRANSIT_METHOD_LABEL[value] }),
+);
 
 /** Picks how a journey is made. A flight is one method among the rest now. */
 export function TransitMethodPicker({

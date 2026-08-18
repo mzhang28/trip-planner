@@ -75,7 +75,9 @@ describe('search', () => {
 
   it('offers actions by what they do rather than only by their name', () => {
     const hits = run('invite');
-    expect(hits.some((hit) => hit.kind === 'command' && hit.label === 'Share this trip')).toBe(true);
+    expect(hits.some((hit) => hit.kind === 'command' && hit.label === 'Share this trip')).toBe(
+      true,
+    );
   });
 
   it('returns nothing for an empty query rather than everything', () => {

@@ -47,7 +47,7 @@ export function FieldPalette({ chips, onAdd, collapsedCount = 6 }: FieldPaletteP
             'inline-flex items-center gap-1 rounded-full border border-line-default px-2 py-0.5',
             'text-2xs text-ink-secondary',
             'hover:border-accent hover:bg-accent-soft hover:text-accent-text',
-            'focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-1',
+            'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus',
           )}
         >
           <Plus aria-hidden="true" className="size-3" />
@@ -60,7 +60,7 @@ export function FieldPalette({ chips, onAdd, collapsedCount = 6 }: FieldPaletteP
           type="button"
           data-testid="expand-palette"
           onClick={() => setExpanded(true)}
-          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs text-ink-muted hover:text-ink focus-visible:outline-focus focus-visible:outline-2"
+          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
         >
           …and {hidden} more
           <ChevronDown aria-hidden="true" className="size-3" />
@@ -71,7 +71,7 @@ export function FieldPalette({ chips, onAdd, collapsedCount = 6 }: FieldPaletteP
         <button
           type="button"
           onClick={() => setExpanded(false)}
-          className="rounded-full px-2 py-0.5 text-2xs text-ink-muted hover:text-ink focus-visible:outline-focus focus-visible:outline-2"
+          className="rounded-full px-2 py-0.5 text-2xs text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-focus"
         >
           Show fewer
         </button>

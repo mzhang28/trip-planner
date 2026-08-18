@@ -2,7 +2,15 @@ import type { Decorator, Preview } from '@storybook/react-vite';
 import type { ReactNode } from 'react';
 import './storybook.css';
 
-function ThemePane({ theme, label, children }: { theme: string; label?: string; children: ReactNode }) {
+function ThemePane({
+  theme,
+  label,
+  children,
+}: {
+  theme: string;
+  label?: string;
+  children: ReactNode;
+}) {
   return (
     <div data-theme={theme} className="flex-1 bg-page p-6 text-ink">
       {label && (

@@ -146,9 +146,12 @@ export function Attachments({ event, doc, onAdd, onRemove }: AttachmentsProps) {
                           attach(file);
                           setOpen(false);
                         }}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2 focus-visible:-outline-offset-1"
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-sunken focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-focus"
                       >
-                        <Paperclip aria-hidden="true" className="size-3.5 shrink-0 text-ink-muted" />
+                        <Paperclip
+                          aria-hidden="true"
+                          className="size-3.5 shrink-0 text-ink-muted"
+                        />
                         <span className="min-w-0 flex-1 truncate text-xs text-ink">
                           {file.filename}
                         </span>
@@ -159,7 +162,9 @@ export function Attachments({ event, doc, onAdd, onRemove }: AttachmentsProps) {
                     </li>
                   ))}
                   {reusable.length === 0 && (
-                    <li className="px-2 py-3 text-center text-xs text-ink-muted">No files match.</li>
+                    <li className="px-2 py-3 text-center text-xs text-ink-muted">
+                      No files match.
+                    </li>
                   )}
                 </ul>
               </>
@@ -201,7 +206,11 @@ export function Attachments({ event, doc, onAdd, onRemove }: AttachmentsProps) {
                     onClick={() => void retry()}
                     className="shrink-0 text-2xs text-accent-text underline underline-offset-2"
                   >
-                    {busy ? <Loader2 aria-label="Sending" className="size-3 animate-spin" /> : 'Send now'}
+                    {busy ? (
+                      <Loader2 aria-label="Sending" className="size-3 animate-spin" />
+                    ) : (
+                      'Send now'
+                    )}
                   </button>
                 </>
               )}
@@ -209,7 +218,7 @@ export function Attachments({ event, doc, onAdd, onRemove }: AttachmentsProps) {
                 type="button"
                 aria-label={`Remove ${attachment.filename}`}
                 onClick={() => onRemove(id)}
-                className="shrink-0 text-ink-muted hover:text-danger focus-visible:outline-focus focus-visible:outline-2"
+                className="shrink-0 text-ink-muted hover:text-danger focus-visible:outline-2 focus-visible:outline-focus"
               >
                 <Trash2 aria-hidden="true" className="size-3.5" />
               </button>

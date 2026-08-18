@@ -23,7 +23,9 @@ const noon = Date.UTC(2026, 7, 14, 12, 0);
 
 describe('checkTransit', () => {
   it('says nothing when no journey has been recorded', () => {
-    expect(checkTransit(event({ startsAt: noon }), event({ startsAt: noon - 60 * MINUTE }))).toBeNull();
+    expect(
+      checkTransit(event({ startsAt: noon }), event({ startsAt: noon - 60 * MINUTE })),
+    ).toBeNull();
   });
 
   it('warns when the journey does not fit the gap', () => {
@@ -98,7 +100,9 @@ describe('checkTransit', () => {
 
 describe('describeTransit', () => {
   it('names the way of getting there', () => {
-    expect(describeTransit(event({ transitIn: { minutes: 20, mode: 'walk' } }))).toBe('Walk 20 min');
+    expect(describeTransit(event({ transitIn: { minutes: 20, mode: 'walk' } }))).toBe(
+      'Walk 20 min',
+    );
     expect(describeTransit(event({ transitIn: { minutes: 45, mode: 'transit' } }))).toBe(
       'Train or bus 45 min',
     );

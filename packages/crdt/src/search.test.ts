@@ -58,7 +58,13 @@ describe('eventSearchText', () => {
         transitIn: { minutes: 20, mode: 'walk', note: 'uphill the whole way' },
         links: { l1: { url: 'https://inari.jp', title: 'Official site', addedAt: 0 } },
         attachments: {
-          a1: { blobHash: 'x', filename: 'tickets.pdf', mime: 'application/pdf', size: 1, addedAt: 0 },
+          a1: {
+            blobHash: 'x',
+            filename: 'tickets.pdf',
+            mime: 'application/pdf',
+            size: 1,
+            addedAt: 0,
+          },
         },
       }),
     );

@@ -146,7 +146,10 @@ export function AirportPicker({ label, code, city, timezone, onChange }: Airport
 
   return (
     <div className="relative min-w-0">
-      <label htmlFor={id} className="mb-1 block text-2xs font-medium tracking-wide text-ink-muted uppercase">
+      <label
+        htmlFor={id}
+        className="mb-1 block text-2xs font-medium tracking-wide text-ink-muted uppercase"
+      >
         {label}
       </label>
 
@@ -196,7 +199,7 @@ export function AirportPicker({ label, code, city, timezone, onChange }: Airport
           className={cn(
             'h-12 w-full rounded-md border border-line-input bg-card pr-3 pl-9 font-mono text-lg font-medium tracking-wide text-ink',
             'placeholder:font-sans placeholder:text-sm placeholder:font-normal placeholder:tracking-normal placeholder:text-ink-placeholder',
-            'focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+            'focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
           )}
         />
       </div>

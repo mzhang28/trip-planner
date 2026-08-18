@@ -78,7 +78,7 @@ export function CoordinatesPicker({
         className={cn(
           'flex h-7 shrink-0 items-center gap-1 rounded-sm border border-line bg-sunken px-1.5',
           'text-2xs text-ink-secondary hover:border-line-strong hover:bg-raised',
-          'focus-visible:outline-focus focus-visible:outline-2',
+          'focus-visible:outline-2 focus-visible:outline-focus',
         )}
         {...getReferenceProps()}
       >
@@ -123,7 +123,7 @@ export function CoordinatesPicker({
                   }}
                   className={cn(
                     'mt-1 h-9 w-full rounded-md border bg-card px-2.5 font-mono text-sm text-ink',
-                    'placeholder:text-ink-placeholder focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                    'placeholder:text-ink-placeholder focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
                     error ? 'border-danger' : 'border-line-input focus:border-accent',
                   )}
                 />

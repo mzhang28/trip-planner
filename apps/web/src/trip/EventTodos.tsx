@@ -34,7 +34,10 @@ export function EventTodos({
       {entries.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {entries.map(([id, todo]) => (
-            <li key={id} className="flex flex-wrap items-center gap-2 rounded-md bg-sunken px-2 py-1.5">
+            <li
+              key={id}
+              className="flex flex-wrap items-center gap-2 rounded-md bg-sunken px-2 py-1.5"
+            >
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <label>
                   <span className="sr-only">
@@ -58,7 +61,7 @@ export function EventTodos({
                   }}
                   className={cn(
                     'h-7 min-w-32 flex-1 rounded-sm border border-transparent bg-transparent px-1 text-xs text-ink',
-                    'hover:border-line-input focus:border-accent focus:bg-card focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                    'hover:border-line-input focus:border-accent focus:bg-card focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
                     todo.completed && 'text-ink-muted line-through',
                   )}
                 />
@@ -73,7 +76,7 @@ export function EventTodos({
                   onChange={(event) =>
                     onUpdate(id, { deadline: event.currentTarget.value || undefined })
                   }
-                  className="h-7 rounded-sm border border-line-input bg-card px-1.5 text-2xs text-ink focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1"
+                  className="h-7 rounded-sm border border-line-input bg-card px-1.5 text-2xs text-ink focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus"
                 />
               </label>
 
@@ -81,7 +84,7 @@ export function EventTodos({
                 type="button"
                 aria-label={`Remove todo: ${todo.text}`}
                 onClick={() => onRemove(id)}
-                className="text-ink-muted hover:text-danger focus-visible:outline-focus focus-visible:outline-2"
+                className="text-ink-muted hover:text-danger focus-visible:outline-2 focus-visible:outline-focus"
               >
                 <Trash2 aria-hidden="true" className="size-3.5" />
               </button>
@@ -104,7 +107,7 @@ export function EventTodos({
             value={text}
             placeholder="Book the airport transfer"
             onChange={(event) => setText(event.currentTarget.value)}
-            className="mt-1 h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-sm text-ink placeholder:text-ink-placeholder focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1"
+            className="mt-1 h-9 w-full rounded-md border border-line-input bg-card px-2.5 text-sm text-ink placeholder:text-ink-placeholder focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus"
           />
         </label>
         <label className="text-2xs font-medium text-ink-secondary">
@@ -113,7 +116,7 @@ export function EventTodos({
             type="date"
             value={deadline}
             onChange={(event) => setDeadline(event.currentTarget.value)}
-            className="mt-1 block h-9 rounded-md border border-line-input bg-card px-2.5 text-sm text-ink focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1"
+            className="mt-1 block h-9 rounded-md border border-line-input bg-card px-2.5 text-sm text-ink focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus"
           />
         </label>
         <Button type="submit" size="sm" isDisabled={!text.trim()} className="mb-1">

@@ -20,7 +20,9 @@ export const oauthClients = sqliteTable(
     clientName: text('client_name').notNull(),
     /** JSON array. Matched exactly, so an open redirect cannot be constructed. */
     redirectUris: text('redirect_uris').notNull(),
-    tokenEndpointAuthMethod: text('token_endpoint_auth_method').notNull().$type<'none' | 'client_secret_post' | 'client_secret_basic'>(),
+    tokenEndpointAuthMethod: text('token_endpoint_auth_method')
+      .notNull()
+      .$type<'none' | 'client_secret_post' | 'client_secret_basic'>(),
     /** Who made it, and so who can see it listed and take it away again. */
     ownerUserId: text('owner_user_id').references(() => users.id, { onDelete: 'cascade' }),
     createdAt: integer('created_at').notNull(),

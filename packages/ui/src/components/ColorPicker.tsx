@@ -20,7 +20,7 @@ export function ColorPicker({ value, onChange, label, isDisabled }: ColorPickerP
         style={coloredSurfaceStyle(value)}
         className={cn(
           'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full border',
-          'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-2',
+          'data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-focus',
           'data-disabled:cursor-not-allowed data-disabled:opacity-45',
           value ? 'border-transparent' : 'border-line-default bg-card text-ink-muted',
         )}
@@ -56,7 +56,7 @@ export function ColorPicker({ value, onChange, label, isDisabled }: ColorPickerP
                       className={cn(
                         'flex size-6 cursor-pointer items-center justify-center rounded-full border-2',
                         'data-hovered:scale-110 data-pressed:scale-95',
-                        'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-2',
+                        'data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-focus',
                       )}
                     >
                       {selected && <Check aria-hidden="true" className="size-3.5" />}
@@ -73,7 +73,7 @@ export function ColorPicker({ value, onChange, label, isDisabled }: ColorPickerP
                 className={cn(
                   'flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-md text-xs text-ink-secondary',
                   'data-hovered:bg-sunken data-pressed:bg-sunken',
-                  'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-1',
+                  'data-focus-visible:outline-2 data-focus-visible:-outline-offset-1 data-focus-visible:outline-focus',
                 )}
               >
                 <X aria-hidden="true" className="size-3.5" />

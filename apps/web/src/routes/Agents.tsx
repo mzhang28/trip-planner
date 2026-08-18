@@ -79,8 +79,8 @@ export function Agents() {
 
       <main className="mx-auto min-h-0 w-full max-w-3xl flex-1 overflow-y-auto px-4 py-8 sm:px-6">
         <p className="mb-6 text-sm text-ink-secondary">
-          An agent needs credentials from here before it can ask for anything. Give it these, and the
-          next time it connects you will be asked which trips it may see.
+          An agent needs credentials from here before it can ask for anything. Give it these, and
+          the next time it connects you will be asked which trips it may see.
         </p>
 
         {created && <Credentials client={created} onDismiss={() => setCreated(null)} />}
@@ -121,7 +121,7 @@ export function Agents() {
             </span>
           </label>
 
-          {failure && <p className="mb-4 text-sm text-danger-text">{failure}</p>}
+          {failure && <p className="text-danger-text mb-4 text-sm">{failure}</p>}
 
           <Button
             variant="primary"

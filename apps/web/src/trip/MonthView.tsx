@@ -68,8 +68,8 @@ function DayCell({
           aria-label={`Add an event on ${day}`}
           onClick={onCreate}
           className={cn(
-            'absolute inset-x-0 bottom-0 top-6 cursor-pointer',
-            'hover:bg-accent-soft/60 focus-visible:outline-focus focus-visible:outline-2 focus-visible:-outline-offset-2',
+            'absolute inset-x-0 top-6 bottom-0 cursor-pointer',
+            'hover:bg-accent-soft/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus',
           )}
         >
           {/*
@@ -169,9 +169,7 @@ export function MonthView({
                         className={cn(
                           'min-h-0 overflow-hidden px-1.5 py-0.5 text-2xs font-medium',
                           namesThisBand && band.fromMinute === 0 && 'pl-6',
-                          cityColors?.[band.label]
-                            ? undefined
-                            : 'bg-accent-soft text-accent-text',
+                          cityColors?.[band.label] ? undefined : 'bg-accent-soft text-accent-text',
                         )}
                       >
                         {namesThisBand ? band.label : ''}
@@ -181,89 +179,84 @@ export function MonthView({
                 </div>
               )}
 
-                    <span className="relative z-10 flex items-baseline justify-between gap-1 p-1">
-                      <button
-                        type="button"
-                        onClick={() => onOpenDay(day)}
-                        aria-label={`Open ${day}`}
-                        className={cn(
-                          'tabular rounded-sm px-1 text-xs hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2',
-                          day === today
-                            ? 'font-semibold text-now-text'
-                            : outside
-                              ? // Muted rather than placeholder: a date either
-                                // side of the month is still a date someone
-                                // reads, and placeholder does not clear 4.5:1
-                                // against the sunken surface it sits on.
-                                'text-ink-muted'
-                              : 'text-ink',
-                        )}
-                      >
-                        {Number(day.slice(8))}
-                      </button>
-                      {glyph && forecast && (
-                        <span
-                          className="text-2xs text-ink-muted"
-                          title={
-                            forecast.place ? `${glyph.label} in ${forecast.place}` : glyph.label
-                          }
-                        >
-                          <span aria-hidden="true">{glyph.icon}</span>
-                          <span className="tabular ml-0.5 hidden sm:inline">
-                            {Math.round(forecast.max)}°
-                          </span>
-                          {forecast.place && <span className="sr-only"> in {forecast.place}</span>}
-                        </span>
-                      )}
+              <span className="relative z-10 flex items-baseline justify-between gap-1 p-1">
+                <button
+                  type="button"
+                  onClick={() => onOpenDay(day)}
+                  aria-label={`Open ${day}`}
+                  className={cn(
+                    'tabular rounded-sm px-1 text-xs hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus',
+                    day === today
+                      ? 'font-semibold text-now-text'
+                      : outside
+                        ? // Muted rather than placeholder: a date either
+                          // side of the month is still a date someone
+                          // reads, and placeholder does not clear 4.5:1
+                          // against the sunken surface it sits on.
+                          'text-ink-muted'
+                        : 'text-ink',
+                  )}
+                >
+                  {Number(day.slice(8))}
+                </button>
+                {glyph && forecast && (
+                  <span
+                    className="text-2xs text-ink-muted"
+                    title={forecast.place ? `${glyph.label} in ${forecast.place}` : glyph.label}
+                  >
+                    <span aria-hidden="true">{glyph.icon}</span>
+                    <span className="tabular ml-0.5 hidden sm:inline">
+                      {Math.round(forecast.max)}°
                     </span>
+                    {forecast.place && <span className="sr-only"> in {forecast.place}</span>}
+                  </span>
+                )}
+              </span>
 
-                    {dayEvents.length > 0 && (
-                      <div className="relative z-10 mt-auto flex w-full flex-col items-stretch gap-px px-1 pb-1 text-left">
-                        {/*
+              {dayEvents.length > 0 && (
+                <div className="relative z-10 mt-auto flex w-full flex-col items-stretch gap-px px-1 pb-1 text-left">
+                  {/*
                           Two names and a count, not a count alone. "2 things"
                           made every day of a month look the same, so the month
                           could not answer the question it exists for -- what is
                           happening, roughly, and when.
                         */}
-                        {dayEvents.slice(0, 2).map((event) => (
-                          <button
-                            type="button"
-                            key={event.id}
-                            data-testid="month-event"
-                            onClick={() => onOpenEvent(event.id)}
-                            style={coloredSurfaceStyle(event.color)}
-                            className={cn(
-                              'flex min-w-0 items-center gap-1 text-left text-2xs text-ink focus-visible:outline-focus focus-visible:outline-2',
-                              event.color && 'rounded-sm px-1 py-0.5',
-                            )}
-                          >
-                            <StatusSpine status={event.booking.status} className="h-2.5 w-0.5" />
-                            <EventKindIcon
-                              kind={event.kind}
-                              className="size-3 shrink-0 text-ink-muted"
-                            />
-                            <span
-                              className={cn(
-                                'truncate',
-                                event.name ? 'text-ink' : 'text-ink-placeholder italic',
-                              )}
-                            >
-                              {event.name || 'Unnamed'}
-                            </span>
-                          </button>
-                        ))}
-
-                        {dayEvents.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenDay(day)}
-                            className="text-left text-2xs text-ink-muted focus-visible:outline-focus focus-visible:outline-2"
-                          >
-                            +{dayEvents.length - 2} more
-                          </button>
+                  {dayEvents.slice(0, 2).map((event) => (
+                    <button
+                      type="button"
+                      key={event.id}
+                      data-testid="month-event"
+                      onClick={() => onOpenEvent(event.id)}
+                      style={coloredSurfaceStyle(event.color)}
+                      className={cn(
+                        'flex min-w-0 items-center gap-1 text-left text-2xs text-ink focus-visible:outline-2 focus-visible:outline-focus',
+                        event.color && 'rounded-sm px-1 py-0.5',
+                      )}
+                    >
+                      <StatusSpine status={event.booking.status} className="h-2.5 w-0.5" />
+                      <EventKindIcon kind={event.kind} className="size-3 shrink-0 text-ink-muted" />
+                      <span
+                        className={cn(
+                          'truncate',
+                          event.name ? 'text-ink' : 'text-ink-placeholder italic',
                         )}
-                      </div>
-                    )}
+                      >
+                        {event.name || 'Unnamed'}
+                      </span>
+                    </button>
+                  ))}
+
+                  {dayEvents.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenDay(day)}
+                      className="text-left text-2xs text-ink-muted focus-visible:outline-2 focus-visible:outline-focus"
+                    >
+                      +{dayEvents.length - 2} more
+                    </button>
+                  )}
+                </div>
+              )}
             </DayCell>
           );
         })}

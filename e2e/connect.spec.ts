@@ -74,7 +74,9 @@ test('picking trips on the consent screen is what the agent ends up holding', as
   const { verifier, challenge } = await pkce(page);
 
   await page.goto(consentUrl(clientId, challenge, 'trips:read trips:write'));
-  await expect(page.getByRole('heading', { name: /wants to read and change your trips/ })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /wants to read and change your trips/ }),
+  ).toBeVisible();
 
   // Nothing is granted until something is picked, so the button stays out.
   const allow = page.getByRole('button', { name: 'Allow' });
@@ -139,7 +141,9 @@ test('a read-only request cannot be widened from the screen', async ({ page }) =
   await page.goto(consentUrl(clientId, challenge, 'trips:read'));
 
   await expect(page.getByRole('heading', { name: /wants to read your trips/ })).toBeVisible();
-  await expect(page.getByText('It asked to read only, so it cannot change anything.')).toBeVisible();
+  await expect(
+    page.getByText('It asked to read only, so it cannot change anything.'),
+  ).toBeVisible();
   await expect(page.getByRole('checkbox', { name: /Let it make changes/ })).toHaveCount(0);
 });
 

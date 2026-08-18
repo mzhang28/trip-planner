@@ -2,20 +2,23 @@
 // @generated from file trip/sync/v1/sync.proto (package trip.sync.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import type { Message } from "@bufbuild/protobuf";
+import type { GenFile, GenMessage, GenService } from '@bufbuild/protobuf/codegenv2';
+import { fileDesc, messageDesc, serviceDesc } from '@bufbuild/protobuf/codegenv2';
+import type { Message } from '@bufbuild/protobuf';
 
 /**
  * Describes the file trip/sync/v1/sync.proto.
  */
-export const file_trip_sync_v1_sync: GenFile = /*@__PURE__*/
-  fileDesc("Chd0cmlwL3N5bmMvdjEvc3luYy5wcm90bxIMdHJpcC5zeW5jLnYxIm4KEFN1YnNjcmliZVJlcXVlc3QSDwoHdHJpcF9pZBgBIAEoCRIbCg5sYXN0X3N5bmNlZF9hdBgCIAEoA0gAiAEBEhkKEWhhc19sb2NhbF9jaGFuZ2VzGAMgASgIQhEKD19sYXN0X3N5bmNlZF9hdCKqAQoJU3luY0V2ZW50Ei0KBm9wZW5lZBgBIAEoCzIbLnRyaXAuc3luYy52MS5TZXNzaW9uT3BlbmVkSAASLAoHbWVzc2FnZRgCIAEoCzIZLnRyaXAuc3luYy52MS5TeW5jTWVzc2FnZUgAEjcKD3Jlc3luY19yZXF1aXJlZBgDIAEoCzIcLnRyaXAuc3luYy52MS5SZXN5bmNSZXF1aXJlZEgAQgcKBWV2ZW50IiMKDVNlc3Npb25PcGVuZWQSEgoKc2Vzc2lvbl9pZBgBIAEoCSIxCgtTeW5jTWVzc2FnZRIPCgdwYXlsb2FkGAEgASgMEhEKCXN5bmNlZF9hdBgCIAEoAyI0Cg5SZXN5bmNSZXF1aXJlZBIVCghzd2VwdF9hdBgBIAEoA0gAiAEBQgsKCV9zd2VwdF9hdCIyCgtQdXNoUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEg8KB3BheWxvYWQYAiABKAwiIQoMUHVzaFJlc3BvbnNlEhEKCXN5bmNlZF9hdBgBIAEoAzKUAQoLU3luY1NlcnZpY2USRgoJU3Vic2NyaWJlEh4udHJpcC5zeW5jLnYxLlN1YnNjcmliZVJlcXVlc3QaFy50cmlwLnN5bmMudjEuU3luY0V2ZW50MAESPQoEUHVzaBIZLnRyaXAuc3luYy52MS5QdXNoUmVxdWVzdBoaLnRyaXAuc3luYy52MS5QdXNoUmVzcG9uc2ViBnByb3RvMw");
+export const file_trip_sync_v1_sync: GenFile =
+  /*@__PURE__*/
+  fileDesc(
+    'Chd0cmlwL3N5bmMvdjEvc3luYy5wcm90bxIMdHJpcC5zeW5jLnYxIm4KEFN1YnNjcmliZVJlcXVlc3QSDwoHdHJpcF9pZBgBIAEoCRIbCg5sYXN0X3N5bmNlZF9hdBgCIAEoA0gAiAEBEhkKEWhhc19sb2NhbF9jaGFuZ2VzGAMgASgIQhEKD19sYXN0X3N5bmNlZF9hdCKqAQoJU3luY0V2ZW50Ei0KBm9wZW5lZBgBIAEoCzIbLnRyaXAuc3luYy52MS5TZXNzaW9uT3BlbmVkSAASLAoHbWVzc2FnZRgCIAEoCzIZLnRyaXAuc3luYy52MS5TeW5jTWVzc2FnZUgAEjcKD3Jlc3luY19yZXF1aXJlZBgDIAEoCzIcLnRyaXAuc3luYy52MS5SZXN5bmNSZXF1aXJlZEgAQgcKBWV2ZW50IiMKDVNlc3Npb25PcGVuZWQSEgoKc2Vzc2lvbl9pZBgBIAEoCSIxCgtTeW5jTWVzc2FnZRIPCgdwYXlsb2FkGAEgASgMEhEKCXN5bmNlZF9hdBgCIAEoAyI0Cg5SZXN5bmNSZXF1aXJlZBIVCghzd2VwdF9hdBgBIAEoA0gAiAEBQgsKCV9zd2VwdF9hdCIyCgtQdXNoUmVxdWVzdBISCgpzZXNzaW9uX2lkGAEgASgJEg8KB3BheWxvYWQYAiABKAwiIQoMUHVzaFJlc3BvbnNlEhEKCXN5bmNlZF9hdBgBIAEoAzKUAQoLU3luY1NlcnZpY2USRgoJU3Vic2NyaWJlEh4udHJpcC5zeW5jLnYxLlN1YnNjcmliZVJlcXVlc3QaFy50cmlwLnN5bmMudjEuU3luY0V2ZW50MAESPQoEUHVzaBIZLnRyaXAuc3luYy52MS5QdXNoUmVxdWVzdBoaLnRyaXAuc3luYy52MS5QdXNoUmVzcG9uc2ViBnByb3RvMw',
+  );
 
 /**
  * @generated from message trip.sync.v1.SubscribeRequest
  */
-export type SubscribeRequest = Message<"trip.sync.v1.SubscribeRequest"> & {
+export type SubscribeRequest = Message<'trip.sync.v1.SubscribeRequest'> & {
   /**
    * @generated from field: string trip_id = 1;
    */
@@ -44,42 +47,48 @@ export type SubscribeRequest = Message<"trip.sync.v1.SubscribeRequest"> & {
  * Describes the message trip.sync.v1.SubscribeRequest.
  * Use `create(SubscribeRequestSchema)` to create a new message.
  */
-export const SubscribeRequestSchema: GenMessage<SubscribeRequest> = /*@__PURE__*/
+export const SubscribeRequestSchema: GenMessage<SubscribeRequest> =
+  /*@__PURE__*/
   messageDesc(file_trip_sync_v1_sync, 0);
 
 /**
  * @generated from message trip.sync.v1.SyncEvent
  */
-export type SyncEvent = Message<"trip.sync.v1.SyncEvent"> & {
+export type SyncEvent = Message<'trip.sync.v1.SyncEvent'> & {
   /**
    * @generated from oneof trip.sync.v1.SyncEvent.event
    */
-  event: {
-    /**
-     * @generated from field: trip.sync.v1.SessionOpened opened = 1;
-     */
-    value: SessionOpened;
-    case: "opened";
-  } | {
-    /**
-     * @generated from field: trip.sync.v1.SyncMessage message = 2;
-     */
-    value: SyncMessage;
-    case: "message";
-  } | {
-    /**
-     * @generated from field: trip.sync.v1.ResyncRequired resync_required = 3;
-     */
-    value: ResyncRequired;
-    case: "resyncRequired";
-  } | { case: undefined; value?: undefined };
+  event:
+    | {
+        /**
+         * @generated from field: trip.sync.v1.SessionOpened opened = 1;
+         */
+        value: SessionOpened;
+        case: 'opened';
+      }
+    | {
+        /**
+         * @generated from field: trip.sync.v1.SyncMessage message = 2;
+         */
+        value: SyncMessage;
+        case: 'message';
+      }
+    | {
+        /**
+         * @generated from field: trip.sync.v1.ResyncRequired resync_required = 3;
+         */
+        value: ResyncRequired;
+        case: 'resyncRequired';
+      }
+    | { case: undefined; value?: undefined };
 };
 
 /**
  * Describes the message trip.sync.v1.SyncEvent.
  * Use `create(SyncEventSchema)` to create a new message.
  */
-export const SyncEventSchema: GenMessage<SyncEvent> = /*@__PURE__*/
+export const SyncEventSchema: GenMessage<SyncEvent> =
+  /*@__PURE__*/
   messageDesc(file_trip_sync_v1_sync, 1);
 
 /**
@@ -88,7 +97,7 @@ export const SyncEventSchema: GenMessage<SyncEvent> = /*@__PURE__*/
  *
  * @generated from message trip.sync.v1.SessionOpened
  */
-export type SessionOpened = Message<"trip.sync.v1.SessionOpened"> & {
+export type SessionOpened = Message<'trip.sync.v1.SessionOpened'> & {
   /**
    * @generated from field: string session_id = 1;
    */
@@ -99,13 +108,14 @@ export type SessionOpened = Message<"trip.sync.v1.SessionOpened"> & {
  * Describes the message trip.sync.v1.SessionOpened.
  * Use `create(SessionOpenedSchema)` to create a new message.
  */
-export const SessionOpenedSchema: GenMessage<SessionOpened> = /*@__PURE__*/
+export const SessionOpenedSchema: GenMessage<SessionOpened> =
+  /*@__PURE__*/
   messageDesc(file_trip_sync_v1_sync, 2);
 
 /**
  * @generated from message trip.sync.v1.SyncMessage
  */
-export type SyncMessage = Message<"trip.sync.v1.SyncMessage"> & {
+export type SyncMessage = Message<'trip.sync.v1.SyncMessage'> & {
   /**
    * An Automerge sync message, as its own bytes rather than text. The old JSON
    * endpoint carried these base64-encoded, which cost a third of the size.
@@ -126,7 +136,8 @@ export type SyncMessage = Message<"trip.sync.v1.SyncMessage"> & {
  * Describes the message trip.sync.v1.SyncMessage.
  * Use `create(SyncMessageSchema)` to create a new message.
  */
-export const SyncMessageSchema: GenMessage<SyncMessage> = /*@__PURE__*/
+export const SyncMessageSchema: GenMessage<SyncMessage> =
+  /*@__PURE__*/
   messageDesc(file_trip_sync_v1_sync, 3);
 
 /**
@@ -135,7 +146,7 @@ export const SyncMessageSchema: GenMessage<SyncMessage> = /*@__PURE__*/
  *
  * @generated from message trip.sync.v1.ResyncRequired
  */
-export type ResyncRequired = Message<"trip.sync.v1.ResyncRequired"> & {
+export type ResyncRequired = Message<'trip.sync.v1.ResyncRequired'> & {
   /**
    * @generated from field: optional int64 swept_at = 1;
    */
@@ -146,13 +157,14 @@ export type ResyncRequired = Message<"trip.sync.v1.ResyncRequired"> & {
  * Describes the message trip.sync.v1.ResyncRequired.
  * Use `create(ResyncRequiredSchema)` to create a new message.
  */
-export const ResyncRequiredSchema: GenMessage<ResyncRequired> = /*@__PURE__*/
+export const ResyncRequiredSchema: GenMessage<ResyncRequired> =
+  /*@__PURE__*/
   messageDesc(file_trip_sync_v1_sync, 4);
 
 /**
  * @generated from message trip.sync.v1.PushRequest
  */
-export type PushRequest = Message<"trip.sync.v1.PushRequest"> & {
+export type PushRequest = Message<'trip.sync.v1.PushRequest'> & {
   /**
    * @generated from field: string session_id = 1;
    */
@@ -168,13 +180,14 @@ export type PushRequest = Message<"trip.sync.v1.PushRequest"> & {
  * Describes the message trip.sync.v1.PushRequest.
  * Use `create(PushRequestSchema)` to create a new message.
  */
-export const PushRequestSchema: GenMessage<PushRequest> = /*@__PURE__*/
+export const PushRequestSchema: GenMessage<PushRequest> =
+  /*@__PURE__*/
   messageDesc(file_trip_sync_v1_sync, 5);
 
 /**
  * @generated from message trip.sync.v1.PushResponse
  */
-export type PushResponse = Message<"trip.sync.v1.PushResponse"> & {
+export type PushResponse = Message<'trip.sync.v1.PushResponse'> & {
   /**
    * @generated from field: int64 synced_at = 1;
    */
@@ -185,7 +198,8 @@ export type PushResponse = Message<"trip.sync.v1.PushResponse"> & {
  * Describes the message trip.sync.v1.PushResponse.
  * Use `create(PushResponseSchema)` to create a new message.
  */
-export const PushResponseSchema: GenMessage<PushResponse> = /*@__PURE__*/
+export const PushResponseSchema: GenMessage<PushResponse> =
+  /*@__PURE__*/
   messageDesc(file_trip_sync_v1_sync, 6);
 
 /**
@@ -207,20 +221,18 @@ export const SyncService: GenService<{
    * @generated from rpc trip.sync.v1.SyncService.Subscribe
    */
   subscribe: {
-    methodKind: "server_streaming";
+    methodKind: 'server_streaming';
     input: typeof SubscribeRequestSchema;
     output: typeof SyncEventSchema;
-  },
+  };
   /**
    * Hands over one sync message from the client's side of a session.
    *
    * @generated from rpc trip.sync.v1.SyncService.Push
    */
   push: {
-    methodKind: "unary";
+    methodKind: 'unary';
     input: typeof PushRequestSchema;
     output: typeof PushResponseSchema;
-  },
-}> = /*@__PURE__*/
-  serviceDesc(file_trip_sync_v1_sync, 0);
-
+  };
+}> = /*@__PURE__*/ serviceDesc(file_trip_sync_v1_sync, 0);

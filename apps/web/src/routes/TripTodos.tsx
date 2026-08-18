@@ -170,8 +170,18 @@ export function TripTodos() {
 
         {todos.length > 0 ? (
           <div data-testid="trip-todos">
-            <TodoGroup title="With deadlines" entries={dated} readOnly={readOnly} onToggle={toggle} />
-            <TodoGroup title="No deadline" entries={undated} readOnly={readOnly} onToggle={toggle} />
+            <TodoGroup
+              title="With deadlines"
+              entries={dated}
+              readOnly={readOnly}
+              onToggle={toggle}
+            />
+            <TodoGroup
+              title="No deadline"
+              entries={undated}
+              readOnly={readOnly}
+              onToggle={toggle}
+            />
           </div>
         ) : (
           <div className="rounded-lg border border-line bg-card px-6 py-12 text-center">

@@ -128,7 +128,9 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
     } catch {
       // A link has to be minted by the server, so this one is not made. Saying
       // nothing left a pressed button and no link, which reads as a broken app.
-      setFailed('That did not reach the server, so no link was made. Try again when you are back on.');
+      setFailed(
+        'That did not reach the server, so no link was made. Try again when you are back on.',
+      );
     }
   }
 
@@ -167,7 +169,7 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="rounded-md p-1 text-ink-muted hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
+            className="rounded-md p-1 text-ink-muted hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus"
           >
             <X aria-hidden="true" className="size-4" />
           </button>
@@ -273,7 +275,9 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
 
           {live.length === 0 ? (
             <p className="text-sm text-ink-secondary">
-              {unreachable ? 'Not known while the server is out of reach.' : 'None. Nobody can join without one.'}
+              {unreachable
+                ? 'Not known while the server is out of reach.'
+                : 'None. Nobody can join without one.'}
             </p>
           ) : (
             <ul className="flex flex-col gap-1">

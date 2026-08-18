@@ -179,11 +179,7 @@ try {
       NODE_ENV: 'test',
     },
   });
-  const apiPortPromise = portFromOutput(
-    api,
-    'API',
-    /api listening on http:\/\/[^:]+:(\d+)/,
-  );
+  const apiPortPromise = portFromOutput(api, 'API', /api listening on http:\/\/[^:]+:(\d+)/);
   consumeServerOutput(api.stdout, 'api');
   consumeServerOutput(api.stderr, 'api');
   const apiPort = await apiPortPromise;
@@ -193,17 +189,13 @@ try {
     name: 'icon build',
     env: { ICON_OUTPUT_DIR: publicDir },
   });
-  await run(
-    'pnpm',
-    ['--filter', '@trip/web', 'exec', 'vite', 'build', '--outDir', webDist],
-    {
-      name: 'web build',
-      env: {
-        API_PORT: String(apiPort),
-        WEB_PUBLIC_DIR: publicDir,
-      },
+  await run('pnpm', ['--filter', '@trip/web', 'exec', 'vite', 'build', '--outDir', webDist], {
+    name: 'web build',
+    env: {
+      API_PORT: String(apiPort),
+      WEB_PUBLIC_DIR: publicDir,
     },
-  );
+  });
 
   const web = start(
     'pnpm',

@@ -129,7 +129,7 @@ export function TripDrawer({ tripId, search, actions }: TripDrawerProps) {
           dragFrom.current = null;
           event.currentTarget.releasePointerCapture(event.pointerId);
         }}
-        className="flex h-9 w-full touch-none items-center gap-2 rounded-md border border-line-input bg-card px-2.5 text-left text-sm text-ink-placeholder hover:border-accent focus-visible:outline-focus focus-visible:outline-2"
+        className="flex h-9 w-full touch-none items-center gap-2 rounded-md border border-line-input bg-card px-2.5 text-left text-sm text-ink-placeholder hover:border-accent focus-visible:outline-2 focus-visible:outline-focus"
       >
         {search ? (
           <Search aria-hidden="true" className="size-4 shrink-0" />
@@ -196,7 +196,7 @@ export function TripDrawer({ tripId, search, actions }: TripDrawerProps) {
                 aria-label="Close"
                 data-testid="close-drawer"
                 onClick={close}
-                className="rounded-md p-1 text-ink-muted hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
+                className="rounded-md p-1 text-ink-muted hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus"
               >
                 <X aria-hidden="true" className="size-4" />
               </button>

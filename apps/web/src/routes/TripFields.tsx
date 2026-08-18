@@ -275,7 +275,7 @@ export function TripFields() {
               href={api.exportUrl(tripId!)}
               download
               data-testid="export-trip"
-              className="inline-flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-line-default bg-card px-2.5 text-xs font-medium whitespace-nowrap text-ink shadow-xs transition-colors duration-100 hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-2"
+              className="inline-flex h-7 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-line-default bg-card px-2.5 text-xs font-medium whitespace-nowrap text-ink shadow-xs transition-colors duration-100 hover:bg-sunken focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             >
               <Download aria-hidden="true" className="size-3.5" />
               Export this trip
@@ -343,7 +343,7 @@ export function TripFields() {
                 value={tripStart}
                 disabled={readOnly}
                 onChange={(event) => setTripStart(event.currentTarget.value)}
-                className="h-9 rounded-md border border-line-input bg-card px-2.5 text-sm text-ink focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1 disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-60"
+                className="h-9 rounded-md border border-line-input bg-card px-2.5 text-sm text-ink focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-60"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs font-medium text-ink-secondary">
@@ -354,7 +354,7 @@ export function TripFields() {
                 value={tripEnd}
                 disabled={readOnly}
                 onChange={(event) => setTripEnd(event.currentTarget.value)}
-                className="h-9 rounded-md border border-line-input bg-card px-2.5 text-sm text-ink focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1 disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-60"
+                className="h-9 rounded-md border border-line-input bg-card px-2.5 text-sm text-ink focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-60"
               />
             </label>
           </div>
@@ -376,48 +376,48 @@ export function TripFields() {
         )}
 
         {!readOnly && (
-        <Card className="mb-8 p-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <TextField
-              label="Name"
-              className="min-w-40 flex-1"
-              placeholder="Dress code"
-              value={label}
-              errorMessage={problem}
-              onChange={(next) => {
-                setLabel(next);
-                setProblem(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') create();
-              }}
-            />
+          <Card className="mb-8 p-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <TextField
+                label="Name"
+                className="min-w-40 flex-1"
+                placeholder="Dress code"
+                value={label}
+                errorMessage={problem}
+                onChange={(next) => {
+                  setLabel(next);
+                  setProblem(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') create();
+                }}
+              />
 
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-ink-secondary">Field type</span>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as FieldType)}
-                className="h-9 rounded-md border border-line-input bg-card px-2 text-sm text-ink focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1"
-              >
-                {TYPES.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-ink-secondary">Field type</span>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value as FieldType)}
+                  className="h-9 rounded-md border border-line-input bg-card px-2 text-sm text-ink focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus"
+                >
+                  {TYPES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            <Button variant="primary" onPress={create} isDisabled={label.trim() === ''}>
-              <Plus className="size-4" />
-              Add field
-            </Button>
-          </div>
+              <Button variant="primary" onPress={create} isDisabled={label.trim() === ''}>
+                <Plus className="size-4" />
+                Add field
+              </Button>
+            </div>
 
-          <p className="mt-2 text-2xs text-ink-muted">
-            {TYPES.find((option) => option.value === type)?.hint}
-          </p>
-        </Card>
+            <p className="mt-2 text-2xs text-ink-muted">
+              {TYPES.find((option) => option.value === type)?.hint}
+            </p>
+          </Card>
         )}
 
         {defs.length === 0 ? (
@@ -432,7 +432,9 @@ export function TripFields() {
                 def={def}
                 readOnly={readOnly}
                 usedBy={usage.get(def.id) ?? 0}
-                onRename={(next) => store?.change((c) => updateFieldDef(c, def.id, { label: next }))}
+                onRename={(next) =>
+                  store?.change((c) => updateFieldDef(c, def.id, { label: next }))
+                }
                 onSetUnit={(unit) => store?.change((c) => updateFieldDef(c, def.id, { unit }))}
                 onSetCurrency={(currency) =>
                   store?.change((c) => updateFieldDef(c, def.id, { currency }))
@@ -532,7 +534,10 @@ function FieldRow({
                * event that had one, and the number is the only way to know
                * whether that is nothing or a week of work.
                */
-              const cost = usedBy === 0 ? '' : ` It is filled in on ${usedBy} event${usedBy === 1 ? '' : 's'}, and those values go with it.`;
+              const cost =
+                usedBy === 0
+                  ? ''
+                  : ` It is filled in on ${usedBy} event${usedBy === 1 ? '' : 's'}, and those values go with it.`;
               if (confirm(`Delete the field “${def.label}”?${cost}`)) onDelete();
             }}
             className="text-danger"
@@ -604,15 +609,18 @@ function FieldRow({
                        * Removing a choice takes it off every event that had it
                        * ticked, and that happened with nothing said at all.
                        */
-                      const ticked = usedBy === 0 ? '' : ` This field is filled in on ${usedBy} event${usedBy === 1 ? '' : 's'}, and any that chose it lose it.`;
+                      const ticked =
+                        usedBy === 0
+                          ? ''
+                          : ` This field is filled in on ${usedBy} event${usedBy === 1 ? '' : 's'}, and any that chose it lose it.`;
                       if (confirm(`Remove the choice “${opt.label}”?${ticked}`)) {
                         onRemoveOption(optionId);
                       }
                     }}
                     className={
                       opt.color
-                        ? 'opacity-75 hover:opacity-100 focus-visible:outline-focus focus-visible:outline-2'
-                        : 'text-ink-muted hover:text-danger focus-visible:outline-focus focus-visible:outline-2'
+                        ? 'opacity-75 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-focus'
+                        : 'text-ink-muted hover:text-danger focus-visible:outline-2 focus-visible:outline-focus'
                     }
                   >
                     <Trash2 aria-hidden="true" className="size-3" />

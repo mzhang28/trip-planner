@@ -77,8 +77,8 @@ export const WithoutColour: Story = {
   render: () => (
     <div className="max-w-md">
       <p className="mb-4 text-sm text-ink-secondary">
-        The same two cards with colour removed. The spine no longer tells them apart on its own;
-        the chip does.
+        The same two cards with colour removed. The spine no longer tells them apart on its own; the
+        chip does.
       </p>
       <div className="flex flex-col gap-2" style={{ filter: 'grayscale(1)' }}>
         {[

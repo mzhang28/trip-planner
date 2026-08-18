@@ -105,8 +105,7 @@ async function runFlush(): Promise<FlushResult> {
       if (!ask.ok) continue;
 
       const plan = (await ask.json()) as
-        | { alreadyStored: true }
-        | { method: 'PUT'; url: string; direct: boolean };
+        { alreadyStored: true } | { method: 'PUT'; url: string; direct: boolean };
 
       if ('alreadyStored' in plan) {
         await forgetUpload(upload.hash);

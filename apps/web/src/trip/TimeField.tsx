@@ -51,7 +51,7 @@ export function TimeField({
       <div
         className={cn(
           'flex h-9 items-center rounded-md border bg-card pr-1 pl-2.5',
-          'focus-within:border-accent focus-within:outline-focus focus-within:outline-2 focus-within:-outline-offset-1',
+          'focus-within:border-accent focus-within:outline-2 focus-within:-outline-offset-1 focus-within:outline-focus',
           disabled && 'bg-sunken opacity-60',
           error ? 'border-danger' : 'border-line-input',
         )}
@@ -82,7 +82,10 @@ export function TimeField({
       </div>
 
       {(error || hint) && (
-        <span id={`${id}-hint`} className={cn('text-2xs', error ? 'text-danger' : 'text-ink-muted')}>
+        <span
+          id={`${id}-hint`}
+          className={cn('text-2xs', error ? 'text-danger' : 'text-ink-muted')}
+        >
           {error ?? hint}
         </span>
       )}

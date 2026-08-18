@@ -56,12 +56,7 @@ export {
 
 export { eventSearchText, remapMentionIds, renderCustomValue, stripMentionMarkup } from './search';
 
-export {
-  canSyncIncrementally,
-  sweepTombstones,
-  TOMBSTONE_TTL_MS,
-  type SweepResult,
-} from './sweep';
+export { canSyncIncrementally, sweepTombstones, TOMBSTONE_TTL_MS, type SweepResult } from './sweep';
 
 export type {
   AttachmentId,

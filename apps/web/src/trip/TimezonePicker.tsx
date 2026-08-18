@@ -15,11 +15,7 @@ import {
 import { cn } from '@trip/ui';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import {
-  knownTimeZones,
-  timeZoneAbbreviation,
-  timeZoneSearchAbbreviations,
-} from '../lib/time';
+import { knownTimeZones, timeZoneAbbreviation, timeZoneSearchAbbreviations } from '../lib/time';
 
 interface ZoneOption {
   id: string;
@@ -113,7 +109,9 @@ export function TimezonePicker({
     const needle = query.trim().toLowerCase();
     if (!needle) {
       const current = options.find((option) => option.id === value);
-      return current ? [current, ...options.filter((option) => option !== current).slice(0, 39)] : options.slice(0, 40);
+      return current
+        ? [current, ...options.filter((option) => option !== current).slice(0, 39)]
+        : options.slice(0, 40);
     }
 
     const words = needle.split(/\s+/);
@@ -146,7 +144,7 @@ export function TimezonePicker({
         className={cn(
           'flex h-7 shrink-0 items-center gap-0.5 rounded-sm border border-line bg-sunken px-1.5',
           'font-mono text-2xs text-ink-secondary hover:border-line-strong hover:bg-raised',
-          'focus-visible:outline-focus focus-visible:outline-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'focus-visible:outline-2 focus-visible:outline-focus disabled:cursor-not-allowed disabled:opacity-50',
         )}
         {...getReferenceProps()}
       >
@@ -179,7 +177,7 @@ export function TimezonePicker({
                     onChange={(event) => setQuery(event.target.value)}
                     className={cn(
                       'h-9 w-full rounded-md border border-line-input bg-card pr-2.5 pl-8 text-sm text-ink',
-                      'placeholder:text-ink-placeholder focus:border-accent focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+                      'placeholder:text-ink-placeholder focus:border-accent focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
                     )}
                   />
                 </div>
@@ -211,7 +209,10 @@ export function TimezonePicker({
                   >
                     <Check
                       aria-hidden="true"
-                      className={cn('size-3.5 shrink-0 text-accent-text', option.id !== value && 'invisible')}
+                      className={cn(
+                        'size-3.5 shrink-0 text-accent-text',
+                        option.id !== value && 'invisible',
+                      )}
                     />
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">
                       {option.id.replaceAll('_', ' ')}

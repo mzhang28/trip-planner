@@ -67,7 +67,7 @@ export function CheckedField({
         className={cn(
           'h-9 w-full rounded-md border bg-card px-2.5 text-ink',
           'placeholder:text-ink-placeholder',
-          'focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+          'focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
           'disabled:cursor-not-allowed disabled:bg-sunken disabled:opacity-60',
           error ? 'border-danger' : 'border-line-input focus:border-accent',
         )}
@@ -82,7 +82,10 @@ export function CheckedField({
       )}
 
       {(error || hint) && (
-        <span id={`${id}-hint`} className={cn('text-2xs', error ? 'text-danger' : 'text-ink-muted')}>
+        <span
+          id={`${id}-hint`}
+          className={cn('text-2xs', error ? 'text-danger' : 'text-ink-muted')}
+        >
           {error ?? hint}
         </span>
       )}

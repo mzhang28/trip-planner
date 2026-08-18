@@ -161,15 +161,11 @@ function settings(db: Db) {
   const existing = db.select().from(instanceSettings).where(eq(instanceSettings.id, 1)).get();
   if (existing) return existing;
 
-  const earliest = db
-    .select({ id: users.id })
-    .from(users)
-    .orderBy(users.createdAt)
-    .limit(1)
-    .get();
+  const earliest = db.select({ id: users.id }).from(users).orderBy(users.createdAt).limit(1).get();
 
   const closedAt = earliest ? Date.now() : null;
-  if (earliest) db.update(users).set({ adminSince: closedAt }).where(eq(users.id, earliest.id)).run();
+  if (earliest)
+    db.update(users).set({ adminSince: closedAt }).where(eq(users.id, earliest.id)).run();
 
   const row = { id: 1, registrationClosedAt: closedAt, fileLinkSecret: null };
   db.insert(instanceSettings).values(row).run();
@@ -203,12 +199,19 @@ export function fileLinkSecret(db: Db): string {
   if (existing) return existing;
 
   const secret = token();
-  db.update(instanceSettings).set({ fileLinkSecret: secret }).where(eq(instanceSettings.id, 1)).run();
+  db.update(instanceSettings)
+    .set({ fileLinkSecret: secret })
+    .where(eq(instanceSettings.id, 1))
+    .run();
 
   return secret;
 }
 
 export function isAdmin(db: Db, userId: string): boolean {
-  const row = db.select({ adminSince: users.adminSince }).from(users).where(eq(users.id, userId)).get();
+  const row = db
+    .select({ adminSince: users.adminSince })
+    .from(users)
+    .where(eq(users.id, userId))
+    .get();
   return row?.adminSince != null;
 }

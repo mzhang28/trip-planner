@@ -32,7 +32,11 @@ export function StatusChip({ status, className }: StatusChipProps) {
         A dot in the spine's own colour, so the chip and the card edge read as
         one system rather than two ways of saying the same thing.
       */}
-      <span aria-hidden="true" className="status-spine size-1.5 rounded-full" data-status={status} />
+      <span
+        aria-hidden="true"
+        className="status-spine size-1.5 rounded-full"
+        data-status={status}
+      />
       {BOOKING_STATUS_LABEL[status]}
     </span>
   );

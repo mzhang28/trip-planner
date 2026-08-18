@@ -475,12 +475,7 @@ export function updateTodo(
   });
 }
 
-export function removeTodo(
-  doc: Doc,
-  eventId: EventId,
-  todoId: TodoId,
-  author: Author,
-): Doc {
+export function removeTodo(doc: Doc, eventId: EventId, todoId: TodoId, author: Author): Doc {
   return A.change(doc, (d) => {
     const event = d.events[eventId];
     if (!event?.todos) return;
@@ -534,11 +529,7 @@ export function addFieldDef(doc: Doc, def: FieldDef): Doc {
 /** What a caller may change about a field definition after it exists. */
 export type EditableFieldDef = Pick<FieldDef, 'label' | 'type' | 'unit' | 'currency' | 'order'>;
 
-export function updateFieldDef(
-  doc: Doc,
-  id: FieldDefId,
-  patch: Partial<EditableFieldDef>,
-): Doc {
+export function updateFieldDef(doc: Doc, id: FieldDefId, patch: Partial<EditableFieldDef>): Doc {
   return A.change(doc, (d) => {
     const def = d.fieldDefs[id];
     if (!def) return;
@@ -719,9 +710,7 @@ export function clearField(doc: Doc, eventId: EventId, key: string, author: Auth
 
     for (const part of FIELD_PARTS[key] ?? []) {
       if (part.startsWith('booking.')) {
-        delete (event.booking as unknown as Record<string, unknown>)[
-          part.slice('booking.'.length)
-        ];
+        delete (event.booking as unknown as Record<string, unknown>)[part.slice('booking.'.length)];
       } else {
         delete (event as unknown as Record<string, unknown>)[part];
       }
@@ -739,12 +728,7 @@ export function clearField(doc: Doc, eventId: EventId, key: string, author: Auth
 }
 
 /** Puts back what `fieldContents` took, exactly as it was. */
-export function restoreField(
-  doc: Doc,
-  eventId: EventId,
-  held: FieldContents,
-  author: Author,
-): Doc {
+export function restoreField(doc: Doc, eventId: EventId, held: FieldContents, author: Author): Doc {
   return A.change(doc, (d) => {
     const event = d.events[eventId];
     if (!event) return;
@@ -847,7 +831,9 @@ export function mergeEvents(
     if (others.length === 0) return;
 
     const all = [primary, ...others];
-    const starts = all.map((event) => event.startsAt).filter((at): at is number => at !== undefined);
+    const starts = all
+      .map((event) => event.startsAt)
+      .filter((at): at is number => at !== undefined);
 
     if (starts.length > 0) {
       const earliest = Math.min(...starts);

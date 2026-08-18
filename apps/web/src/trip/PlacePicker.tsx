@@ -66,9 +66,12 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
     setOpen(true);
   }
 
-  useEffect(() => () => {
-    if (closing.current) clearTimeout(closing.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (closing.current) clearTimeout(closing.current);
+    },
+    [],
+  );
 
   const places = lookup.state === 'found' ? lookup.places : [];
 
@@ -153,7 +156,7 @@ export function PlacePicker({ value, onChange }: PlacePickerProps) {
         <div
           className={cn(
             'flex h-9 items-center rounded-md border border-line-input bg-card pr-1 pl-2.5',
-            'focus-within:border-accent focus-within:outline-focus focus-within:outline-2 focus-within:-outline-offset-1',
+            'focus-within:border-accent focus-within:outline-2 focus-within:-outline-offset-1 focus-within:outline-focus',
           )}
         >
           <input
