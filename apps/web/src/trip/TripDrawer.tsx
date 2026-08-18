@@ -100,7 +100,7 @@ export function TripDrawer({ tripId, search, actions }: TripDrawerProps) {
     <div
       className={cn(
         'shrink-0 border-t border-line bg-page px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]',
-        open && 'relative z-40',
+        open && 'relative z-50',
       )}
     >
       <button

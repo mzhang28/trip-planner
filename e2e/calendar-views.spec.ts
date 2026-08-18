@@ -386,6 +386,49 @@ test.describe('week and month views', () => {
     await expect(page.getByTestId('go-to-date')).toHaveValue(ON);
     await expect(page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' })).toBeVisible();
   });
+
+  test(
+    'what opens over the week is reachable, not under it',
+    { tag: '@responsive' },
+    async ({ page }) => {
+      await page.goto('/');
+      await newTrip(page, 'Japan, April');
+      await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+      await page.getByTestId('go-to-date').fill(ON);
+      await switchView(page, 'Week');
+
+      /*
+       * The week's day names and hotel rail are sticky, and they used to be
+       * painted over anything opened from the row above them -- the click below
+       * landed on a day column instead of the box that was open.
+       */
+      await page.locator('summary').filter({ hasText: 'Display' }).click();
+      const fit = page.getByRole('checkbox', { name: 'Fit hours to view' });
+      await fit.click();
+      await expect(fit).not.toBeChecked();
+    },
+  );
+
+  test('the header settings open over the week too', async ({ page }) => {
+    await page.goto('/');
+    await newTrip(page, 'Japan, April');
+    await addEvent(page, 'Fushimi Inari', 'Kyoto', '09:00');
+
+    await page.getByTestId('go-to-date').fill(ON);
+    await switchView(page, 'Week');
+
+    await page.getByRole('button', { name: 'Settings' }).click();
+
+    // The theme sits at the bottom of the popover, which is the end that the
+    // week's sticky day names used to cover.
+    await page
+      .getByRole('dialog', { name: 'Settings' })
+      .getByText('Dark', { exact: true })
+      .click();
+
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  });
 });
 
 test.describe('flights and the map', () => {

@@ -147,7 +147,7 @@ export function SharePanel({ tripId, onClose }: { tripId: string; onClose: () =>
   const live = links.filter((link) => link.revokedAt === null);
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-overlay p-4">
+    <div className="fixed inset-0 z-60 grid place-items-center bg-overlay p-4">
       <Card
         raised
         role="dialog"

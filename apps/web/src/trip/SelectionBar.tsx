@@ -135,7 +135,7 @@ export function MergePreview({
   const all = [primary, ...others];
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-overlay p-4">
+    <div className="fixed inset-0 z-60 grid place-items-center bg-overlay p-4">
       <div
         role="dialog"
         aria-modal="true"

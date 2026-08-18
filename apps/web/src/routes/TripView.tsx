@@ -301,7 +301,7 @@ function HeaderActions({
         <div
           role="dialog"
           aria-label="Settings"
-          className="absolute top-full right-0 z-30 mt-2 flex w-72 flex-col gap-4 rounded-lg border border-line bg-raised p-4 shadow-lg"
+          className="absolute top-full right-0 z-50 mt-2 flex w-72 flex-col gap-4 rounded-lg border border-line bg-raised p-4 shadow-lg"
         >
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-ink-secondary">Show times in</span>
@@ -1030,7 +1030,12 @@ export function TripView() {
         />
       )}
     >
-      <header className="z-10 shrink-0 border-b border-line bg-page/95 backdrop-blur">
+      {/*
+        Above the calendar, whose sticky day names and hotel rail sit at 30 and
+        would otherwise cut the top off anything opened from this row. Below the
+        panels that take the whole screen, which sit at 60.
+      */}
+      <header className="z-40 shrink-0 border-b border-line bg-page/95 backdrop-blur">
         <div
           data-testid="trip-toolbar"
           className="relative flex w-full flex-wrap items-center gap-3 px-4 py-3 sm:px-6 lg:px-8"

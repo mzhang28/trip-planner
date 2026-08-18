@@ -97,7 +97,11 @@ export function DayNavigator({ view, anchor, tripStart, tripEnd, onChange }: Day
           <summary className="h-7 cursor-pointer rounded-md border border-line-input bg-card px-2 text-xs leading-7 text-ink hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2">
             Display
           </summary>
-          <div className="absolute top-full left-0 z-20 mt-1 flex w-56 flex-col gap-3 rounded-lg border border-line bg-raised p-3 shadow-lg">
+          {/*
+            Over the calendar rather than under it: the week's day names are
+            sticky at 30, and this opens right above them.
+          */}
+          <div className="absolute top-full right-0 z-50 mt-1 flex w-56 flex-col gap-3 rounded-lg border border-line bg-raised p-3 shadow-lg sm:right-auto sm:left-0">
             <p className="text-xs text-ink-secondary">Week timetable hours</p>
             <label className="flex items-center gap-2 text-xs text-ink">
               <input
