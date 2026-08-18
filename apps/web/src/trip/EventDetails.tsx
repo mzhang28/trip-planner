@@ -1,7 +1,7 @@
 import type { CustomValue, FieldDef, TripDoc, TripEvent } from '@trip/crdt';
 import { renderCustomValue, type FieldDefId } from '@trip/crdt';
-import { StatusChip, coloredSurfaceStyle } from '@trip/ui';
-import { Paperclip } from 'lucide-react';
+import { Button, StatusChip, coloredSurfaceStyle } from '@trip/ui';
+import { Paperclip, Pencil } from 'lucide-react';
 import { formatDuration, formatTime } from '../lib/time';
 import { Description } from './DescriptionEditor';
 import { JourneySummary } from './FlightFields';
@@ -15,6 +15,11 @@ export interface EventDetailsProps {
   cityColors?: Record<string, string>;
   doc: TripDoc | undefined;
   onOpenEvent: (eventId: string) => void;
+  /**
+   * Swaps the card over to the editor. Absent for a viewer, who has nothing to
+   * swap to, and the footer holding it is absent with it.
+   */
+  onEdit?: () => void;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -70,6 +75,7 @@ export function EventDetails({
   cityColors,
   doc,
   onOpenEvent,
+  onEdit,
 }: EventDetailsProps) {
   const links = Object.values(event.links);
   const files = Object.values(event.attachments);
@@ -81,130 +87,146 @@ export function EventDetails({
     .filter((entry) => entry.value !== undefined);
 
   return (
-    <dl
-      data-testid="event-details"
-      className="flex flex-col gap-2 border-t border-line px-3 py-3"
-    >
-      <Row label="When">
-        {event.startsAt === undefined
-          ? 'Not scheduled yet'
-          : `${new Intl.DateTimeFormat('en-GB', {
-              weekday: 'short',
-              day: 'numeric',
-              month: 'short',
-              timeZone: zone,
-            }).format(event.startsAt)} · ${
-              event.timeUndecided ? 'time not set' : formatTime(event.startsAt, zone)
-            }${
-              event.durationMinutes !== undefined && !event.timeUndecided
-                ? `–${formatTime(event.startsAt + event.durationMinutes * 60_000, zone)} · ${formatDuration(event.durationMinutes)}`
-                : ''
-            }`}
-      </Row>
-
-      {(event.city || event.location?.label) && (
-        <Row label="Where">
-          {event.location?.label}
-          {event.location?.label && event.city && ' · '}
-          {event.city && (
-            <span
-              style={coloredSurfaceStyle(cityColors?.[event.city])}
-              className={cityColors?.[event.city] ? 'rounded-full px-2 py-0.5 text-xs' : undefined}
-            >
-              {event.city}
-            </span>
-          )}
-          {event.location?.address && (
-            <span className="block text-xs text-ink-muted">{event.location.address}</span>
-          )}
+    <div className="border-t border-line">
+      <dl data-testid="event-details" className="flex flex-col gap-2 px-3 py-3">
+        <Row label="When">
+          {event.startsAt === undefined
+            ? 'Not scheduled yet'
+            : `${new Intl.DateTimeFormat('en-GB', {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                timeZone: zone,
+              }).format(event.startsAt)} · ${
+                event.timeUndecided ? 'time not set' : formatTime(event.startsAt, zone)
+              }${
+                event.durationMinutes !== undefined && !event.timeUndecided
+                  ? `–${formatTime(event.startsAt + event.durationMinutes * 60_000, zone)} · ${formatDuration(event.durationMinutes)}`
+                  : ''
+              }`}
         </Row>
-      )}
 
-      <Row label="Booking">
-        <span className="flex flex-wrap items-center gap-2">
-          <StatusChip status={event.booking.status} />
-          {event.booking.confirmationCode && (
-            <span className="tabular text-xs">{event.booking.confirmationCode}</span>
-          )}
-        </span>
-        {event.booking.note && (
-          <span className="block text-xs text-ink-secondary">{event.booking.note}</span>
-        )}
-      </Row>
-
-      {transit && <Row label="Getting here">{transit}</Row>}
-
-      {event.kind === 'transit' && (
-        <Row label="Journey">
-          <JourneySummary event={event} homeTimezone={homeTimezone} />
-        </Row>
-      )}
-
-      {event.description && (
-        <Row label="Notes">
-          <Description text={event.description} doc={doc} onOpenEvent={onOpenEvent} />
-        </Row>
-      )}
-
-      {links.length > 0 && (
-        <Row label="Links">
-          <ul className="flex flex-col gap-0.5">
-            {links.map((link) => (
-              <li key={link.url}>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="text-xs text-accent-text underline underline-offset-2"
-                >
-                  {link.title ?? link.url}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Row>
-      )}
-
-      {files.length > 0 && (
-        <Row label="Files">
-          <ul className="flex flex-col gap-0.5">
-            {files.map((file) => (
-              <li key={file.blobHash} className="flex items-center gap-1.5">
-                <Paperclip aria-hidden="true" className="size-3 text-ink-muted" />
-                <a
-                  href={`/api/blobs/${file.blobHash}?mime=${encodeURIComponent(file.mime)}`}
-                  download={file.filename}
-                  className="text-xs text-accent-text underline underline-offset-2"
-                >
-                  {file.filename}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Row>
-      )}
-
-      {todos.length > 0 && (
-        <Row label="To-dos">
-          <ul className="flex flex-col gap-1">
-            {todos.map((todo) => (
-              <li
-                key={`${todo.addedAt}:${todo.text}`}
-                className={todo.completed ? 'text-xs text-ink-muted line-through' : 'text-xs'}
+        {(event.city || event.location?.label) && (
+          <Row label="Where">
+            {event.location?.label}
+            {event.location?.label && event.city && ' · '}
+            {event.city && (
+              <span
+                style={coloredSurfaceStyle(cityColors?.[event.city])}
+                className={
+                  cityColors?.[event.city] ? 'rounded-full px-2 py-0.5 text-xs' : undefined
+                }
               >
-                {todo.completed ? '✓' : '○'} {todo.text}
-                {todo.deadline && <span className="ml-1 text-ink-muted">· due {todo.deadline}</span>}
-              </li>
-            ))}
-          </ul>
-        </Row>
-      )}
+                {event.city}
+              </span>
+            )}
+            {event.location?.address && (
+              <span className="block text-xs text-ink-muted">{event.location.address}</span>
+            )}
+          </Row>
+        )}
 
-      {customs.map(({ def, value }) => (
-        <Row key={def.id} label={def.label}>
-          <CustomValueDisplay value={value!} def={def} />
+        <Row label="Booking">
+          <span className="flex flex-wrap items-center gap-2">
+            <StatusChip status={event.booking.status} />
+            {event.booking.confirmationCode && (
+              <span className="tabular text-xs">{event.booking.confirmationCode}</span>
+            )}
+          </span>
+          {event.booking.note && (
+            <span className="block text-xs text-ink-secondary">{event.booking.note}</span>
+          )}
         </Row>
-      ))}
-    </dl>
+
+        {transit && <Row label="Getting here">{transit}</Row>}
+
+        {event.kind === 'transit' && (
+          <Row label="Journey">
+            <JourneySummary event={event} homeTimezone={homeTimezone} />
+          </Row>
+        )}
+
+        {event.description && (
+          <Row label="Notes">
+            <Description text={event.description} doc={doc} onOpenEvent={onOpenEvent} />
+          </Row>
+        )}
+
+        {links.length > 0 && (
+          <Row label="Links">
+            <ul className="flex flex-col gap-0.5">
+              {links.map((link) => (
+                <li key={link.url}>
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-xs text-accent-text underline underline-offset-2"
+                  >
+                    {link.title ?? link.url}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Row>
+        )}
+
+        {files.length > 0 && (
+          <Row label="Files">
+            <ul className="flex flex-col gap-0.5">
+              {files.map((file) => (
+                <li key={file.blobHash} className="flex items-center gap-1.5">
+                  <Paperclip aria-hidden="true" className="size-3 text-ink-muted" />
+                  <a
+                    href={`/api/blobs/${file.blobHash}?mime=${encodeURIComponent(file.mime)}`}
+                    download={file.filename}
+                    className="text-xs text-accent-text underline underline-offset-2"
+                  >
+                    {file.filename}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Row>
+        )}
+
+        {todos.length > 0 && (
+          <Row label="To-dos">
+            <ul className="flex flex-col gap-1">
+              {todos.map((todo) => (
+                <li
+                  key={`${todo.addedAt}:${todo.text}`}
+                  className={todo.completed ? 'text-xs text-ink-muted line-through' : 'text-xs'}
+                >
+                  {todo.completed ? '✓' : '○'} {todo.text}
+                  {todo.deadline && (
+                    <span className="ml-1 text-ink-muted">· due {todo.deadline}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Row>
+        )}
+
+        {customs.map(({ def, value }) => (
+          <Row key={def.id} label={def.label}>
+            <CustomValueDisplay value={value!} def={def} />
+          </Row>
+        ))}
+      </dl>
+
+      {/*
+        The same corner of the card the editor puts Done in, so the one button
+        that swaps the two does not move when they swap.
+      */}
+      {onEdit && (
+        <div className="flex justify-end border-t border-line px-3 py-2">
+          <Button size="sm" variant="primary" data-testid="edit-event" onPress={onEdit}>
+            <Pencil aria-hidden="true" className="size-3.5" />
+            Edit
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

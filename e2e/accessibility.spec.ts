@@ -28,9 +28,7 @@ async function newTrip(page: Page) {
  * a heading order that can be navigated.
  */
 async function scan(page: Page) {
-  return new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
+  return new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
 }
 
 function describeViolations(results: Awaited<ReturnType<typeof scan>>) {
@@ -62,11 +60,16 @@ test.describe('accessibility', () => {
       await newTrip(page);
 
       await addNewEvent(page, 'Fushimi Inari');
-      await page.getByTestId('event').first().click();
-      await expect(page.getByTestId('event-editor')).toBeVisible();
 
-      const results = await scan(page);
-      expect(describeViolations(results)).toBe('');
+      // Both faces of an open card: what the event says, and the form behind
+      // the Edit button.
+      await page.getByTestId('event').first().click();
+      await expect(page.getByTestId('event-details')).toBeVisible();
+      expect(describeViolations(await scan(page))).toBe('');
+
+      await page.getByTestId('edit-event').click();
+      await expect(page.getByTestId('event-editor')).toBeVisible();
+      expect(describeViolations(await scan(page))).toBe('');
     },
   );
 
@@ -101,9 +104,14 @@ test.describe('accessibility', () => {
     await addNewEvent(page, 'Fushimi Inari');
     await expect(page.getByTestId('event').first()).toBeVisible();
 
-    // Tab to the card and open it with the keyboard alone. Opening an event is
-    // the way into every other edit, so it cannot be pointer-only.
+    // Both steps from the keyboard alone. Opening an event, and then getting
+    // from what it says to the form, is the way into every other edit, so
+    // neither can be pointer-only.
     await page.getByTestId('event').first().focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('event-details')).toBeVisible();
+
+    await page.getByTestId('edit-event').focus();
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('event-editor')).toBeVisible();
 
@@ -112,7 +120,10 @@ test.describe('accessibility', () => {
 
   test('the theme control keeps its contrast in the dark', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('radiogroup', { name: 'Theme' }).getByText('Dark', { exact: true }).click();
+    await page
+      .getByRole('radiogroup', { name: 'Theme' })
+      .getByText('Dark', { exact: true })
+      .click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
     const results = await scan(page);

@@ -1,5 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, editEvent } from './helpers';
 
 /**
  * Creates a trip and returns an editor link for it.
@@ -93,7 +93,7 @@ test.describe('offline editing', () => {
     await openTrip(page, tripId);
 
     await page.context().setOffline(true);
-    await expect(page.getByTestId('sync-status')).toHaveText("Saved on this device");
+    await expect(page.getByTestId('sync-status')).toHaveText('Saved on this device');
 
     // Two events with no network at all. Both are on screen immediately,
     // because nothing here waits on a response.
@@ -137,7 +137,7 @@ test.describe('offline editing', () => {
     await other.setOffline(true);
 
     // One sets the time, the other sets the booking status.
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
     await revealField(page, 'when');
     await page.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
     await page.getByRole('textbox', { name: 'Time' }).fill('05:30');
@@ -185,7 +185,7 @@ test.describe('offline editing', () => {
 
     // Served by the service worker, and the trip read back out of IndexedDB.
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
-    await expect(page.getByTestId('sync-status')).toHaveText("Saved on this device");
+    await expect(page.getByTestId('sync-status')).toHaveText('Saved on this device');
   });
 
   test('the trips list opens offline from the copy saved on this device', async ({
@@ -313,7 +313,7 @@ test.describe('moving events', () => {
     await openTrip(page, tripId);
 
     await addEvent(page, 'Fushimi Inari');
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
     await revealField(page, 'when');
     await page.getByTestId('event-date').fill(new Date().toISOString().slice(0, 10));
     await page.getByRole('textbox', { name: 'Time' }).fill('09:00');

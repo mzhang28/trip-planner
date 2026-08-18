@@ -39,6 +39,17 @@ import { JourneySummary } from './FlightFields';
  */
 const TIME_COLUMN = usesTwelveHourClock() ? 'w-16' : 'w-11';
 
+/**
+ * What the card is showing under its header.
+ *
+ * A click on a row lands on `details`: an event opens to what it says before it
+ * opens to a form, so reading the confirmation code costs nothing and a stray
+ * tap cannot change anything. `editor` is for the acts that meant to write --
+ * Add event, an empty day, a double click on the name, and the Edit button at
+ * the foot of the details.
+ */
+export type EventExpansion = 'closed' | 'details' | 'editor';
+
 export interface EventRowProps {
   event: TripEvent;
   homeTimezone: string;
@@ -64,8 +75,8 @@ export interface EventRowProps {
    * and would reset state living here -- so the editor would snap shut at the
    * moment someone finished typing into it.
    */
-  isOpen: boolean;
-  onToggle: () => void;
+  expansion: EventExpansion;
+  onExpansionChange: (next: EventExpansion) => void;
   /** Fields asked for during this sitting, held by the list for the same reason. */
   revealed: ReadonlySet<string>;
   onReveal: (key: string) => void;
@@ -100,11 +111,7 @@ function EventContentIndicators({ event }: { event: TripEvent }) {
         </span>
       )}
       {hasDescription && (
-        <span
-          data-testid="description-indicator"
-          title="Has description"
-          className="inline-flex"
-        >
+        <span data-testid="description-indicator" title="Has description" className="inline-flex">
           <FileText aria-hidden="true" className="size-3.5" />
           <span className="sr-only">Has description</span>
         </span>
@@ -130,7 +137,7 @@ function EventKindPicker({
         className={cn(
           'flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-ink-secondary',
           'data-hovered:bg-sunken data-hovered:text-ink data-pressed:bg-sunken',
-          'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-1',
+          'data-focus-visible:outline-2 data-focus-visible:outline-offset-1 data-focus-visible:outline-focus',
         )}
       >
         <EventKindIcon kind={kind} method={method} className="size-5" />
@@ -155,8 +162,8 @@ function EventKindPicker({
                   className={cn(
                     'flex min-w-14 cursor-pointer flex-col items-center gap-1 rounded-md px-2 py-2 text-2xs text-ink-secondary',
                     'data-hovered:bg-sunken data-hovered:text-ink data-pressed:bg-sunken',
-                    'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-1',
-                    kind === option.value && 'bg-accent-soft text-accent-strong',
+                    'data-focus-visible:outline-2 data-focus-visible:-outline-offset-1 data-focus-visible:outline-focus',
+                    kind === option.value && 'text-accent-strong bg-accent-soft',
                   )}
                 >
                   <EventKindIcon kind={option.value} className="size-5" />
@@ -187,7 +194,7 @@ function BookingStatusPicker({
         aria-label={`Change booking status, currently ${BOOKING_STATUS_LABEL[status]}`}
         className={cn(
           'cursor-pointer rounded-sm',
-          'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:outline-offset-2',
+          'data-focus-visible:outline-2 data-focus-visible:outline-offset-2 data-focus-visible:outline-focus',
           className,
         )}
       >
@@ -213,7 +220,7 @@ function BookingStatusPicker({
                   className={cn(
                     'flex cursor-pointer items-center rounded-md px-2 py-1.5 text-left',
                     'data-hovered:bg-sunken data-pressed:bg-sunken',
-                    'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-1',
+                    'data-focus-visible:outline-2 data-focus-visible:-outline-offset-1 data-focus-visible:outline-focus',
                     status === option && 'bg-sunken',
                   )}
                 >
@@ -274,7 +281,7 @@ function InlineEventName({
         }}
         className={cn(
           'flex h-8 min-w-0 flex-1 cursor-text items-center truncate rounded-sm px-2 text-sm font-medium',
-          'focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-1',
+          'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus',
           value ? 'text-ink' : 'text-ink-placeholder italic',
         )}
       >
@@ -304,9 +311,9 @@ function InlineEventName({
           }
         }}
         className={cn(
-          'h-8 min-w-0 w-full rounded-md border bg-transparent px-2 text-sm font-medium text-ink',
+          'h-8 w-full min-w-0 rounded-md border bg-transparent px-2 text-sm font-medium text-ink',
           'placeholder:text-ink-placeholder placeholder:italic',
-          'hover:border-line-input focus:bg-card focus:outline-focus focus:outline-2 focus:-outline-offset-1',
+          'hover:border-line-input focus:bg-card focus:outline-2 focus:-outline-offset-1 focus:outline-focus',
           error ? 'border-danger' : 'border-transparent focus:border-accent',
         )}
       />
@@ -344,11 +351,11 @@ export function EventRow({
   onDelete,
   doc,
   onOpenEvent,
-  isOpen,
+  expansion,
   revealed,
   onReveal,
   onRemoveField,
-  onToggle,
+  onExpansionChange,
   isSelected,
   onToggleSelected,
   selectionActive,
@@ -356,6 +363,10 @@ export function EventRow({
 }: EventRowProps) {
   const displayZone = useDisplayZone();
   const zone = displayZone(event.timezone, homeTimezone);
+  const isOpen = expansion !== 'closed';
+  // A viewer has no editor to reach, so an expansion that somehow says so
+  // still shows them the details.
+  const editing = expansion === 'editor' && !readOnly;
   // An event on a day with no hour yet reads the same as one with no day: the
   // card says nothing about when, and the day it sits under says the rest.
   const time =
@@ -363,7 +374,7 @@ export function EventRow({
 
   const linkCount = Object.keys(event.links).length;
   const summary = [
-    event.kind === 'transit' ? event.transit?.fromCity ?? event.city : event.city,
+    event.kind === 'transit' ? (event.transit?.fromCity ?? event.city) : event.city,
     event.location?.label,
     linkCount > 0 ? `${linkCount} link${linkCount === 1 ? '' : 's'}` : undefined,
   ].filter(Boolean);
@@ -377,13 +388,18 @@ export function EventRow({
     [],
   );
 
+  /** Open to the details, or shut a card that is already showing them. */
+  function toggle() {
+    setOpenForNameEdit(false);
+    onExpansionChange(isOpen ? 'closed' : 'details');
+  }
+
   function openFromClick(click: MouseEvent) {
     // Hold a pointer's first click briefly so a second click can mean inline
     // name editing without opening and replacing the row between clicks.
     if (click.detail === 1) {
       openTimer.current = setTimeout(() => {
-        setOpenForNameEdit(false);
-        onToggle();
+        toggle();
         openTimer.current = null;
       }, 200);
       return;
@@ -398,15 +414,23 @@ export function EventRow({
       click.detail === 2 &&
       (click.target as HTMLElement).closest('[data-testid="event-name"]') !== null;
 
-    setOpenForNameEdit(onTheName);
-
     /*
      * A double click on the name means "edit this", never "close this". It used
      * to toggle as well, so a card that was already open shut underneath the
      * name field it had just been asked to show -- and with the first click's
      * timer still to fire, the card went on opening and closing after that.
+     *
+     * It is also the one click that goes straight past the details: the
+     * gesture is aimed at a field, and stopping to read the event first would
+     * be answering a question nobody asked.
      */
-    if (!(onTheName && isOpen)) onToggle();
+    if (onTheName && !readOnly) {
+      setOpenForNameEdit(true);
+      onExpansionChange('editor');
+      return;
+    }
+
+    toggle();
   }
 
   return (
@@ -417,6 +441,7 @@ export function EventRow({
      * bottom edge -- which is exactly the part that is off screen.
      */
     <Card
+      data-testid="event-card"
       className={cn(
         // The spine's own strip, kept clear of everything else. Laid over the
         // card without it, the mark sat inside the padding of whatever it
@@ -449,7 +474,6 @@ export function EventRow({
         )}
         style={coloredSurfaceStyle(event.color)}
       >
-
         {!readOnly && (
           <label
             className={cn(
@@ -462,7 +486,7 @@ export function EventRow({
                */
               !selectionActive &&
                 !isSelected &&
-                '[@media(hover:hover)]:opacity-0 focus-within:opacity-100 group-hover/event-row:opacity-100',
+                'group-hover/event-row:opacity-100 focus-within:opacity-100 [@media(hover:hover)]:opacity-0',
             )}
           >
             <span className="sr-only">Select {event.name}</span>
@@ -478,7 +502,7 @@ export function EventRow({
 
         {dragHandle}
 
-        {isOpen && !readOnly ? (
+        {editing ? (
           <div data-testid="event" className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
             {/* Keeps row lookup and announcements useful while the visible name is an input. */}
             <span className="sr-only">{event.name || 'Unnamed'}</span>
@@ -514,7 +538,7 @@ export function EventRow({
               aria-expanded={isOpen}
               className={cn(
                 'flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left',
-                'data-focus-visible:outline-focus data-focus-visible:outline-2 data-focus-visible:-outline-offset-2',
+                'data-focus-visible:outline-2 data-focus-visible:-outline-offset-2 data-focus-visible:outline-focus',
               )}
             >
               <span className={cn('tabular shrink-0 text-xs text-ink-muted', TIME_COLUMN)}>
@@ -567,7 +591,7 @@ export function EventRow({
         </div>
       )}
 
-      {isOpen && readOnly && (
+      {isOpen && !editing && (
         <EventDetails
           event={event}
           homeTimezone={homeTimezone}
@@ -576,10 +600,21 @@ export function EventRow({
           cityColors={doc?.cityColors}
           doc={doc}
           onOpenEvent={onOpenEvent}
+          onEdit={
+            readOnly
+              ? undefined
+              : () => {
+                  // Edit opens the form, not the name field. That is what a
+                  // double click on the name is for, and the flag it sets
+                  // outlives the round trip back through the details.
+                  setOpenForNameEdit(false);
+                  onExpansionChange('editor');
+                }
+          }
         />
       )}
 
-      {isOpen && !readOnly && (
+      {editing && (
         <EventEditor
           event={event}
           homeTimezone={homeTimezone}
@@ -597,7 +632,7 @@ export function EventRow({
           onDelete={onDelete}
           doc={doc}
           onOpenEvent={onOpenEvent}
-          onClose={onToggle}
+          onClose={() => onExpansionChange('details')}
           revealed={revealed}
           onReveal={onReveal}
           onRemoveField={onRemoveField}

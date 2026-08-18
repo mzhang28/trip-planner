@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { GripVertical } from 'lucide-react';
 import { Example, useEventCallbacks, useTrip } from '../stories/harness';
-import { EventRow } from './EventRow';
+import { EventRow, type EventExpansion } from './EventRow';
 
 /**
  * One event in the itinerary list, closed and open.
@@ -30,7 +30,7 @@ type Story = StoryObj;
 
 interface RowProps {
   eventId: string;
-  open?: boolean;
+  expansion?: EventExpansion;
   readOnly?: boolean;
   selected?: boolean;
   selectionActive?: boolean;
@@ -40,7 +40,7 @@ interface RowProps {
 /** A card wired to a document, so everything on it actually works. */
 function Row({
   eventId,
-  open = false,
+  expansion = 'closed',
   readOnly = false,
   selected = false,
   selectionActive = false,
@@ -48,7 +48,7 @@ function Row({
 }: RowProps) {
   const trip = useTrip();
   const callbacks = useEventCallbacks(trip, eventId);
-  const [isOpen, setOpen] = useState(open);
+  const [shows, setShows] = useState<EventExpansion>(expansion);
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
   const [isSelected, setSelected] = useState(selected);
 
@@ -62,8 +62,8 @@ function Row({
       fieldDefs={callbacks.fieldDefs}
       doc={trip.doc}
       readOnly={readOnly}
-      isOpen={isOpen}
-      onToggle={() => setOpen((was) => !was)}
+      expansion={shows}
+      onExpansionChange={setShows}
       revealed={revealed}
       onReveal={(key) => setRevealed((was) => new Set(was).add(key))}
       onRemoveField={() => {}}
@@ -140,7 +140,20 @@ export const States: Story = {
 export const Open: Story = {
   render: () => (
     <List>
-      <Row eventId="e_momijiya" open />
+      <Row eventId="e_momijiya" expansion="details" />
+    </List>
+  ),
+};
+
+/**
+ * The editor, which is one press of Edit further in. Opening straight to it is
+ * for the moments where the person clearly meant to write: Add event, a tap on
+ * an empty day, a double click on the name.
+ */
+export const Editing: Story = {
+  render: () => (
+    <List>
+      <Row eventId="e_momijiya" expansion="editor" />
     </List>
   ),
 };
@@ -150,7 +163,7 @@ export const OpenFlight: Story = {
   name: 'Open (flight)',
   render: () => (
     <List>
-      <Row eventId="e_sfo_nrt" open />
+      <Row eventId="e_sfo_nrt" expansion="details" />
     </List>
   ),
 };
@@ -173,7 +186,7 @@ export const Selecting: Story = {
 export const ReadOnly: Story = {
   render: () => (
     <List>
-      <Row eventId="e_hiroshima_stay" readOnly />
+      <Row eventId="e_hiroshima_stay" readOnly expansion="details" />
       <Row eventId="e_miyajima" readOnly />
     </List>
   ),

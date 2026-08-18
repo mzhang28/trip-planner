@@ -34,13 +34,7 @@ import {
   type TripDoc,
   type TripEvent,
 } from '@trip/crdt';
-import {
-  Button,
-  IconButton,
-  SegmentedControl,
-  ThemeToggle,
-  coloredSurfaceStyle,
-} from '@trip/ui';
+import { Button, IconButton, SegmentedControl, ThemeToggle, coloredSurfaceStyle } from '@trip/ui';
 import { ChevronRight, GripVertical, Plus, Settings, Share2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
@@ -340,7 +334,17 @@ export function TripView() {
   );
   const [sharing, setSharing] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
-  const [openEventId, setOpenEventId] = useState<string | null>(null);
+  /**
+   * The one card open in the day list, and which of its two faces it shows.
+   *
+   * Opening an event shows what it says; only an act aimed at changing it --
+   * Add event, an empty day, the Edit button on the details -- opens the
+   * editor. See `EventExpansion` on the card.
+   */
+  const [openEvent, setOpenEvent] = useState<{
+    id: string;
+    shows: 'details' | 'editor';
+  } | null>(null);
 
   /*
    * Which optional fields each open event has been asked to show. Held here
@@ -545,7 +549,7 @@ export function TripView() {
    */
   useEffect(() => {
     const eventId = pendingEventScrollRef.current;
-    if (view !== 'day' || !eventId || openEventId !== eventId) return;
+    if (view !== 'day' || !eventId || openEvent?.id !== eventId) return;
 
     const frame = requestAnimationFrame(() => {
       const list = dayListRef.current;
@@ -560,13 +564,10 @@ export function TripView() {
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [view, openEventId, days.length]);
+  }, [view, openEvent?.id, days.length]);
 
   /** Everything with no day yet, which the week and month cannot draw. */
-  const undated = useMemo(
-    () => events.filter((event) => event.startsAt === undefined),
-    [events],
-  );
+  const undated = useMemo(() => events.filter((event) => event.startsAt === undefined), [events]);
 
   const phone = useMediaQuery(PHONE);
 
@@ -577,7 +578,10 @@ export function TripView() {
    * both pins on it.
    */
   const mappable = useMemo(
-    () => events.filter((event) => event.startsAt !== undefined && slotForInstant(slots, event.startsAt) === anchor),
+    () =>
+      events.filter(
+        (event) => event.startsAt !== undefined && slotForInstant(slots, event.startsAt) === anchor,
+      ),
     [events, slots, anchor],
   );
 
@@ -601,7 +605,7 @@ export function TripView() {
     pendingEventScrollRef.current = id;
     setView('day');
     setHighlighted(id);
-    setOpenEventId(id);
+    setOpenEvent({ id, shows: 'editor' });
   }
 
   function onDragEnd({ active, over }: DragEndEvent) {
@@ -707,7 +711,7 @@ export function TripView() {
     if (options.openAfterCreate !== false) {
       setView('day');
       moveAnchor(day);
-      setOpenEventId(id);
+      setOpenEvent({ id, shows: 'editor' });
       setHighlighted(id);
     }
   }
@@ -850,7 +854,14 @@ export function TripView() {
     );
   }
 
-  function focusEvent(eventId: string) {
+  /**
+   * Brings an event on screen in the day view and opens its card.
+   *
+   * Search results, mentions in a description and the map all point at an
+   * event without meaning to change it, so they get the details. Only a caller
+   * that has just made the event asks for the editor.
+   */
+  function focusEvent(eventId: string, shows: 'details' | 'editor' = 'details') {
     const event = events.find((candidate) => candidate.id === eventId);
     const day =
       event?.startsAt === undefined
@@ -861,7 +872,7 @@ export function TripView() {
     if (day) moveAnchor(day);
     setView('day');
     setHighlighted(eventId);
-    setOpenEventId(eventId);
+    setOpenEvent({ id: eventId, shows });
   }
 
   function toggleSelected(eventId: string) {
@@ -922,16 +933,14 @@ export function TripView() {
 
     remember({
       message: `Removed ${label}`,
-      revert: () => store?.change((current) => restoreField(current, eventId, held, { userId: 'me' })),
+      revert: () =>
+        store?.change((current) => restoreField(current, eventId, held, { userId: 'me' })),
     });
   }
 
   function bulkDelete() {
     const ids = [...selected];
-    removeEvents(
-      ids,
-      ids.length === 1 ? 'Deleted 1 event' : `Deleted ${ids.length} events`,
-    );
+    removeEvents(ids, ids.length === 1 ? 'Deleted 1 event' : `Deleted ${ids.length} events`);
     setSelected(new Set());
   }
 
@@ -1167,43 +1176,43 @@ export function TripView() {
         className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-4 py-6 sm:px-6 lg:px-8"
       >
         <div className="shrink-0">
-        {state && store && <RecoveryBanner state={state} store={store} />}
+          {state && store && <RecoveryBanner state={state} store={store} />}
 
-        {/*
+          {/*
           Your copy, unchecked. Editing stays open because that is what this app
           is for, but the trip could not be confirmed to still exist or still be
           yours -- which is worth knowing before an afternoon of planning.
         */}
-        {access === 'unreachable' && (
-          <div
-            role="status"
-            data-testid="offline-copy"
-            className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-sunken px-4 py-3"
-          >
-            <p className="min-w-0 flex-1 text-sm text-ink">
-              Showing your copy of this trip. The server could not be reached, so changes stay on
-              this device until it can be.
+          {access === 'unreachable' && (
+            <div
+              role="status"
+              data-testid="offline-copy"
+              className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-sunken px-4 py-3"
+            >
+              <p className="min-w-0 flex-1 text-sm text-ink">
+                Showing your copy of this trip. The server could not be reached, so changes stay on
+                this device until it can be.
+              </p>
+              <Button size="sm" onPress={() => retryAccess()}>
+                Try again
+              </Button>
+            </div>
+          )}
+
+          {events.length === 0 && (
+            <p className="py-10 text-center text-ink-secondary">
+              Nothing here yet. Add the first thing you know about — where you are staying, or the
+              flight out.
             </p>
-            <Button size="sm" onPress={() => retryAccess()}>
-              Try again
-            </Button>
-          </div>
-        )}
+          )}
 
-        {events.length === 0 && (
-          <p className="py-10 text-center text-ink-secondary">
-            Nothing here yet. Add the first thing you know about — where you are staying, or the
-            flight out.
-          </p>
-        )}
-
-        <DayNavigator
-          view={view}
-          anchor={anchor}
-          tripStart={tripRange.start}
-          tripEnd={tripRange.end}
-          onChange={moveAnchor}
-        />
+          <DayNavigator
+            view={view}
+            anchor={anchor}
+            tripStart={tripRange.start}
+            tripEnd={tripRange.end}
+            onChange={moveAnchor}
+          />
         </div>
 
         {/*
@@ -1213,269 +1222,282 @@ export function TripView() {
           hotels are -- past the edge that clips.
         */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          {/*
+          <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+            {/*
             Everything still waiting for a day. The week and the month are
             drawn from dates, so an event without one was invisible in both --
             the calendar gave no clue that the work was outstanding. Drag one
             onto a day, or open it and pick a date.
           */}
-          {view !== 'day' && undated.length > 0 && (
-            <div
-              data-testid="unscheduled-tray"
-              className="mb-2 flex shrink-0 flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-1.5"
-            >
-              <span className="text-2xs text-ink-muted">
-                {undated.length} with no date yet
-              </span>
-
-              {undated.slice(0, 6).map((event) => (
-                <DraggableEvent key={event.id} id={event.id} disabled={readOnly}>
-                  {(handle) => (
-                    <button
-                      {...handle}
-                      type="button"
-                      data-testid="unscheduled-item"
-                      onClick={() => focusEvent(event.id)}
-                      style={coloredSurfaceStyle(event.color)}
-                      className="max-w-40 truncate rounded-sm border border-line bg-card px-1.5 py-0.5 text-2xs text-ink hover:bg-sunken focus-visible:outline-focus focus-visible:outline-2"
-                    >
-                      {event.name || 'Unnamed'}
-                    </button>
-                  )}
-                </DraggableEvent>
-              ))}
-
-              {undated.length > 6 && (
-                <span className="text-2xs text-ink-muted">+{undated.length - 6} more</span>
-              )}
-            </div>
-          )}
-
-          {view === 'week' && (
-            <WeekView
-              anchor={anchor}
-              tripStart={tripRange.start}
-              tripEnd={tripRange.end}
-              events={events}
-              cityColors={doc?.cityColors}
-              homeTimezone={homeTimezone}
-              slots={slots}
-              onSetDayZone={(day, timezone) =>
-                store?.change((current) => setDayZone(current, day, timezone))
-              }
-              weather={weather}
-              today={today}
-              readOnly={readOnly}
-              onOpenEvent={focusEvent}
-              onCreateAt={(day, name, startMinutes, endMinutes) =>
-                createOn(day, { startMinutes, endMinutes, name, openAfterCreate: false })
-              }
-              onCreateLodging={createLodging}
-              onMoveEvent={moveEventTo}
-            />
-          )}
-
-          {view === 'month' && (
-            <MonthView
-              anchor={anchor}
-              tripStart={tripRange.start}
-              tripEnd={tripRange.end}
-              events={events}
-              cityColors={doc?.cityColors}
-              homeTimezone={homeTimezone}
-              weather={weather}
-              today={today}
-              readOnly={readOnly}
-              onOpenDay={(day) => {
-                moveAnchor(day);
-                setView('day');
-              }}
-              onOpenEvent={focusEvent}
-              onCreateOn={(day) => createOn(day)}
-            />
-          )}
-
-          {view === 'day' && (
-            <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+            {view !== 'day' && undated.length > 0 && (
               <div
-                ref={dayListRef}
-                data-testid="day-list-scroll"
-                className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:pr-1"
+                data-testid="unscheduled-tray"
+                className="mb-2 flex shrink-0 flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-1.5"
               >
-          {days.map(([key, dayEvents]) => (
-            <section key={key} data-day-section={key} className="mb-8">
-              <h2 className="mb-2 text-sm text-ink-muted">
-                {key === UNSCHEDULED ? (
-                  'No date yet'
-                ) : (
-                  <button
-                    type="button"
-                    data-testid={`day-heading-${key}`}
-                    onClick={() => {
-                      moveAnchor(key);
-                      setView('week');
-                    }}
-                    className="inline-flex items-center gap-1 rounded-sm hover:text-ink focus-visible:outline-focus focus-visible:outline-2 focus-visible:outline-offset-2"
-                  >
-                    {/*
-                     * From the day itself, not from its first event. A day the
-                     * person navigated to has no events to ask, which is
-                     * exactly when it needs a heading.
-                     */}
-                    {formatDayHeading(Date.parse(`${key}T12:00:00Z`), 'UTC')}
-                    <ChevronRight aria-hidden="true" className="size-3.5" />
-                  </button>
-                )}
-              </h2>
+                <span className="text-2xs text-ink-muted">{undated.length} with no date yet</span>
 
-              <DayDropZone dayKey={key} disabled={readOnly || key === UNSCHEDULED}>
-                {dayEvents.length === 0 && !readOnly && (
-                  <button
-                    type="button"
-                    data-testid={`add-on-${key}`}
-                    onClick={() => createOn(key)}
-                    className="w-full rounded-lg border border-dashed border-line-default px-3 py-6 text-sm text-ink-muted hover:border-accent hover:bg-accent-soft hover:text-accent-text focus-visible:outline-focus focus-visible:outline-2"
-                  >
-                    Nothing on this day yet. Add something.
-                  </button>
-                )}
+                {undated.slice(0, 6).map((event) => (
+                  <DraggableEvent key={event.id} id={event.id} disabled={readOnly}>
+                    {(handle) => (
+                      <button
+                        {...handle}
+                        type="button"
+                        data-testid="unscheduled-item"
+                        onClick={() => focusEvent(event.id)}
+                        style={coloredSurfaceStyle(event.color)}
+                        className="max-w-40 truncate rounded-sm border border-line bg-card px-1.5 py-0.5 text-2xs text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-focus"
+                      >
+                        {event.name || 'Unnamed'}
+                      </button>
+                    )}
+                  </DraggableEvent>
+                ))}
 
-                <div className="flex flex-col gap-2">
-                  {dayEvents.map((event, index) => (
-                    <div key={event.id}>
-                      <TransitLeg event={event} previous={dayEvents[index - 1]} />
-                      <DraggableEvent id={event.id} disabled={readOnly}>
-                      {(handle) => (
-                        <div
-                          id={`event-${event.id}`}
-                          className={
-                            highlighted === event.id ? 'rounded-lg ring-2 ring-accent' : undefined
-                          }
-                        >
-                          <EventRow
-                            dragHandle={
-                              handle ? (
-                                <button
-                                  {...handle}
-                                  type="button"
-                                  aria-label={`Move ${event.name} to another day`}
-                                  className="flex cursor-grab touch-none items-center justify-center px-1 text-ink-placeholder hover:text-ink-muted focus-visible:outline-focus focus-visible:outline-2"
-                                >
-                                  <GripVertical aria-hidden="true" className="size-4" />
-                                </button>
-                              ) : undefined
-                            }
-                            event={event}
-                            isSelected={selected.has(event.id)}
-                            onToggleSelected={() => toggleSelected(event.id)}
-                            selectionActive={selected.size > 0}
-                            isOpen={openEventId === event.id}
-                            onToggle={() => {
-                              if (openEventId === event.id) setOpenEventId(null);
-                              else focusEvent(event.id);
+                {undated.length > 6 && (
+                  <span className="text-2xs text-ink-muted">+{undated.length - 6} more</span>
+                )}
+              </div>
+            )}
+
+            {view === 'week' && (
+              <WeekView
+                anchor={anchor}
+                tripStart={tripRange.start}
+                tripEnd={tripRange.end}
+                events={events}
+                cityColors={doc?.cityColors}
+                homeTimezone={homeTimezone}
+                slots={slots}
+                onSetDayZone={(day, timezone) =>
+                  store?.change((current) => setDayZone(current, day, timezone))
+                }
+                weather={weather}
+                today={today}
+                readOnly={readOnly}
+                onOpenEvent={focusEvent}
+                onCreateAt={(day, name, startMinutes, endMinutes) =>
+                  createOn(day, { startMinutes, endMinutes, name, openAfterCreate: false })
+                }
+                onCreateLodging={createLodging}
+                onMoveEvent={moveEventTo}
+              />
+            )}
+
+            {view === 'month' && (
+              <MonthView
+                anchor={anchor}
+                tripStart={tripRange.start}
+                tripEnd={tripRange.end}
+                events={events}
+                cityColors={doc?.cityColors}
+                homeTimezone={homeTimezone}
+                weather={weather}
+                today={today}
+                readOnly={readOnly}
+                onOpenDay={(day) => {
+                  moveAnchor(day);
+                  setView('day');
+                }}
+                onOpenEvent={focusEvent}
+                onCreateOn={(day) => createOn(day)}
+              />
+            )}
+
+            {view === 'day' && (
+              <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
+                <div
+                  ref={dayListRef}
+                  data-testid="day-list-scroll"
+                  className="min-h-0 min-w-0 flex-1 overflow-y-auto lg:pr-1"
+                >
+                  {days.map(([key, dayEvents]) => (
+                    <section key={key} data-day-section={key} className="mb-8">
+                      <h2 className="mb-2 text-sm text-ink-muted">
+                        {key === UNSCHEDULED ? (
+                          'No date yet'
+                        ) : (
+                          <button
+                            type="button"
+                            data-testid={`day-heading-${key}`}
+                            onClick={() => {
+                              moveAnchor(key);
+                              setView('week');
                             }}
-                            homeTimezone={homeTimezone}
-                            fieldDefs={fieldDefs}
-                            readOnly={readOnly}
-                            onPatch={(patch) =>
-                              store?.change((current) =>
-                                updateEvent(
-                                  current,
-                                  event.id,
-                                  patch as Partial<EditableEventFields>,
-                                  { userId: 'me' },
-                                ),
-                              )
-                            }
-                            onAddLink={(url, title) =>
-                              store?.change((current) =>
-                                addLink(
-                                  current,
-                                  event.id,
-                                  `l_${randomId()}`,
-                                  { url, title },
-                                  { userId: 'me' },
-                                ),
-                              )
-                            }
-                            onRemoveLink={(linkId) =>
-                              store?.change((current) =>
-                                removeLink(current, event.id, linkId, { userId: 'me' }),
-                              )
-                            }
-                            onSetCustomField={(fieldId: FieldDefId, value: CustomValue | undefined) =>
-                              store?.change((current) =>
-                                setCustomField(current, event.id, fieldId, value, {
-                                  userId: 'me',
-                                }),
-                              )
-                            }
-                            onSetCityColor={(city, color) =>
-                              store?.change((current) => setCityColor(current, city, color))
-                            }
-                            onAddAttachment={(id, attachment: EventAttachment) =>
-                              store?.change((current) =>
-                                addAttachment(current, event.id, id, attachment, {
-                                  userId: 'me',
-                                }),
-                              )
-                            }
-                            onRemoveAttachment={(id) =>
-                              store?.change((current) =>
-                                removeAttachment(current, event.id, id, { userId: 'me' }),
-                              )
-                            }
-                            onAddTodo={(text, deadline) =>
-                              store?.change((current) =>
-                                addTodo(
-                                  current,
-                                  event.id,
-                                  `todo_${randomId()}`,
-                                  { text, deadline },
-                                  { userId: 'me' },
-                                ),
-                              )
-                            }
-                            onUpdateTodo={(id, patch: Partial<EditableTodo>) =>
-                              store?.change((current) =>
-                                updateTodo(current, event.id, id, patch, { userId: 'me' }),
-                              )
-                            }
-                            onRemoveTodo={(id) =>
-                              store?.change((current) =>
-                                removeTodo(current, event.id, id, { userId: 'me' }),
-                              )
-                            }
-                            onDelete={() =>
-                              removeEvents(
-                                [event.id],
-                                `Deleted ${event.name || 'the unnamed event'}`,
-                              )
-                            }
-                            doc={doc}
-                            onOpenEvent={focusEvent}
-                            revealed={revealedFields[event.id] ?? NOTHING_REVEALED}
-                            onReveal={(key) =>
-                              setRevealedFields((current) => ({
-                                ...current,
-                                [event.id]: new Set(current[event.id]).add(key),
-                              }))
-                            }
-                            onRemoveField={(key, label) => removeField(event.id, key, label)}
-                          />
-                          </div>
+                            className="inline-flex items-center gap-1 rounded-sm hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                          >
+                            {/*
+                             * From the day itself, not from its first event. A day the
+                             * person navigated to has no events to ask, which is
+                             * exactly when it needs a heading.
+                             */}
+                            {formatDayHeading(Date.parse(`${key}T12:00:00Z`), 'UTC')}
+                            <ChevronRight aria-hidden="true" className="size-3.5" />
+                          </button>
                         )}
-                      </DraggableEvent>
-                    </div>
+                      </h2>
+
+                      <DayDropZone dayKey={key} disabled={readOnly || key === UNSCHEDULED}>
+                        {dayEvents.length === 0 && !readOnly && (
+                          <button
+                            type="button"
+                            data-testid={`add-on-${key}`}
+                            onClick={() => createOn(key)}
+                            className="w-full rounded-lg border border-dashed border-line-default px-3 py-6 text-sm text-ink-muted hover:border-accent hover:bg-accent-soft hover:text-accent-text focus-visible:outline-2 focus-visible:outline-focus"
+                          >
+                            Nothing on this day yet. Add something.
+                          </button>
+                        )}
+
+                        <div className="flex flex-col gap-2">
+                          {dayEvents.map((event, index) => (
+                            <div key={event.id}>
+                              <TransitLeg event={event} previous={dayEvents[index - 1]} />
+                              <DraggableEvent id={event.id} disabled={readOnly}>
+                                {(handle) => (
+                                  <div
+                                    id={`event-${event.id}`}
+                                    className={
+                                      highlighted === event.id
+                                        ? 'rounded-lg ring-2 ring-accent'
+                                        : undefined
+                                    }
+                                  >
+                                    <EventRow
+                                      dragHandle={
+                                        handle ? (
+                                          <button
+                                            {...handle}
+                                            type="button"
+                                            aria-label={`Move ${event.name} to another day`}
+                                            className="flex cursor-grab touch-none items-center justify-center px-1 text-ink-placeholder hover:text-ink-muted focus-visible:outline-2 focus-visible:outline-focus"
+                                          >
+                                            <GripVertical aria-hidden="true" className="size-4" />
+                                          </button>
+                                        ) : undefined
+                                      }
+                                      event={event}
+                                      isSelected={selected.has(event.id)}
+                                      onToggleSelected={() => toggleSelected(event.id)}
+                                      selectionActive={selected.size > 0}
+                                      expansion={
+                                        openEvent?.id === event.id ? openEvent.shows : 'closed'
+                                      }
+                                      onExpansionChange={(next) => {
+                                        if (next === 'closed') setOpenEvent(null);
+                                        else if (openEvent?.id === event.id) {
+                                          setOpenEvent({ id: event.id, shows: next });
+                                        } else focusEvent(event.id, next);
+                                      }}
+                                      homeTimezone={homeTimezone}
+                                      fieldDefs={fieldDefs}
+                                      readOnly={readOnly}
+                                      onPatch={(patch) =>
+                                        store?.change((current) =>
+                                          updateEvent(
+                                            current,
+                                            event.id,
+                                            patch as Partial<EditableEventFields>,
+                                            { userId: 'me' },
+                                          ),
+                                        )
+                                      }
+                                      onAddLink={(url, title) =>
+                                        store?.change((current) =>
+                                          addLink(
+                                            current,
+                                            event.id,
+                                            `l_${randomId()}`,
+                                            { url, title },
+                                            { userId: 'me' },
+                                          ),
+                                        )
+                                      }
+                                      onRemoveLink={(linkId) =>
+                                        store?.change((current) =>
+                                          removeLink(current, event.id, linkId, { userId: 'me' }),
+                                        )
+                                      }
+                                      onSetCustomField={(
+                                        fieldId: FieldDefId,
+                                        value: CustomValue | undefined,
+                                      ) =>
+                                        store?.change((current) =>
+                                          setCustomField(current, event.id, fieldId, value, {
+                                            userId: 'me',
+                                          }),
+                                        )
+                                      }
+                                      onSetCityColor={(city, color) =>
+                                        store?.change((current) =>
+                                          setCityColor(current, city, color),
+                                        )
+                                      }
+                                      onAddAttachment={(id, attachment: EventAttachment) =>
+                                        store?.change((current) =>
+                                          addAttachment(current, event.id, id, attachment, {
+                                            userId: 'me',
+                                          }),
+                                        )
+                                      }
+                                      onRemoveAttachment={(id) =>
+                                        store?.change((current) =>
+                                          removeAttachment(current, event.id, id, { userId: 'me' }),
+                                        )
+                                      }
+                                      onAddTodo={(text, deadline) =>
+                                        store?.change((current) =>
+                                          addTodo(
+                                            current,
+                                            event.id,
+                                            `todo_${randomId()}`,
+                                            { text, deadline },
+                                            { userId: 'me' },
+                                          ),
+                                        )
+                                      }
+                                      onUpdateTodo={(id, patch: Partial<EditableTodo>) =>
+                                        store?.change((current) =>
+                                          updateTodo(current, event.id, id, patch, {
+                                            userId: 'me',
+                                          }),
+                                        )
+                                      }
+                                      onRemoveTodo={(id) =>
+                                        store?.change((current) =>
+                                          removeTodo(current, event.id, id, { userId: 'me' }),
+                                        )
+                                      }
+                                      onDelete={() =>
+                                        removeEvents(
+                                          [event.id],
+                                          `Deleted ${event.name || 'the unnamed event'}`,
+                                        )
+                                      }
+                                      doc={doc}
+                                      onOpenEvent={focusEvent}
+                                      revealed={revealedFields[event.id] ?? NOTHING_REVEALED}
+                                      onReveal={(key) =>
+                                        setRevealedFields((current) => ({
+                                          ...current,
+                                          [event.id]: new Set(current[event.id]).add(key),
+                                        }))
+                                      }
+                                      onRemoveField={(key, label) =>
+                                        removeField(event.id, key, label)
+                                      }
+                                    />
+                                  </div>
+                                )}
+                              </DraggableEvent>
+                            </div>
+                          ))}
+                        </div>
+                      </DayDropZone>
+                    </section>
                   ))}
                 </div>
-              </DayDropZone>
-            </section>
-          ))}
-              </div>
 
-              {/*
+                {/*
                 Beside the timeline from the large breakpoint up, and under it
                 between there and a phone. A phone gets no map: it has nowhere
                 to put one but under the list, where it would take a third of
@@ -1483,28 +1505,24 @@ export function TripView() {
                 already name. Left out of the tree, so Leaflet never mounts and
                 no tile is fetched.
               */}
-              {/*
+                {/*
                 Takes its space only when there is a pin to put in it. Before
                 that the panel is one line, and the itinerary has the width.
               */}
-              {!phone && (
-                <aside
-                  className={
-                    mappable.some((event) => event.location?.lat !== undefined)
-                      ? 'h-64 shrink-0 lg:h-full lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
-                      : 'shrink-0 lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
-                  }
-                >
-                  <DayMap
-                    events={mappable}
-                    selectedId={highlighted}
-                    onSelect={focusEvent}
-                  />
-                </aside>
-              )}
-            </div>
-          )}
-        </DndContext>
+                {!phone && (
+                  <aside
+                    className={
+                      mappable.some((event) => event.location?.lat !== undefined)
+                        ? 'h-64 shrink-0 lg:h-full lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
+                        : 'shrink-0 lg:w-[26rem] xl:w-[34rem] 2xl:w-[42rem]'
+                    }
+                  >
+                    <DayMap events={mappable} selectedId={highlighted} onSelect={focusEvent} />
+                  </aside>
+                )}
+              </div>
+            )}
+          </DndContext>
         </div>
 
         {sharing && tripId && <SharePanel tripId={tripId} onClose={() => setSharing(false)} />}
@@ -1524,26 +1542,19 @@ export function TripView() {
 
         {/* Never both: the selection bar is in the same place at the bottom. */}
         {undoable && selected.size === 0 && (
-          <UndoBar
-            message={undoable.message}
-            onUndo={undo}
-            onDismiss={() => setUndoable(null)}
-          />
+          <UndoBar message={undoable.message} onUndo={undo} onDismiss={() => setUndoable(null)} />
         )}
 
         {mergePrimary && (
           <MergePreview
             primary={events.find((event) => event.id === mergePrimary)!}
-            others={events.filter(
-              (event) => selected.has(event.id) && event.id !== mergePrimary,
-            )}
+            others={events.filter((event) => selected.has(event.id) && event.id !== mergePrimary)}
             onChangePrimary={setMergePrimary}
             onConfirm={confirmMerge}
             onCancel={() => setMergePrimary(null)}
           />
         )}
       </main>
-
     </TripChrome>
   );
 }

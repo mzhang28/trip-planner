@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent, goToScreen, switchView } from './helpers';
+import { addNewEvent, editEvent, goToScreen, switchView } from './helpers';
 
 /** A trip whose only event is a stay spanning three weeks. */
 async function tripWithALongStay(page: Page) {
@@ -21,10 +21,7 @@ async function tripWithALongStay(page: Page) {
   await goToScreen(page, 'Itinerary');
 
   await addNewEvent(page, 'A deliberately named long hotel');
-  await page
-    .getByTestId('event')
-    .filter({ hasText: 'A deliberately named long hotel' })
-    .click();
+  await editEvent(page, 'A deliberately named long hotel');
   await page.getByTestId('event-kind-button').click();
   await page
     .getByRole('dialog', { name: 'Event kind' })

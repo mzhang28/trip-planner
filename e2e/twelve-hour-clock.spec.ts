@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent, switchView } from './helpers';
+import { addNewEvent, editEvent, switchView } from './helpers';
 
 /*
  * The rest of the suite runs on en-GB, which reads times as 24 hours. This file
@@ -49,7 +49,7 @@ async function revealField(page: Page, key: string) {
 /** Opens an event's date and time fields, having given it a day to be on. */
 async function openWhen(page: Page, name: string) {
   await addNewEvent(page, name);
-  await eventRow(page, name).click();
+  await editEvent(page, name);
 
   const editor = page.getByTestId('event-editor');
   await expect(editor).toHaveCount(1);
@@ -76,7 +76,7 @@ test('a time typed with an AM or PM is kept and shown back that way', async ({ p
   // Stored as a moment rather than as the text that was typed, so it survives
   // the round trip through the document.
   await page.reload();
-  await eventRow(page, 'Fushimi Inari').click();
+  await editEvent(page, 'Fushimi Inari');
   await expect(page.getByRole('textbox', { name: 'Time' })).toHaveValue(/^9:00\sPM$/);
 });
 

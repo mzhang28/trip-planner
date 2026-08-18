@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, editEvent } from './helpers';
 
 async function newTrip(page: Page, name: string) {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -30,8 +30,7 @@ test.describe('exporting and importing a trip', () => {
     const tripId = await newTrip(page, 'Kyoto, export');
 
     await addNewEvent(page, 'Fushimi Inari');
-    await page.getByTestId('event').filter({ hasText: 'Fushimi Inari' }).click();
-    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await editEvent(page, 'Fushimi Inari');
 
     const editor = page.getByTestId('event-editor');
     if ((await editor.getByTestId('add-field-files').count()) === 0) {
@@ -69,7 +68,7 @@ test.describe('exporting and importing a trip', () => {
     await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
     await expect(page.getByTestId('event').filter({ hasText: 'Fushimi Inari' })).toBeVisible();
 
-    await page.getByTestId('event').filter({ hasText: 'Fushimi Inari' }).click();
+    await editEvent(page, 'Fushimi Inari');
     const attachment = page.getByTestId('event-editor').getByRole('link', { name: 'booking.txt' });
     await expect(attachment).toBeVisible();
 

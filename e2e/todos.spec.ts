@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent, goToScreen } from './helpers';
+import { addNewEvent, editEvent, goToScreen } from './helpers';
 
 async function newTrip(page: Page) {
   await page.goto('/');
@@ -44,13 +44,13 @@ test('event todos are collected with deadlines first and remain checkable', asyn
   const tripId = await newTrip(page);
 
   await addNewEvent(page, 'Packing');
-  await eventRow(page, 'Packing').click();
+  await editEvent(page, 'Packing');
   await revealTodos(page);
   await addTodo(page, 'Pack charger');
   await page.getByTestId('close-editor').click();
 
   await addNewEvent(page, 'Flight');
-  await eventRow(page, 'Flight').click();
+  await editEvent(page, 'Flight');
   await revealTodos(page);
   await addTodo(page, 'Check in online', '2026-09-05');
   await addTodo(page, 'Choose a seat', '2026-09-02');
@@ -61,11 +61,9 @@ test('event todos are collected with deadlines first and remain checkable', asyn
 
   const rows = page.getByTestId('trip-todo');
   await expect(rows).toHaveCount(3);
-  expect(await rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-deadline')))).toEqual([
-    '2026-09-02',
-    '2026-09-05',
-    '',
-  ]);
+  expect(
+    await rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-deadline'))),
+  ).toEqual(['2026-09-02', '2026-09-05', '']);
   await expect(rows.nth(0)).toContainText('Choose a seat');
   await expect(rows.nth(1)).toContainText('Check in online');
   await expect(rows.nth(2)).toContainText('Pack charger');
@@ -73,5 +71,7 @@ test('event todos are collected with deadlines first and remain checkable', asyn
   await page.getByRole('checkbox', { name: 'Mark complete: Choose a seat' }).check();
   await expect(page.getByTestId('sync-status')).toHaveText('Saved', { timeout: 15_000 });
   await page.reload();
-  await expect(page.getByRole('checkbox', { name: 'Mark incomplete: Choose a seat' })).toBeChecked();
+  await expect(
+    page.getByRole('checkbox', { name: 'Mark incomplete: Choose a seat' }),
+  ).toBeChecked();
 });

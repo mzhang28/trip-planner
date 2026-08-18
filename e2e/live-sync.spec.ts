@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, editEvent } from './helpers';
 
 /**
  * Creates a trip and returns an editor link for it.
@@ -92,7 +92,7 @@ test.describe('two people with the trip open', () => {
     await expect(eventRow(otherPage, 'Nishiki Market')).toBeVisible({ timeout: 15_000 });
 
     // The first person gives the event a city while the second is looking at it.
-    await eventRow(page, 'Nishiki Market').click();
+    await editEvent(page, 'Nishiki Market');
     const editor = page.getByTestId('event-editor');
     if ((await editor.getByTestId('field-city').count()) === 0) {
       if ((await editor.getByTestId('add-field-city').count()) === 0) {

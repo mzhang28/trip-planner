@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, editEvent } from './helpers';
 
 async function newTrip(page: Page) {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -29,7 +29,7 @@ async function addEvent(page: Page, name: string) {
 
 /** Opens an event and reveals its description, which starts behind a chip. */
 async function openWithDescription(page: Page, name: string) {
-  await eventRow(page, name).click();
+  await editEvent(page, name);
 
   const editor = page.getByTestId('event-editor');
   if ((await editor.getByTestId('field-description').count()) === 0) {
@@ -64,8 +64,6 @@ test.describe('pointing at the rest of the trip', () => {
     // Renaming what it points at renames the mention, because the id is the
     // reference and the label is only a copy.
     await page.getByTestId('close-editor').click();
-    await eventRow(page, 'Nishiki Market').click();
-
     // Scoped to the card being renamed: every card carries its own name.
     await eventRow(page, 'Nishiki Market').getByTestId('event-name').dblclick();
     await page.getByRole('textbox', { name: 'Name' }).fill('Nishiki, morning');
@@ -90,7 +88,7 @@ test.describe('pointing at the rest of the trip', () => {
     await expect(page.getByTestId('mention')).toBeVisible();
 
     await page.getByTestId('close-editor').click();
-    await eventRow(page, 'Nishiki Market').click();
+    await editEvent(page, 'Nishiki Market');
     await page.getByTestId('event-editor').getByRole('button', { name: 'Delete event' }).click();
 
     await eventRow(page, 'Fushimi Inari').click();

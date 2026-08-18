@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent } from './helpers';
+import { addNewEvent, editEvent } from './helpers';
 
 async function newTrip(page: Page) {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -20,8 +20,7 @@ async function newTrip(page: Page) {
 
 async function addEvent(page: Page, name: string) {
   await addNewEvent(page, name);
-  await page.getByTestId('event').filter({ hasText: name }).click();
-  await expect(page.getByTestId('event-editor')).toBeVisible();
+  await editEvent(page, name);
 
   // Files are behind their chip until the event has one.
   const editor = page.getByTestId('event-editor');
@@ -70,7 +69,10 @@ test.describe('attachments', () => {
     await expect(row.getByTestId('description-indicator')).toBeVisible();
   });
 
-  test('a file attached with no network is kept and sent on reconnect', async ({ page, context }) => {
+  test('a file attached with no network is kept and sent on reconnect', async ({
+    page,
+    context,
+  }) => {
     await page.goto('/');
     await newTrip(page);
     await addEvent(page, 'Ryokan');

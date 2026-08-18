@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent, goToScreen, switchView } from './helpers';
+import { addNewEvent, closeEvent, editEvent, goToScreen, switchView } from './helpers';
 
 /*
  * The hours the week timetable shows out of the box. A column covers exactly
@@ -37,7 +37,7 @@ async function addEvent(page: Page, name: string, city: string, time: string, da
   await addNewEvent(page, name);
   await expect(eventRow(page, name)).toBeVisible();
 
-  await eventRow(page, name).click();
+  await editEvent(page, name);
 
   // Scoped to the open editor. Two open at once would make every field query
   // ambiguous, and the assertion says which happened rather than leaving a
@@ -73,10 +73,8 @@ async function addEvent(page: Page, name: string, city: string, time: string, da
 
   // Close whichever card is open. The event has moved to another day by now,
   // so it is not necessarily the one that was clicked to open it.
-  await page.getByTestId('close-editor').click();
-  await expect(page.getByTestId('event-editor')).toHaveCount(0);
+  await closeEvent(page, name);
 }
-
 
 /**
  * Reveals a field before filling it.
@@ -211,9 +209,9 @@ test.describe('week and month views', () => {
       expect(sfBox.height / cellBox.height).toBeCloseTo(15 / 24, 1);
       expect(tokyoBox.height / cellBox.height).toBeCloseTo(9 / 24, 1);
 
-      const mainFits = await page.locator('main').evaluate(
-        (element) => element.scrollHeight <= element.clientHeight,
-      );
+      const mainFits = await page
+        .locator('main')
+        .evaluate((element) => element.scrollHeight <= element.clientHeight);
       expect(mainFits).toBe(true);
     },
   );
@@ -233,13 +231,14 @@ test.describe('week and month views', () => {
 
     await cell.getByText('Fushimi Inari').click();
 
-    // Clicking an event drops back into the day view with that event open.
+    // Clicking an event drops back into the day view with that event open on
+    // what it says.
     await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
-    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await expect(page.getByTestId('event-details')).toBeVisible();
   });
 
-  test('events opened from month and week are scrolled into editing view', async ({ page }) => {
+  test('events opened from month and week are scrolled into view', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 600 });
     await page.goto('/');
     await newTrip(page, 'Japan, April');
@@ -257,15 +256,15 @@ test.describe('week and month views', () => {
 
     async function expectOpenedAndScrolled() {
       const list = page.getByTestId('day-list-scroll');
-      const editor = page.getByTestId('event-editor');
+      const details = page.getByTestId('event-details');
       await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
-      await expect(editor).toBeVisible();
+      await expect(details).toBeVisible();
       await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
 
-      const [listBox, editorBox] = await Promise.all([list.boundingBox(), editor.boundingBox()]);
-      if (!listBox || !editorBox) throw new Error('no focused event bounds');
-      expect(editorBox.y).toBeGreaterThanOrEqual(listBox.y);
-      expect(editorBox.y).toBeLessThan(listBox.y + listBox.height);
+      const [listBox, detailsBox] = await Promise.all([list.boundingBox(), details.boundingBox()]);
+      if (!listBox || !detailsBox) throw new Error('no focused event bounds');
+      expect(detailsBox.y).toBeGreaterThanOrEqual(listBox.y);
+      expect(detailsBox.y).toBeLessThan(listBox.y + listBox.height);
     }
 
     await switchView(page, 'Month');
@@ -422,10 +421,7 @@ test.describe('week and month views', () => {
 
     // The theme sits at the bottom of the popover, which is the end that the
     // week's sticky day names used to cover.
-    await page
-      .getByRole('dialog', { name: 'Settings' })
-      .getByText('Dark', { exact: true })
-      .click();
+    await page.getByRole('dialog', { name: 'Settings' }).getByText('Dark', { exact: true }).click();
 
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
@@ -437,7 +433,7 @@ test.describe('flights and the map', () => {
     await newTrip(page, 'Japan, April');
 
     await addNewEvent(page, 'Flight to Osaka');
-    await eventRow(page, 'Flight to Osaka').click();
+    await editEvent(page, 'Flight to Osaka');
 
     const editor = page.getByTestId('event-editor');
     await page.getByTestId('event-kind-button').click();
@@ -510,7 +506,7 @@ test.describe('flights and the map', () => {
     await setTripDates(page, '2026-08-10', '2026-08-16');
 
     await addNewEvent(page, 'Kyoto to Osaka');
-    await eventRow(page, 'Kyoto to Osaka').click();
+    await editEvent(page, 'Kyoto to Osaka');
     await page.getByTestId('event-kind-button').click();
     await page
       .getByRole('dialog', { name: 'Event kind' })
@@ -518,7 +514,9 @@ test.describe('flights and the map', () => {
       .click();
 
     let editor = page.getByTestId('event-editor');
-    await expect(eventRow(page, 'Kyoto to Osaka').getByRole('img', { name: 'Transit' })).toBeVisible();
+    await expect(
+      eventRow(page, 'Kyoto to Osaka').getByRole('img', { name: 'Transit' }),
+    ).toBeVisible();
     await expect(editor.getByTestId('field-route')).toBeVisible();
     await editor.getByRole('textbox', { name: 'Starting city' }).fill('Kyoto');
     await editor.getByRole('textbox', { name: 'Starting city' }).blur();
@@ -652,7 +650,7 @@ test.describe('getting between events', () => {
     await addEvent(page, 'Nishiki Market', 'Kyoto', '12:00');
     await addEvent(page, 'Fushimi Inari', 'Kyoto', '12:20');
 
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
     const editor = page.getByTestId('event-editor');
     await revealField(page, 'transit');
 
@@ -720,7 +718,7 @@ test.describe('filling an event in gradually', () => {
     await newTrip(page, 'Japan, April');
 
     await addNewEvent(page, 'Fushimi Inari');
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
 
     const editor = page.getByTestId('event-editor');
 
@@ -780,7 +778,7 @@ test.describe('filling an event in gradually', () => {
     await newTrip(page, 'Japan, April');
 
     await addNewEvent(page, 'Fushimi Inari');
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
 
     const editor = page.getByTestId('event-editor');
     const expand = editor.getByTestId('expand-palette');
@@ -800,7 +798,7 @@ test.describe('filling an event in gradually', () => {
 
     // Reopened from scratch: the city and time show because they hold
     // something, and are not offered as chips again.
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
     const editor = page.getByTestId('event-editor');
 
     await expect(editor.getByTestId('field-city')).toBeVisible();
@@ -861,9 +859,7 @@ test.describe('moving an event in the week', () => {
     // And the same thing from the toolbar, for a hand that does not know that.
     await dragTo(page, 'Fushimi Inari', ON, 13.5);
     await expect(card).toContainText('13:30');
-    await expect(page.getByTestId('undo-last')).toHaveAccessibleName(
-      'Undo: Moved Fushimi Inari',
-    );
+    await expect(page.getByTestId('undo-last')).toHaveAccessibleName('Undo: Moved Fushimi Inari');
     await page.getByTestId('undo-last').click();
     await expect(card).toContainText('09:00');
   });
@@ -944,7 +940,8 @@ test.describe('moving an event in the week', () => {
 
     await page.getByTestId('week-event').filter({ hasText: 'Fushimi Inari' }).click();
     await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
-    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await expect(page.getByTestId('event-details')).toBeVisible();
+    await expect(page.getByTestId('event-editor')).toHaveCount(0);
   });
 });
 
@@ -1025,8 +1022,8 @@ test.describe('making an event from the calendar', () => {
     await created.click();
 
     await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
+    await editEvent(page, 'Nishiki Market');
     const editor = page.getByTestId('event-editor');
-    await expect(editor).toBeVisible();
 
     await expect(editor.getByRole('textbox', { name: 'Time' })).toHaveValue('10:00');
     await expect(editor.getByTestId('field-duration')).toBeVisible();
@@ -1047,7 +1044,10 @@ test.describe('making an event from the calendar', () => {
     const rail = page.getByTestId('week-zone-tag').first();
     await rail.getByRole('button').click();
     await page.getByRole('searchbox', { name: /^Search zone for these days/i }).fill('London');
-    await page.getByRole('option', { name: /Europe\/London/ }).first().click();
+    await page
+      .getByRole('option', { name: /Europe\/London/ })
+      .first()
+      .click();
     await expect(rail).toHaveAttribute('data-zone', 'Europe/London');
 
     const column = page.locator('[data-testid^="day-2"]').first();
@@ -1075,6 +1075,7 @@ test.describe('making an event from the calendar', () => {
     const created = page.getByTestId('week-event').filter({ hasText: 'Borough Market' });
     await expect(created).toBeVisible();
     await created.click();
+    await editEvent(page, 'Borough Market');
 
     const editor = page.getByTestId('event-editor');
     await expect(editor.getByRole('textbox', { name: 'Time' })).toHaveValue('10:00');
@@ -1116,8 +1117,8 @@ test.describe('booking somewhere to sleep from the week', () => {
   /** Reads the dates back off the stay itself, which is what was booked. */
   async function datesOf(page: Page, hotel: string) {
     await page.getByTestId('week-lodging').filter({ hasText: hotel }).click();
+    await editEvent(page, hotel);
     const editor = page.getByTestId('event-editor');
-    await expect(editor).toBeVisible();
 
     return {
       checkIn: await editor.getByTestId('check-in').inputValue(),

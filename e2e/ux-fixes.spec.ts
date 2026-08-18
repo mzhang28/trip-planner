@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent, goToScreen, switchView } from './helpers';
+import { addNewEvent, closeEvent, editEvent, goToScreen, switchView } from './helpers';
 
 async function newTrip(page: Page, name = 'Japan, April') {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -50,7 +50,7 @@ test.describe('putting an event on a chosen day', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Morning temple');
-    await eventRow(page, 'Morning temple').click();
+    await editEvent(page, 'Morning temple');
     await reveal(page, 'when');
 
     // A real date control. Typing a time used to put it on today whatever day
@@ -98,7 +98,7 @@ test.describe('putting an event on a chosen day', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Morning temple');
-    await eventRow(page, 'Morning temple').click();
+    await editEvent(page, 'Morning temple');
     await reveal(page, 'when');
 
     await page.getByTestId('event-date').fill('2026-09-03');
@@ -120,7 +120,7 @@ test.describe('custom colors', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Night train');
-    await eventRow(page, 'Night train').click();
+    await editEvent(page, 'Night train');
 
     await page.getByRole('button', { name: 'Color for Night train, no color' }).click();
     const eventPalette = page.getByRole('dialog', { name: 'Color for Night train' });
@@ -175,7 +175,7 @@ test.describe('what a viewer can do', () => {
     const tripId = await newTrip(page);
 
     await addNewEvent(page, 'Ryokan');
-    await eventRow(page, 'Ryokan').click();
+    await editEvent(page, 'Ryokan');
     await reveal(page, 'confirmation');
     await page.getByRole('textbox', { name: 'Confirmation code' }).fill('7K2QLM');
     await page.getByRole('textbox', { name: 'Confirmation code' }).blur();
@@ -234,7 +234,8 @@ test.describe('sharing', () => {
     await expect(panel).toBeVisible();
 
     // Read-only was never offered though the server always supported it.
-    await panel.getByRole('radiogroup', { name: 'What the link allows' })
+    await panel
+      .getByRole('radiogroup', { name: 'What the link allows' })
       .getByText('Can read', { exact: true })
       .click();
     await panel.getByRole('button', { name: 'Make a link' }).click();
@@ -286,7 +287,7 @@ test.describe('what a field does with input it cannot use', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Tea ceremony');
-    await eventRow(page, 'Tea ceremony').click();
+    await editEvent(page, 'Tea ceremony');
     await reveal(page, 'when');
     await page.getByTestId('event-date').fill('2026-08-30');
     await page.getByRole('textbox', { name: 'Time' }).fill('13:15');
@@ -309,7 +310,7 @@ test.describe('what a field does with input it cannot use', () => {
     // Reloaded, so both the derived end and the human-readable duration come
     // from what was stored rather than local input state.
     await page.reload();
-    await eventRow(page, 'Tea ceremony').click();
+    await editEvent(page, 'Tea ceremony');
     await expect(page.getByRole('textbox', { name: 'Ends' })).toHaveValue('21:00');
     await expect(page.getByText('Duration: 7 hr 45 min')).toBeVisible();
   });
@@ -319,7 +320,7 @@ test.describe('what a field does with input it cannot use', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Tea ceremony');
-    await eventRow(page, 'Tea ceremony').click();
+    await editEvent(page, 'Tea ceremony');
     await reveal(page, 'when');
 
     await page.getByRole('button', { name: 'Time zone: Asia/Tokyo' }).click();
@@ -368,7 +369,7 @@ test.describe('searching', () => {
     expect(await search.getAttribute('aria-activedescendant')).toBe(selected);
 
     await search.press('Enter');
-    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await expect(page.getByTestId('event-details')).toBeVisible();
   });
 
   test('a phone searches from a drawer at the bottom, not a row at the top', async ({ page }) => {
@@ -402,7 +403,7 @@ test.describe('searching', () => {
 
     // Picking a result puts the drawer away, leaving what it went to in view.
     await expect(page.getByTestId('trip-drawer')).toHaveCount(0);
-    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await expect(page.getByTestId('event-details')).toBeVisible();
   });
 
   test('dragging the bar up brings the header controls within reach', async ({ page }) => {
@@ -492,7 +493,7 @@ test.describe('a day decided before an hour', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Ryokan');
-    await eventRow(page, 'Ryokan').click();
+    await editEvent(page, 'Ryokan');
     await reveal(page, 'when');
 
     await page.getByTestId('event-date').fill('2026-09-03');
@@ -516,7 +517,7 @@ test.describe('a day decided before an hour', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Ryokan');
-    await eventRow(page, 'Ryokan').click();
+    await editEvent(page, 'Ryokan');
     await reveal(page, 'when');
 
     await page.getByTestId('event-date').fill('2026-09-03');
@@ -536,7 +537,7 @@ test.describe('a day decided before an hour', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Ryokan');
-    await eventRow(page, 'Ryokan').click();
+    await editEvent(page, 'Ryokan');
 
     await reveal(page, 'when');
     await reveal(page, 'city');
@@ -558,7 +559,7 @@ test.describe('taking something back', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Fushimi Inari');
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
 
     await page.getByRole('button', { name: 'Delete event' }).click();
     await expect(eventRow(page, 'Fushimi Inari')).toHaveCount(0);
@@ -624,7 +625,7 @@ test.describe('text a field will not take', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Fushimi Inari');
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
     await reveal(page, 'links');
 
     const editor = page.getByTestId('event-editor');
@@ -742,7 +743,7 @@ test.describe('reaching things with a finger', () => {
     await page.getByTestId('week-untimed-event').filter({ hasText: 'Dinner' }).click();
 
     await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
-    await expect(page.getByTestId('event-editor')).toBeVisible();
+    await editEvent(page, 'Dinner');
     await expect(page.getByTestId('event-date')).toHaveValue(today);
   });
 
@@ -766,7 +767,7 @@ test.describe('reaching things with a finger', () => {
       await newTrip(page);
 
       await addNewEvent(page, 'Fushimi Inari');
-      await eventRow(page, 'Fushimi Inari').click();
+      await editEvent(page, 'Fushimi Inari');
 
       // Enough fields open that the editor is taller than the screen, which is
       // the state the complaint is about.
@@ -792,9 +793,12 @@ test.describe('a stay', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Ryokan');
-    await eventRow(page, 'Ryokan').click();
+    await editEvent(page, 'Ryokan');
     await page.getByTestId('event-kind-button').click();
-    await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Stay' }).click();
+    await page
+      .getByRole('dialog', { name: 'Event kind' })
+      .getByRole('button', { name: 'Stay' })
+      .click();
 
     // Stay dates are the canonical event schedule, so duplicate generic date
     // and duration controls cannot disagree with them.
@@ -814,7 +818,7 @@ test.describe('a stay', () => {
 
     // Read back in the hotel's zone, which is what was typed.
     await page.reload();
-    await eventRow(page, 'Ryokan').click();
+    await editEvent(page, 'Ryokan');
     await expect(page.getByTestId('check-in')).toHaveValue('2026-08-14');
     await expect(page.getByTestId('check-out')).toHaveValue('2026-08-17');
 
@@ -822,9 +826,12 @@ test.describe('a stay', () => {
     // stacked row beneath the timetable.
     await page.getByTestId('close-editor').click();
     await addNewEvent(page, 'City Hotel');
-    await eventRow(page, 'City Hotel').click();
+    await editEvent(page, 'City Hotel');
     await page.getByTestId('event-kind-button').click();
-    await page.getByRole('dialog', { name: 'Event kind' }).getByRole('button', { name: 'Stay' }).click();
+    await page
+      .getByRole('dialog', { name: 'Event kind' })
+      .getByRole('button', { name: 'Stay' })
+      .click();
     await page.getByTestId('check-in').fill('2026-08-17');
     await page.getByTestId('check-out').fill('2026-08-19');
     await page.getByTestId('close-editor').click();
@@ -853,7 +860,7 @@ test.describe('a stay', () => {
 test.describe('a flight', () => {
   async function newFlight(page: Page) {
     await addNewEvent(page, 'NH017');
-    await eventRow(page, 'NH017').click();
+    await editEvent(page, 'NH017');
     await page.getByTestId('event-kind-button').click();
     await page
       .getByRole('dialog', { name: 'Event kind' })
@@ -912,19 +919,16 @@ test.describe('a flight', () => {
     await editor.getByTestId('arrives-date').fill('2026-08-13');
     await expect(editor.getByText('before the flight leaves')).toBeVisible();
   });
-
 });
 
 test.describe('the map and the forecast', () => {
   test('coordinates copied from Google Maps can pin a hand-written place', async ({ page }) => {
-    await page.route('**/api/places/search*', (route) =>
-      route.fulfill({ json: { places: [] } }),
-    );
+    await page.route('**/api/places/search*', (route) => route.fulfill({ json: { places: [] } }));
 
     await page.goto('/');
     await newTrip(page);
     await addNewEvent(page, 'Byodo-in');
-    await eventRow(page, 'Byodo-in').click();
+    await editEvent(page, 'Byodo-in');
     await reveal(page, 'place');
 
     const place = page.getByRole('combobox', { name: 'Place' });
@@ -950,7 +954,7 @@ test.describe('the map and the forecast', () => {
 
     // The pair is part of the event, not state held only by the popover.
     await page.getByTestId('close-editor').click();
-    await eventRow(page, 'Byodo-in').click();
+    await editEvent(page, 'Byodo-in');
     await expect(
       page.getByRole('button', {
         name: 'Coordinates: 34.891549790773766, 135.80448560871287',
@@ -985,7 +989,7 @@ test.describe('the map and the forecast', () => {
 
     async function pin(name: string, query: string, day = anchored) {
       await addNewEvent(page, name);
-      await eventRow(page, name).click();
+      await editEvent(page, name);
 
       // On the day the map is showing, which is the day the view is anchored
       // on -- and that is the trip's day, not necessarily today.
@@ -998,7 +1002,10 @@ test.describe('the map and the forecast', () => {
       await page.getByRole('option').first().click();
       await expect(page.getByText('Pinned at')).toBeVisible();
 
-      await page.getByTestId('close-editor').click();
+      // Shut, not merely handed back to its details: the click below is what
+      // moves the map to this event's day, and a click on an open card closes
+      // it instead.
+      await closeEvent(page, name);
     }
 
     await pin('Fushimi Inari', 'Kyoto Station');
@@ -1019,7 +1026,7 @@ test.describe('the map and the forecast', () => {
 
     // The map used to redraw only when an id or a booking state changed, so a
     // place moved to another city left its marker where it was.
-    await eventRow(page, 'Nishiki Market').click();
+    await editEvent(page, 'Nishiki Market');
     await expect(page.getByTestId('go-to-date')).toHaveValue(anchored);
     const place = page.getByTestId('event-editor').getByRole('combobox', { name: 'Place' });
     await place.fill('Osaka Castle');
@@ -1125,7 +1132,7 @@ test.describe('a trip is more than its name', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Fushimi Inari');
-    await eventRow(page, 'Fushimi Inari').click();
+    await editEvent(page, 'Fushimi Inari');
     await reveal(page, 'when');
     await page.getByTestId('event-date').fill('2027-04-14');
     await reveal(page, 'city');
@@ -1247,7 +1254,7 @@ test.describe('attaching files', () => {
     await newTrip(page);
 
     await addNewEvent(page, 'Ryokan');
-    await eventRow(page, 'Ryokan').click();
+    await editEvent(page, 'Ryokan');
     await reveal(page, 'files');
 
     // Said before a file is chosen rather than after one is refused, and
