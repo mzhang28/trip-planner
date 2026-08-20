@@ -962,6 +962,43 @@ test.describe('the map and the forecast', () => {
     ).toBeVisible();
   });
 
+  test('a place has a way through to Google Maps', async ({ page }) => {
+    await page.route('**/api/places/search*', (route) => route.fulfill({ json: { places: [] } }));
+
+    await page.goto('/');
+    await newTrip(page);
+    await addNewEvent(page, 'Sanjusangendo');
+    await editEvent(page, 'Sanjusangendo');
+    await reveal(page, 'place');
+
+    const place = page.getByRole('combobox', { name: 'Place' });
+    await place.fill('Sanjusangendo Temple');
+    await place.blur();
+
+    // Done hands the card back to its details, which is where the link is.
+    await page.getByTestId('close-editor').click();
+
+    const maps = page.getByTestId('open-in-maps');
+    await expect(maps).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/search/?api=1&query=Sanjusangendo%20Temple',
+    );
+    await expect(maps).toHaveAttribute('target', '_blank');
+
+    /*
+     * A place written down as a Maps link is followed as it stands. Handing it
+     * to a search would look for the address of the link rather than for the
+     * place the link points at.
+     */
+    const shared = 'https://maps.app.goo.gl/QwErTy123';
+    await editEvent(page, 'Sanjusangendo');
+    await place.fill(shared);
+    await place.blur();
+    await page.getByTestId('close-editor').click();
+
+    await expect(maps).toHaveAttribute('href', shared);
+  });
+
   test('moving a pinned place moves its pin', async ({ page }) => {
     /*
      * The geocoder is stubbed. What is being tested is what the map does with

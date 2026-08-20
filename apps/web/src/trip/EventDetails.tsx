@@ -1,7 +1,8 @@
 import type { CustomValue, FieldDef, TripDoc, TripEvent } from '@trip/crdt';
 import { renderCustomValue, type FieldDefId } from '@trip/crdt';
-import { Button, StatusChip, coloredSurfaceStyle } from '@trip/ui';
-import { Paperclip, Pencil } from 'lucide-react';
+import { Button, StatusChip, cn, coloredSurfaceStyle } from '@trip/ui';
+import { MapPin, Paperclip, Pencil } from 'lucide-react';
+import { googleMapsUrl } from '../lib/maps';
 import { formatDuration, formatTime } from '../lib/time';
 import { Description } from './DescriptionEditor';
 import { JourneySummary } from './FlightFields';
@@ -82,6 +83,9 @@ export function EventDetails({
   const todos = Object.values(event.todos ?? {});
   const transit = describeTransit(event);
 
+  // Somewhere to go with the place, rather than a name to copy out by hand.
+  const mapsUrl = googleMapsUrl({ ...event.location, city: event.city });
+
   const customs = fieldDefs
     .map((def) => ({ def, value: event.customFields[def.id as FieldDefId] }))
     .filter((entry) => entry.value !== undefined);
@@ -122,6 +126,23 @@ export function EventDetails({
             )}
             {event.location?.address && (
               <span className="block text-xs text-ink-muted">{event.location.address}</span>
+            )}
+
+            {mapsUrl && (
+              <a
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                data-testid="open-in-maps"
+                className={cn(
+                  'mt-1 flex h-7 w-fit items-center gap-1 rounded-sm border border-line bg-sunken px-1.5',
+                  'text-2xs text-ink-secondary hover:border-line-strong hover:bg-raised',
+                  'focus-visible:outline-2 focus-visible:outline-focus',
+                )}
+              >
+                <MapPin aria-hidden="true" className="size-3" />
+                Open in Google Maps
+              </a>
             )}
           </Row>
         )}
