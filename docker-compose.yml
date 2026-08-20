@@ -3,7 +3,14 @@ name: trip-planner
 services:
   app:
     image: forgejo.apps.mzhang.io/michael/trip-planner:latest
-    build: .
+    build:
+      context: .
+      args:
+        # Shown on the settings screen beside the build time, so a deployment
+        # can be traced back to a commit. Empty unless the build is started with
+        # APP_COMMIT set -- `APP_COMMIT=$(git rev-parse --short HEAD) docker
+        # compose build` -- because .git never reaches the build context.
+        APP_COMMIT: ${APP_COMMIT:-}
     # Set anything else, S3 credentials included, in a .env file beside this
     # one. See .env.example.
     env_file:

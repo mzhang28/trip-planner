@@ -3,7 +3,6 @@ import { Plus, Upload } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ApiError, api, deviceTimezone, type ImportedTrip, type TripSummary } from '../lib/api';
-import { useIdentity } from '../lib/useIdentity';
 import { loadTripList, saveTripList } from '../trip/storage';
 
 /**
@@ -54,10 +53,6 @@ function whatIsNext(trip: TripSummary): string {
 }
 
 export function TripList() {
-  // Only whoever put the server up has anything to change about it.
-  const state = useIdentity();
-  const admin = state.status === 'ready' && state.identity.admin;
-
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
 
   /*
@@ -159,14 +154,17 @@ export function TripList() {
             >
               Agents
             </Link>
-            {admin && (
-              <Link
-                to="/settings"
-                className="rounded-md px-2 py-1 text-sm text-ink-secondary hover:bg-sunken hover:text-ink"
-              >
-                Settings
-              </Link>
-            )}
+            {/*
+              Shown to everybody, not only to the admin: the settings screen
+              also holds which build of the app this device is running, and
+              installing a newer one is something anybody may need to do.
+            */}
+            <Link
+              to="/settings"
+              className="rounded-md px-2 py-1 text-sm text-ink-secondary hover:bg-sunken hover:text-ink"
+            >
+              Settings
+            </Link>
             <ThemeToggle />
           </div>
         </div>

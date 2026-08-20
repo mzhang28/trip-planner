@@ -1,13 +1,25 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { execFileSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import wasm from 'vite-plugin-wasm';
+
+/*
+ * What names this build: when it was made, and the commit it was made from
+ * where that could be read. Written into the bundle for the app to show, and
+ * emitted beside it as version.json for an older copy of the app to fetch --
+ * that file is how a device with a stale build learns what is on the server.
+ */
+const build = { commit: commit(), builtAt: new Date().toISOString() };
 
 export default defineConfig({
   // The E2E harness gives each concurrent build its own generated public
   // assets instead of having them race in apps/web/public.
   publicDir: process.env.WEB_PUBLIC_DIR ?? 'public',
+  // Read through src/lib/build.ts, which is what the settings screen shows.
+  define: { __APP_BUILD__: JSON.stringify(build) },
+
   // ES2022 for top-level await, which loading Automerge's WebAssembly needs.
   build: { target: 'es2022' },
   esbuild: { target: 'es2022' },
@@ -26,13 +38,28 @@ export default defineConfig({
      * and the build fails outright.
      */
     wasm(),
+    {
+      name: 'build-stamp',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify(build) });
+      },
+      // The dev server has no bundle to emit into, and the app asks for this
+      // whenever a new worker turns up -- which happens in dev too.
+      configureServer(server) {
+        server.middlewares.use('/version.json', (_request, response) => {
+          response.setHeader('content-type', 'application/json');
+          response.end(JSON.stringify(build));
+        });
+      },
+    },
     VitePWA({
       registerType: 'prompt',
       /*
        * `prompt` rather than `autoUpdate`. A trip being edited offline has
        * unsynced changes in memory, and reloading the page under someone
-       * mid-edit to install a new version is how those get lost. The app asks
-       * instead, and the person picks the moment.
+       * mid-edit to install a new version is how those get lost. So a new
+       * worker waits, and the settings screen is where somebody is told it is
+       * waiting and picks the moment -- see src/lib/useAppUpdate.ts.
        */
       manifest: {
         name: 'Trip Planner',
@@ -110,6 +137,27 @@ export default defineConfig({
     proxy: apiProxy(),
   },
 });
+
+/**
+ * The commit this build was made from, or an empty string.
+ *
+ * Docker builds have no repository to ask: .dockerignore keeps .git out of the
+ * build context, so the commit is passed in as APP_COMMIT instead. Without
+ * either, the build time in the stamp stands on its own -- it is already
+ * different for every deployment.
+ */
+function commit(): string {
+  if (process.env.APP_COMMIT) return process.env.APP_COMMIT.trim();
+
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return '';
+  }
+}
 
 function apiProxy() {
   // Both ports come from the environment so a test run can sit beside a dev

@@ -53,6 +53,13 @@ COPY packages/crdt packages/crdt
 COPY packages/proto packages/proto
 COPY packages/ui packages/ui
 COPY apps/web apps/web
+# Stamped into the bundle, which is what the settings screen shows for the
+# version it is running. .dockerignore keeps .git out of the build context, so
+# the commit has to be handed in; without it the build time stands alone, and
+# that is already different for every deployment. Declared after the COPYs so
+# passing a new commit does not invalidate the layers above it.
+ARG APP_COMMIT=""
+ENV APP_COMMIT=$APP_COMMIT
 # Writes the PWA icons from the SVG, then bundles.
 RUN pnpm --filter @trip/web build
 # A .gz beside each file the server may hand back compressed. It serves those as
