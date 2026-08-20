@@ -1,6 +1,6 @@
 import type { CustomValue, FieldDef, TripDoc, TripEvent } from '@trip/crdt';
 import { renderCustomValue, type FieldDefId } from '@trip/crdt';
-import { Button, StatusChip, cn, coloredSurfaceStyle } from '@trip/ui';
+import { Button, cn, coloredSurfaceStyle } from '@trip/ui';
 import { MapPin, Paperclip, Pencil } from 'lucide-react';
 import { googleMapsUrl } from '../lib/maps';
 import { formatDuration, formatTime } from '../lib/time';
@@ -147,17 +147,21 @@ export function EventDetails({
           </Row>
         )}
 
-        <Row label="Booking">
-          <span className="flex flex-wrap items-center gap-2">
-            <StatusChip status={event.booking.status} />
+        {/*
+          The status itself is on the card header, above this and visible
+          whether the card is open or not, so this row is here for the
+          reference and the note and is absent without them.
+        */}
+        {(event.booking.confirmationCode || event.booking.note) && (
+          <Row label="Booking">
             {event.booking.confirmationCode && (
               <span className="tabular text-xs">{event.booking.confirmationCode}</span>
             )}
-          </span>
-          {event.booking.note && (
-            <span className="block text-xs text-ink-secondary">{event.booking.note}</span>
-          )}
-        </Row>
+            {event.booking.note && (
+              <span className="block text-xs text-ink-secondary">{event.booking.note}</span>
+            )}
+          </Row>
+        )}
 
         {transit && <Row label="Getting here">{transit}</Row>}
 
