@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addNewEvent, closeEvent, editEvent, goToScreen, switchView } from './helpers';
+import { addNewEvent, closeEvent, editEvent, eventCard, goToScreen, switchView } from './helpers';
 
 async function newTrip(page: Page, name = 'Japan, April') {
   await expect(page.getByRole('heading', { name: 'Trips' })).toBeVisible();
@@ -551,6 +551,45 @@ test.describe('a day decided before an hour', () => {
     await expect(editor.getByTestId('field-city')).toBeVisible();
     await expect(editor.getByTestId('field-duration')).toBeVisible();
   });
+});
+
+test.describe('a name longer than its card', () => {
+  const LONG =
+    'Breakfast at the little kissaten by the north exit of Demachiyanagi station, the one with the ' +
+    'blue curtain, before the bus up to Kurama and the walk over to Kibune';
+
+  test(
+    'the whole name is on screen once the card is open',
+    { tag: '@responsive' },
+    async ({ page }) => {
+      await page.goto('/');
+      await newTrip(page);
+
+      await addNewEvent(page, LONG);
+      const card = eventCard(page, LONG);
+      const name = card.getByTestId('event-name');
+
+      const overflows = () => name.evaluate((element) => element.scrollWidth > element.clientWidth);
+      const height = async () => (await name.boundingBox())!.height;
+
+      // Shut, the name is cut short: the list reads as a list because every row
+      // is one line deep.
+      expect(await overflows()).toBe(true);
+      const closed = await height();
+
+      await card.getByTestId('event').click();
+      await expect(card.getByTestId('event-details')).toBeVisible();
+
+      // Open, it wraps instead, and the card is taller by however much it took.
+      expect(await overflows()).toBe(false);
+      expect(await height()).toBeGreaterThan(closed);
+
+      // The editor writes the name out in full too, where it is also the field
+      // a double-click edits.
+      await editEvent(page, LONG);
+      expect(await overflows()).toBe(false);
+    },
+  );
 });
 
 test.describe('taking something back', () => {

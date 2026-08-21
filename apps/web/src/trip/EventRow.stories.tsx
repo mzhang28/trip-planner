@@ -158,7 +158,9 @@ export const ReadOnly: Story = {
 
 /**
  * Names longer than the card, which is most hotel names and every idea typed
- * in a hurry.
+ * in a hurry. Shut, a name is cut short so that every row in the list is one
+ * line deep. Open, the card is already as tall as what it holds, so the name
+ * wraps and is read in full — the last card here is the first one, opened.
  */
 export const LongNames: Story = {
   render: () => (
@@ -166,6 +168,7 @@ export const LongNames: Story = {
       <Row eventId="e_kyoto_stay" />
       <Row eventId="e_hiroshima_free" />
       <Row eventId="e_skyliner_out" />
+      <Row eventId="e_kyoto_stay" expansion="details" />
     </div>
   ),
 };

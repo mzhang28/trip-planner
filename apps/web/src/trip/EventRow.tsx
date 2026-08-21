@@ -274,7 +274,7 @@ function InlineEventName({
           if (event.key === 'Enter' || event.key === 'F2') setEditing(true);
         }}
         className={cn(
-          'flex h-8 min-w-0 flex-1 cursor-text items-center truncate rounded-sm px-2 text-sm font-medium',
+          'flex min-h-8 min-w-0 flex-1 cursor-text items-center rounded-sm px-2 text-sm leading-5 font-medium wrap-anywhere',
           'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-focus',
           value ? 'text-ink' : 'text-ink-placeholder italic',
         )}
@@ -465,7 +465,7 @@ export function EventRow({
         style={coloredSurfaceStyle(event.color)}
       >
         {editing ? (
-          <div data-testid="event" className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
+          <div data-testid="event" className="flex min-w-0 flex-1 items-start gap-2 px-3 py-2">
             {/* Keeps row lookup and announcements useful while the visible name is an input. */}
             <span className="sr-only">{event.name || 'Unnamed'}</span>
             <span className={cn('tabular shrink-0 text-xs text-ink-muted', TIME_COLUMN)}>
@@ -499,26 +499,42 @@ export function EventRow({
               onClick={openFromClick}
               aria-expanded={isOpen}
               className={cn(
-                'flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left',
+                'flex min-w-0 flex-1 gap-3 px-3 py-2.5 text-left',
+                /*
+                 * A name that runs past the card is cut short while the card is
+                 * shut, where every row has to stay one line deep for the list
+                 * to be readable at a glance. Opened, the card is already as
+                 * tall as its contents, so the name is written out in full --
+                 * and the time and the kind move up to meet its first line.
+                 */
+                isOpen ? 'items-start' : 'items-center',
                 'data-focus-visible:outline-2 data-focus-visible:-outline-offset-2 data-focus-visible:outline-focus',
               )}
             >
-              <span className={cn('tabular shrink-0 text-xs text-ink-muted', TIME_COLUMN)}>
+              <span
+                className={cn('tabular shrink-0 text-xs leading-5 text-ink-muted', TIME_COLUMN)}
+              >
                 {time ?? '--:--'}
               </span>
 
               <span className="min-w-0 flex-1">
                 {/* An event made by picking a day is real before it is named. */}
-                <span className="flex min-w-0 items-center gap-1.5">
+                <span
+                  className={cn('flex min-w-0 gap-1.5', isOpen ? 'items-start' : 'items-center')}
+                >
                   <EventKindIcon
                     kind={event.kind}
                     method={event.transit?.method}
-                    className="size-3.5 shrink-0 text-ink-muted"
+                    className={cn('size-3.5 shrink-0 text-ink-muted', isOpen && 'mt-[3px]')}
                   />
                   <span
                     data-testid="event-name"
                     className={cn(
-                      'truncate text-sm font-medium',
+                      'text-sm leading-5 font-medium',
+                      // `wrap-anywhere` rather than a word break, so a name that
+                      // is one long unspaced string breaks instead of running
+                      // out of the card.
+                      isOpen ? 'min-w-0 wrap-anywhere' : 'truncate',
                       event.name ? 'text-ink' : 'text-ink-placeholder italic',
                     )}
                   >
@@ -534,14 +550,21 @@ export function EventRow({
               </span>
             </Button>
 
+            {/*
+              On the first line of the name rather than halfway down the card,
+              once the name is long enough to have a second line.
+            */}
             {!readOnly ? (
               <BookingStatusPicker
                 status={event.booking.status}
                 onChange={(status) => onPatch({ booking: { ...event.booking, status } })}
-                className="mr-3 self-center"
+                className={cn('mr-3', isOpen ? 'mt-2 self-start' : 'self-center')}
               />
             ) : (
-              <StatusChip status={event.booking.status} className="mr-3 self-center" />
+              <StatusChip
+                status={event.booking.status}
+                className={cn('mr-3', isOpen ? 'mt-2 self-start' : 'self-center')}
+              />
             )}
           </div>
         )}
