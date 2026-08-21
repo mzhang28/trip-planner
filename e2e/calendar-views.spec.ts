@@ -597,50 +597,6 @@ test.describe('flights and the map', () => {
   });
 });
 
-test.describe('selecting several events', () => {
-  test('ticking events offers bulk actions, and delete removes them all', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page, 'Japan, April');
-
-    for (const name of ['Fushimi Inari', 'Nishiki Market', 'Dotonbori']) {
-      await addNewEvent(page, name);
-      await expect(eventRow(page, name)).toBeVisible();
-    }
-
-    await page.getByTestId('event-select').nth(0).check();
-    await page.getByTestId('event-select').nth(1).check();
-
-    const bar = page.getByTestId('selection-bar');
-    await expect(bar).toContainText('2 selected');
-
-    await bar.getByRole('button', { name: /Delete 2/ }).click();
-
-    await expect(page.getByTestId('event')).toHaveCount(1);
-    await expect(page.getByTestId('selection-bar')).toHaveCount(0);
-  });
-
-  test('merging folds the others into the one that gives the name', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page, 'Japan, April');
-
-    for (const name of ['Market, morning', 'Market, afternoon']) {
-      await addNewEvent(page, name);
-      await expect(eventRow(page, name)).toBeVisible();
-    }
-
-    await page.getByTestId('event-select').nth(0).check();
-    await page.getByTestId('event-select').nth(1).check();
-    await page.getByTestId('selection-bar').getByRole('button', { name: 'Merge' }).click();
-
-    // The dialog says what survives before anything is folded in.
-    const dialog = page.getByTestId('merge-preview');
-    await expect(dialog).toContainText('Merge 2 events');
-    await dialog.getByRole('button', { name: /Merge into/ }).click();
-
-    await expect(page.getByTestId('event')).toHaveCount(1);
-  });
-});
-
 test.describe('getting between events', () => {
   test('a journey that does not fit the gap says how short it is', async ({ page }) => {
     await page.goto('/');

@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
-import { GripVertical } from 'lucide-react';
 import { Example, useEventCallbacks, useTrip } from '../stories/harness';
 import { EventRow, type EventExpansion } from './EventRow';
 
@@ -32,25 +31,14 @@ interface RowProps {
   eventId: string;
   expansion?: EventExpansion;
   readOnly?: boolean;
-  selected?: boolean;
-  selectionActive?: boolean;
-  withHandle?: boolean;
 }
 
 /** A card wired to a document, so everything on it actually works. */
-function Row({
-  eventId,
-  expansion = 'closed',
-  readOnly = false,
-  selected = false,
-  selectionActive = false,
-  withHandle = false,
-}: RowProps) {
+function Row({ eventId, expansion = 'closed', readOnly = false }: RowProps) {
   const trip = useTrip();
   const callbacks = useEventCallbacks(trip, eventId);
   const [shows, setShows] = useState<EventExpansion>(expansion);
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
-  const [isSelected, setSelected] = useState(selected);
 
   const event = trip.doc.events[eventId];
   if (!event) return null;
@@ -67,16 +55,6 @@ function Row({
       revealed={revealed}
       onReveal={(key) => setRevealed((was) => new Set(was).add(key))}
       onRemoveField={() => {}}
-      isSelected={isSelected}
-      onToggleSelected={() => setSelected((was) => !was)}
-      selectionActive={selectionActive}
-      dragHandle={
-        withHandle ? (
-          <span className="flex w-5 cursor-grab items-center justify-center text-ink-muted">
-            <GripVertical className="size-4" />
-          </span>
-        ) : undefined
-      }
       onPatch={callbacks.onPatch}
       onAddLink={callbacks.onAddLink}
       onRemoveLink={callbacks.onRemoveLink}
@@ -105,10 +83,10 @@ function List({ children }: { children: React.ReactNode }) {
 export const Kinds: Story = {
   render: () => (
     <List>
-      <Row eventId="e_arashiyama" withHandle />
-      <Row eventId="e_go_kyoto" withHandle />
-      <Row eventId="e_momijiya" withHandle />
-      <Row eventId="e_note_cash" withHandle />
+      <Row eventId="e_arashiyama" />
+      <Row eventId="e_go_kyoto" />
+      <Row eventId="e_momijiya" />
+      <Row eventId="e_note_cash" />
     </List>
   ),
 };
@@ -168,21 +146,7 @@ export const OpenFlight: Story = {
   ),
 };
 
-/**
- * Selection turns every card's box on, not just the ticked one — otherwise the
- * only way to find out a card can be selected is to have selected it.
- */
-export const Selecting: Story = {
-  render: () => (
-    <List>
-      <Row eventId="e_himeji_castle" selected selectionActive />
-      <Row eventId="e_onomichi" selectionActive />
-      <Row eventId="e_bunnies" selectionActive />
-    </List>
-  ),
-};
-
-/** A viewer's copy: no grip, no checkbox, nothing that implies an edit. */
+/** A viewer's copy: nothing on it implies an edit. */
 export const ReadOnly: Story = {
   render: () => (
     <List>

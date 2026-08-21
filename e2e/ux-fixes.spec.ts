@@ -571,36 +571,6 @@ test.describe('taking something back', () => {
     await expect(eventRow(page, 'Fushimi Inari')).toBeVisible();
     await expect(page.getByTestId('undo-bar')).toHaveCount(0);
   });
-
-  test('deleting a long selection asks first', async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page);
-
-    for (const name of ['One', 'Two', 'Three', 'Four']) {
-      await addNewEvent(page, name);
-      await expect(eventRow(page, name)).toBeVisible();
-    }
-
-    const boxes = page.getByTestId('event-select');
-    for (let index = 0; index < 4; index += 1) await boxes.nth(index).check();
-
-    const bar = page.getByTestId('selection-bar');
-    await bar.getByRole('button', { name: 'Delete 4' }).click();
-
-    // Nothing has happened yet: four events is enough to be worth a question.
-    await expect(bar).toContainText('Delete 4 events?');
-    await expect(page.getByTestId('event')).toHaveCount(4);
-
-    await bar.getByRole('button', { name: 'Keep them' }).click();
-    await expect(page.getByTestId('event')).toHaveCount(4);
-
-    await bar.getByRole('button', { name: 'Delete 4' }).click();
-    await bar.getByTestId('confirm-bulk-delete').click();
-    await expect(page.getByTestId('event')).toHaveCount(0);
-
-    await page.getByTestId('undo-bar').getByRole('button', { name: 'Undo' }).click();
-    await expect(page.getByTestId('event')).toHaveCount(4);
-  });
 });
 
 test.describe('text a field will not take', () => {
@@ -745,18 +715,6 @@ test.describe('reaching things with a finger', () => {
     await expect(page.locator('main')).toHaveAttribute('data-view', 'day');
     await editEvent(page, 'Dinner');
     await expect(page.getByTestId('event-date')).toHaveValue(today);
-  });
-
-  test('an event can be ticked without hovering it first', { tag: '@touch' }, async ({ page }) => {
-    await page.goto('/');
-    await newTrip(page);
-
-    await addNewEvent(page, 'Fushimi Inari');
-
-    // Nothing to hover on a phone, so the box has to be there already.
-    await expect(page.getByTestId('event-select')).toBeVisible();
-    await page.getByTestId('event-select').check();
-    await expect(page.getByTestId('selection-bar')).toBeVisible();
   });
 
   test(

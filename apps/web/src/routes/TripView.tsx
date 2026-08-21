@@ -17,7 +17,6 @@ import {
   restoreEvent,
   restoreField,
   liveFieldDefs,
-  mergeEvents,
   removeAttachment,
   removeLink,
   removeTodo,
@@ -35,7 +34,7 @@ import {
   type TripEvent,
 } from '@trip/crdt';
 import { Button, IconButton, SegmentedControl, ThemeToggle, coloredSurfaceStyle } from '@trip/ui';
-import { ChevronRight, GripVertical, Plus, Settings, Share2, Undo2 } from 'lucide-react';
+import { ChevronRight, Plus, Settings, Share2, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ApiError, api, type TripSummary } from '../lib/api';
@@ -56,13 +55,12 @@ import { DayNavigator, type CalendarView } from '../trip/DayNavigator';
 import { useUploadFlush } from '../trip/Attachments';
 import { RecoveryBanner } from '../trip/RecoveryBanner';
 import { SharePanel } from '../trip/SharePanel';
-import { MergePreview, SelectionBar } from '../trip/SelectionBar';
 import { UndoBar } from '../trip/UndoBar';
 import { TransitLeg } from '../trip/TransitLeg';
 import { MonthView } from '../trip/MonthView';
 import { WeekView } from '../trip/WeekView';
 import { useWeather } from '../trip/useWeather';
-import { DayDropZone, DraggableEvent } from '../trip/DayDropZone';
+import { DraggableEvent } from '../trip/DraggableEvent';
 import { EventRow } from '../trip/EventRow';
 import { SearchBar } from '../trip/SearchBar';
 import { SyncBadge } from '../trip/SyncBadge';
@@ -394,8 +392,6 @@ export function TripView() {
       return current.slice(0, -1);
     });
   }, []);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [mergePrimary, setMergePrimary] = useState<string | null>(null);
 
   /**
    * Asks the server whether this trip is open to this person.
@@ -875,15 +871,6 @@ export function TripView() {
     setOpenEvent({ id: eventId, shows });
   }
 
-  function toggleSelected(eventId: string) {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(eventId)) next.delete(eventId);
-      else next.add(eventId);
-      return next;
-    });
-  }
-
   /**
    * Deletes, and keeps the way back open for a few seconds.
    *
@@ -936,29 +923,6 @@ export function TripView() {
       revert: () =>
         store?.change((current) => restoreField(current, eventId, held, { userId: 'me' })),
     });
-  }
-
-  function bulkDelete() {
-    const ids = [...selected];
-    removeEvents(ids, ids.length === 1 ? 'Deleted 1 event' : `Deleted ${ids.length} events`);
-    setSelected(new Set());
-  }
-
-  function confirmMerge() {
-    const primary = mergePrimary ?? [...selected][0];
-    if (!primary) return;
-
-    store?.change((current) =>
-      mergeEvents(
-        current,
-        primary,
-        [...selected].filter((id) => id !== primary),
-        { userId: 'me' },
-      ),
-    );
-
-    setSelected(new Set());
-    setMergePrimary(null);
   }
 
   function share() {
@@ -1336,7 +1300,7 @@ export function TripView() {
                         )}
                       </h2>
 
-                      <DayDropZone dayKey={key} disabled={readOnly || key === UNSCHEDULED}>
+                      <div data-testid={`day-${key}`}>
                         {dayEvents.length === 0 && !readOnly && (
                           <button
                             type="button"
@@ -1352,147 +1316,124 @@ export function TripView() {
                           {dayEvents.map((event, index) => (
                             <div key={event.id}>
                               <TransitLeg event={event} previous={dayEvents[index - 1]} />
-                              <DraggableEvent id={event.id} disabled={readOnly}>
-                                {(handle) => (
-                                  <div
-                                    id={`event-${event.id}`}
-                                    className={
-                                      highlighted === event.id
-                                        ? 'rounded-lg ring-2 ring-accent'
-                                        : undefined
-                                    }
-                                  >
-                                    <EventRow
-                                      dragHandle={
-                                        handle ? (
-                                          <button
-                                            {...handle}
-                                            type="button"
-                                            aria-label={`Move ${event.name} to another day`}
-                                            className="flex cursor-grab touch-none items-center justify-center px-1 text-ink-placeholder hover:text-ink-muted focus-visible:outline-2 focus-visible:outline-focus"
-                                          >
-                                            <GripVertical aria-hidden="true" className="size-4" />
-                                          </button>
-                                        ) : undefined
-                                      }
-                                      event={event}
-                                      isSelected={selected.has(event.id)}
-                                      onToggleSelected={() => toggleSelected(event.id)}
-                                      selectionActive={selected.size > 0}
-                                      expansion={
-                                        openEvent?.id === event.id ? openEvent.shows : 'closed'
-                                      }
-                                      onExpansionChange={(next) => {
-                                        if (next === 'closed') setOpenEvent(null);
-                                        else if (openEvent?.id === event.id) {
-                                          setOpenEvent({ id: event.id, shows: next });
-                                        } else focusEvent(event.id, next);
-                                      }}
-                                      homeTimezone={homeTimezone}
-                                      fieldDefs={fieldDefs}
-                                      readOnly={readOnly}
-                                      onPatch={(patch) =>
-                                        store?.change((current) =>
-                                          updateEvent(
-                                            current,
-                                            event.id,
-                                            patch as Partial<EditableEventFields>,
-                                            { userId: 'me' },
-                                          ),
-                                        )
-                                      }
-                                      onAddLink={(url, title) =>
-                                        store?.change((current) =>
-                                          addLink(
-                                            current,
-                                            event.id,
-                                            `l_${randomId()}`,
-                                            { url, title },
-                                            { userId: 'me' },
-                                          ),
-                                        )
-                                      }
-                                      onRemoveLink={(linkId) =>
-                                        store?.change((current) =>
-                                          removeLink(current, event.id, linkId, { userId: 'me' }),
-                                        )
-                                      }
-                                      onSetCustomField={(
-                                        fieldId: FieldDefId,
-                                        value: CustomValue | undefined,
-                                      ) =>
-                                        store?.change((current) =>
-                                          setCustomField(current, event.id, fieldId, value, {
-                                            userId: 'me',
-                                          }),
-                                        )
-                                      }
-                                      onSetCityColor={(city, color) =>
-                                        store?.change((current) =>
-                                          setCityColor(current, city, color),
-                                        )
-                                      }
-                                      onAddAttachment={(id, attachment: EventAttachment) =>
-                                        store?.change((current) =>
-                                          addAttachment(current, event.id, id, attachment, {
-                                            userId: 'me',
-                                          }),
-                                        )
-                                      }
-                                      onRemoveAttachment={(id) =>
-                                        store?.change((current) =>
-                                          removeAttachment(current, event.id, id, { userId: 'me' }),
-                                        )
-                                      }
-                                      onAddTodo={(text, deadline) =>
-                                        store?.change((current) =>
-                                          addTodo(
-                                            current,
-                                            event.id,
-                                            `todo_${randomId()}`,
-                                            { text, deadline },
-                                            { userId: 'me' },
-                                          ),
-                                        )
-                                      }
-                                      onUpdateTodo={(id, patch: Partial<EditableTodo>) =>
-                                        store?.change((current) =>
-                                          updateTodo(current, event.id, id, patch, {
-                                            userId: 'me',
-                                          }),
-                                        )
-                                      }
-                                      onRemoveTodo={(id) =>
-                                        store?.change((current) =>
-                                          removeTodo(current, event.id, id, { userId: 'me' }),
-                                        )
-                                      }
-                                      onDelete={() =>
-                                        removeEvents(
-                                          [event.id],
-                                          `Deleted ${event.name || 'the unnamed event'}`,
-                                        )
-                                      }
-                                      doc={doc}
-                                      onOpenEvent={focusEvent}
-                                      revealed={revealedFields[event.id] ?? NOTHING_REVEALED}
-                                      onReveal={(key) =>
-                                        setRevealedFields((current) => ({
-                                          ...current,
-                                          [event.id]: new Set(current[event.id]).add(key),
-                                        }))
-                                      }
-                                      onRemoveField={(key, label) =>
-                                        removeField(event.id, key, label)
-                                      }
-                                    />
-                                  </div>
-                                )}
-                              </DraggableEvent>
+                              <div
+                                id={`event-${event.id}`}
+                                className={
+                                  highlighted === event.id
+                                    ? 'rounded-lg ring-2 ring-accent'
+                                    : undefined
+                                }
+                              >
+                                <EventRow
+                                  event={event}
+                                  expansion={
+                                    openEvent?.id === event.id ? openEvent.shows : 'closed'
+                                  }
+                                  onExpansionChange={(next) => {
+                                    if (next === 'closed') setOpenEvent(null);
+                                    else if (openEvent?.id === event.id) {
+                                      setOpenEvent({ id: event.id, shows: next });
+                                    } else focusEvent(event.id, next);
+                                  }}
+                                  homeTimezone={homeTimezone}
+                                  fieldDefs={fieldDefs}
+                                  readOnly={readOnly}
+                                  onPatch={(patch) =>
+                                    store?.change((current) =>
+                                      updateEvent(
+                                        current,
+                                        event.id,
+                                        patch as Partial<EditableEventFields>,
+                                        { userId: 'me' },
+                                      ),
+                                    )
+                                  }
+                                  onAddLink={(url, title) =>
+                                    store?.change((current) =>
+                                      addLink(
+                                        current,
+                                        event.id,
+                                        `l_${randomId()}`,
+                                        { url, title },
+                                        { userId: 'me' },
+                                      ),
+                                    )
+                                  }
+                                  onRemoveLink={(linkId) =>
+                                    store?.change((current) =>
+                                      removeLink(current, event.id, linkId, { userId: 'me' }),
+                                    )
+                                  }
+                                  onSetCustomField={(
+                                    fieldId: FieldDefId,
+                                    value: CustomValue | undefined,
+                                  ) =>
+                                    store?.change((current) =>
+                                      setCustomField(current, event.id, fieldId, value, {
+                                        userId: 'me',
+                                      }),
+                                    )
+                                  }
+                                  onSetCityColor={(city, color) =>
+                                    store?.change((current) => setCityColor(current, city, color))
+                                  }
+                                  onAddAttachment={(id, attachment: EventAttachment) =>
+                                    store?.change((current) =>
+                                      addAttachment(current, event.id, id, attachment, {
+                                        userId: 'me',
+                                      }),
+                                    )
+                                  }
+                                  onRemoveAttachment={(id) =>
+                                    store?.change((current) =>
+                                      removeAttachment(current, event.id, id, { userId: 'me' }),
+                                    )
+                                  }
+                                  onAddTodo={(text, deadline) =>
+                                    store?.change((current) =>
+                                      addTodo(
+                                        current,
+                                        event.id,
+                                        `todo_${randomId()}`,
+                                        { text, deadline },
+                                        { userId: 'me' },
+                                      ),
+                                    )
+                                  }
+                                  onUpdateTodo={(id, patch: Partial<EditableTodo>) =>
+                                    store?.change((current) =>
+                                      updateTodo(current, event.id, id, patch, {
+                                        userId: 'me',
+                                      }),
+                                    )
+                                  }
+                                  onRemoveTodo={(id) =>
+                                    store?.change((current) =>
+                                      removeTodo(current, event.id, id, { userId: 'me' }),
+                                    )
+                                  }
+                                  onDelete={() =>
+                                    removeEvents(
+                                      [event.id],
+                                      `Deleted ${event.name || 'the unnamed event'}`,
+                                    )
+                                  }
+                                  doc={doc}
+                                  onOpenEvent={focusEvent}
+                                  revealed={revealedFields[event.id] ?? NOTHING_REVEALED}
+                                  onReveal={(key) =>
+                                    setRevealedFields((current) => ({
+                                      ...current,
+                                      [event.id]: new Set(current[event.id]).add(key),
+                                    }))
+                                  }
+                                  onRemoveField={(key, label) => removeField(event.id, key, label)}
+                                />
+                              </div>
                             </div>
                           ))}
                         </div>
-                      </DayDropZone>
+                      </div>
                     </section>
                   ))}
                 </div>
@@ -1527,32 +1468,8 @@ export function TripView() {
 
         {sharing && tripId && <SharePanel tripId={tripId} onClose={() => setSharing(false)} />}
 
-        {selected.size > 0 && (
-          <SelectionBar
-            selected={selected}
-            events={events}
-            dayEvents={mappable}
-            dayLabel={formatDayHeading(Date.parse(`${anchor}T12:00:00Z`), 'UTC')}
-            onSelectAll={(ids) => setSelected(new Set(ids))}
-            onClear={() => setSelected(new Set())}
-            onDelete={bulkDelete}
-            onMerge={() => setMergePrimary([...selected][0] ?? null)}
-          />
-        )}
-
-        {/* Never both: the selection bar is in the same place at the bottom. */}
-        {undoable && selected.size === 0 && (
+        {undoable && (
           <UndoBar message={undoable.message} onUndo={undo} onDismiss={() => setUndoable(null)} />
-        )}
-
-        {mergePrimary && (
-          <MergePreview
-            primary={events.find((event) => event.id === mergePrimary)!}
-            others={events.filter((event) => selected.has(event.id) && event.id !== mergePrimary)}
-            onChangePrimary={setMergePrimary}
-            onConfirm={confirmMerge}
-            onCancel={() => setMergePrimary(null)}
-          />
         )}
       </main>
     </TripChrome>

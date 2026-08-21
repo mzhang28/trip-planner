@@ -21,7 +21,7 @@ import {
   coloredSurfaceStyle,
 } from '@trip/ui';
 import { FileText, Paperclip } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { Button, Dialog, DialogTrigger, Popover } from 'react-aria-components';
 import { formatTime, usesTwelveHourClock } from '../lib/time';
 import { useDisplayZone } from './useDisplayZone';
@@ -82,12 +82,6 @@ export interface EventRowProps {
   onReveal: (key: string) => void;
   /** Takes a field off the event, with what it holds. Undo is offered after. */
   onRemoveField: (key: string, label: string) => void;
-  isSelected: boolean;
-  onToggleSelected: () => void;
-  /** Once anything is ticked, every card shows its box. */
-  selectionActive: boolean;
-  /** Rendered as the grip. Absent for a viewer, who cannot move anything. */
-  dragHandle?: ReactNode;
 }
 
 function EventContentIndicators({ event }: { event: TripEvent }) {
@@ -356,10 +350,6 @@ export function EventRow({
   onReveal,
   onRemoveField,
   onExpansionChange,
-  isSelected,
-  onToggleSelected,
-  selectionActive,
-  dragHandle,
 }: EventRowProps) {
   const displayZone = useDisplayZone();
   const zone = displayZone(event.timezone, homeTimezone);
@@ -469,39 +459,11 @@ export function EventRow({
 
       <div
         className={cn(
-          'event-row-header group/event-row flex transition-colors duration-100',
+          'event-row-header flex transition-colors duration-100',
           isOpen && 'rounded-t-lg',
         )}
         style={coloredSurfaceStyle(event.color)}
       >
-        {!readOnly && (
-          <label
-            className={cn(
-              'flex cursor-pointer items-center pl-2',
-              /*
-               * Hidden until something is ticked or the card is hovered, so a
-               * list of events is a list of events rather than a form -- but
-               * only where hovering is a thing. A finger has no hover, so on a
-               * phone the boxes were invisible and selection unreachable.
-               */
-              !selectionActive &&
-                !isSelected &&
-                'group-hover/event-row:opacity-100 focus-within:opacity-100 [@media(hover:hover)]:opacity-0',
-            )}
-          >
-            <span className="sr-only">Select {event.name}</span>
-            <input
-              type="checkbox"
-              data-testid="event-select"
-              checked={isSelected}
-              onChange={onToggleSelected}
-              className="size-4 accent-[var(--accent)]"
-            />
-          </label>
-        )}
-
-        {dragHandle}
-
         {editing ? (
           <div data-testid="event" className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2">
             {/* Keeps row lookup and announcements useful while the visible name is an input. */}
