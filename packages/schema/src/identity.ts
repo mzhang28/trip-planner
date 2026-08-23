@@ -170,3 +170,47 @@ export const tripMembers = sqliteTable(
     index('trip_members_user').on(table.userId),
   ],
 );
+
+/**
+ * A URL a calendar client subscribes to, which answers with the trip as
+ * iCalendar text.
+ *
+ * Separate from a share link because it grants something different. A share
+ * link is redeemed once and turns whoever followed it into a member; this is
+ * read over and over by a program that will never hold a session, and it never
+ * becomes a membership. Each fetch is answered from the trip as it stands at
+ * that moment, so an event moved here reaches the subscriber without anybody
+ * re-sending anything.
+ *
+ * Only the hash of the token is stored, the same as a share link, so a leaked
+ * database does not hand out working feeds.
+ */
+export const calendarFeeds = sqliteTable(
+  'calendar_feeds',
+  {
+    id: text('id').primaryKey(),
+    tripId: text('trip_id')
+      .notNull()
+      .references(() => trips.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    /** What it is for — "my phone", "Mum" — so two feeds can be told apart. */
+    label: text('label'),
+    /** Leave out the events that are still only ideas. */
+    confirmedOnly: integer('confirmed_only', { mode: 'boolean' }).notNull().default(false),
+    createdBy: text('created_by')
+      .notNull()
+      .references(() => users.id),
+    createdAt: integer('created_at').notNull(),
+    revokedAt: integer('revoked_at'),
+    /**
+     * When a client last asked for it, and how many times it has.
+     *
+     * A subscription is set up in another app and then never mentions itself
+     * again, so this is the only thing that tells a feed something is polling
+     * from one that was pasted into the wrong box.
+     */
+    lastFetchedAt: integer('last_fetched_at'),
+    fetchCount: integer('fetch_count').notNull().default(0),
+  },
+  (table) => [index('calendar_feeds_trip').on(table.tripId)],
+);

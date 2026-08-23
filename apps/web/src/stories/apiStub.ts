@@ -207,6 +207,54 @@ const ACCESS = {
   ],
 };
 
+/**
+ * The calendar subscriptions a trip has handed out.
+ *
+ * One that something is polling, one that was made and never used, and one
+ * narrowed to what is booked -- which is the row that says what the option
+ * does without anybody having to tick it.
+ */
+const CALENDAR_FEEDS = [
+  {
+    id: 'cf_1',
+    label: 'My phone',
+    confirmedOnly: false,
+    createdAt: Date.parse('2026-04-02T18:12:00Z'),
+    createdBy: 'u_michael',
+    createdByName: 'Michael',
+    lastFetchedAt: Date.now() - 40 * 60_000,
+    fetchCount: 214,
+  },
+  {
+    id: 'cf_2',
+    label: "Jasmine's work calendar",
+    confirmedOnly: true,
+    createdAt: Date.parse('2026-04-03T08:30:00Z'),
+    createdBy: 'u_jasmine',
+    createdByName: 'Jasmine',
+    lastFetchedAt: Date.now() - 3 * 60 * 60_000,
+    fetchCount: 96,
+  },
+  {
+    id: 'cf_3',
+    label: null,
+    confirmedOnly: false,
+    createdAt: Date.parse('2026-04-11T02:15:00Z'),
+    createdBy: 'u_michael',
+    createdByName: 'Michael',
+    lastFetchedAt: null,
+    fetchCount: 0,
+  },
+];
+
+const NEW_CALENDAR_FEED = {
+  id: 'cf_4',
+  url: 'https://trips.example/calendar/uOtY3n3Rk8pQvW2xLd7fJqA1sB4cE6gH9iK0mN2oP5r.ics',
+  webcalUrl: 'webcal://trips.example/calendar/uOtY3n3Rk8pQvW2xLd7fJqA1sB4cE6gH9iK0mN2oP5r.ics',
+  label: null,
+  confirmedOnly: false,
+};
+
 const AUDIT = [
   {
     id: 'a_1',
@@ -305,6 +353,15 @@ async function answer(url: URL, init: RequestInit | undefined): Promise<Response
     const source = url.searchParams.get('source');
     return json({ entries: source ? AUDIT.filter((one) => one.source === source) : AUDIT });
   }
+
+  if (path.endsWith('/calendar')) {
+    if (init?.method === 'POST') return json(NEW_CALENDAR_FEED, 201);
+    return json({ feeds: CALENDAR_FEEDS, you: 'u_michael' });
+  }
+
+  // Revoking a feed: accepted, and the reload after one shows the same list,
+  // the same as a share link below.
+  if (path.includes('/calendar/') && init?.method) return json({ ok: true });
 
   if (path.endsWith('/access')) return json(ACCESS);
   if (path.endsWith('/share')) return json({ token: 'demo-share-token', role: 'editor' });

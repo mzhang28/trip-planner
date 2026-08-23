@@ -18,6 +18,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { randomId } from '../lib/crypto';
 import { api, type TripSummary } from '../lib/api';
 import { isTimeZone, knownTimeZones, setDay, toDateInput } from '../lib/time';
+import { CalendarFeeds } from '../trip/CalendarFeeds';
 import { CheckedField } from '../trip/CheckedField';
 import { AuditPanel } from '../trip/AuditPanel';
 import { SyncBadge } from '../trip/SyncBadge';
@@ -362,6 +363,21 @@ export function TripFields() {
             Dates use the trip timezone: {homeTimezone}.
           </p>
         </Card>
+
+        {/*
+          Offered to everyone on the trip, on the same reasoning as the export
+          above: a viewer can already read every event, so a copy of them in
+          their own calendar withholds nothing. It is also usually not the
+          owner who wants the trip on their phone.
+        */}
+        <h2 className="mb-1 text-sm text-ink">Calendar subscription</h2>
+        <p className="mb-4 max-w-prose text-sm text-ink-secondary">
+          An address you can add to Google Calendar, Apple Calendar or Outlook. It stays current on
+          its own, so an event moved here turns up there without anybody sending anything. Events
+          with no date yet are left out.
+        </p>
+
+        <div className="mb-10">{tripId && <CalendarFeeds tripId={tripId} />}</div>
 
         <h2 className="mb-1 text-sm text-ink">Custom fields</h2>
         <p className="mb-6 max-w-prose text-sm text-ink-secondary">

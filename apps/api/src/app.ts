@@ -21,6 +21,7 @@ import { airportRoutes } from './routes/airports';
 import { archiveRoutes } from './routes/archive';
 import { auditRoutes } from './routes/audit';
 import { blobRoutes } from './routes/blobs';
+import { calendarFeedRoutes, calendarRoutes } from './routes/calendar';
 import { clientRoutes } from './routes/clients';
 import { fileRoutes } from './routes/files';
 import { mcpRoutes } from './routes/mcp';
@@ -92,6 +93,16 @@ export function createApp(services: Services) {
   // middleware that insists on a person. Nothing following one has a session.
   app.use('/files/*', withServices(services));
   app.route('/files', fileRoutes());
+
+  /*
+   * A calendar subscription, polled by whatever the person pasted the URL into.
+   * Outside the middleware for the same reason: a calendar client has no cookie
+   * and no way to be given one, so the token in the path is all it carries --
+   * and minting a person for every poll would fill the table with one user per
+   * refresh.
+   */
+  app.use('/calendar/*', withServices(services));
+  app.route('/calendar', calendarRoutes());
 
   app.use('/api/*', withServices(services), withIdentity);
 
@@ -188,6 +199,7 @@ export function createApp(services: Services) {
   // Before the trip routes, so that /import is read as itself rather than as
   // the name of a trip.
   app.route('/api/trips', archiveRoutes());
+  app.route('/api/trips', calendarFeedRoutes());
   app.route('/api/trips', tripRoutes());
   app.route('/api/share', shareRoutes());
 
@@ -215,7 +227,7 @@ export function createApp(services: Services) {
 }
 
 /** The paths this server answers, which the client must not be given for. */
-const SERVER_PATHS = /^\/(api|oauth|mcp|files|\.well-known)(\/|$)/;
+const SERVER_PATHS = /^\/(api|oauth|mcp|files|calendar|\.well-known)(\/|$)/;
 
 /**
  * Serves the built client beside the API, on one origin.

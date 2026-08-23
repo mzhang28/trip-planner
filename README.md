@@ -21,6 +21,7 @@ I literally have not looked at the code.
 
 - Offline mobile PWA support
 - Attachments and todos for events
+- Calendar subscription URLs (Google Calendar, Apple Calendar, Outlook)
 - Remote MCP
 
 Sorry for the super vibed UI, needed this done quick for hotel booking.

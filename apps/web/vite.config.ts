@@ -177,5 +177,7 @@ function apiProxy() {
     '/.well-known': forward,
     // Signed download links, which an agent is handed and follows itself.
     '/files': forward,
+    // Calendar subscriptions, polled by whatever the address was pasted into.
+    '/calendar': forward,
   };
 }

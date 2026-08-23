@@ -116,6 +116,35 @@ export interface NewAgentClient {
   redirectUris: string[];
 }
 
+/**
+ * A subscription URL, the one time it can be read.
+ *
+ * Only the hash of the token was stored, so this is not something the server
+ * can be asked for again. Losing it means making another feed, which is cheap
+ * and is also how you stop sharing with one device without stopping the rest.
+ */
+export interface NewCalendarFeed {
+  id: string;
+  url: string;
+  /** The same address as `webcal:`, which a calendar client offers to open. */
+  webcalUrl: string;
+  label: string | null;
+  confirmedOnly: boolean;
+}
+
+/** A feed that exists, as the list shows it. */
+export interface CalendarFeed {
+  id: string;
+  label: string | null;
+  confirmedOnly: boolean;
+  createdAt: number;
+  createdBy: string;
+  createdByName: string;
+  /** Null until something has polled it, which is how you know it is live. */
+  lastFetchedAt: number | null;
+  fetchCount: number;
+}
+
 export const api = {
   listTrips: () => request<{ trips: TripSummary[] }>('/api/trips'),
 
@@ -178,6 +207,18 @@ export const api = {
 
   deleteTrip: (tripId: string) =>
     request<{ ok: true }>(`/api/trips/${tripId}`, { method: 'DELETE' }),
+
+  listCalendarFeeds: (tripId: string) =>
+    request<{ feeds: CalendarFeed[]; you: string }>(`/api/trips/${tripId}/calendar`),
+
+  createCalendarFeed: (tripId: string, feed: { label?: string; confirmedOnly: boolean }) =>
+    request<NewCalendarFeed>(`/api/trips/${tripId}/calendar`, {
+      method: 'POST',
+      body: JSON.stringify(feed),
+    }),
+
+  revokeCalendarFeed: (tripId: string, feedId: string) =>
+    request<{ ok: true }>(`/api/trips/${tripId}/calendar/${feedId}/revoke`, { method: 'POST' }),
 
   redeemShareLink: (token: string) =>
     request<{ tripId: string; role: string }>(`/api/share/${token}`, { method: 'POST' }),

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { Example } from '../stories/harness';
 import { AuditPanel } from './AuditPanel';
+import { CalendarFeeds } from './CalendarFeeds';
 import { SharePanel } from './SharePanel';
 import { SyncBadge } from './SyncBadge';
 import { UndoBar } from './UndoBar';
@@ -14,7 +15,8 @@ import type { TripState } from './TripStore';
  *
  * These are the parts that need a server, so they are drawn here against a
  * stubbed one — see `apps/web/src/stories/apiStub.ts`. Sharing shows three
- * links and three people; the log shows what an agent did four minutes ago.
+ * links and three people; the log shows what an agent did four minutes ago;
+ * the calendar addresses show one being polled and one nothing ever asked for.
  */
 const meta = {
   title: 'Panels/Trip',
@@ -33,6 +35,23 @@ export const Sharing: Story = {
     },
   },
   render: () => <SharePanel tripId="t_japan" onClose={() => {}} />,
+};
+
+/**
+ * The addresses a calendar app subscribes to, and whether anything is reading
+ * them.
+ *
+ * The last line of each row is the part worth looking at: a subscription is set
+ * up in another app and never reports back, so "not fetched yet" is the only
+ * thing that distinguishes an address that did not take from one on somebody's
+ * phone.
+ */
+export const CalendarSubscription: Story = {
+  render: () => (
+    <div className="max-w-2xl">
+      <CalendarFeeds tripId="t_japan" />
+    </div>
+  ),
 };
 
 /**

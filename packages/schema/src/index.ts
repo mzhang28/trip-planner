@@ -1,5 +1,6 @@
 export {
   authCredentials,
+  calendarFeeds,
   instanceSettings,
   sessions,
   shareLinks,
